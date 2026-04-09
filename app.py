@@ -81,8 +81,7 @@ def obtener_reservas():
     return eventos
 
 def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
-    c.execute("""
-    INSERT INTO reservas (nombre, barbero, servicio, precio, inicio, fin)
+    c.execute("""INSERT INTO reservas (nombre, barbero, servicio, precio, inicio, fin)
     VALUES (?, ?, ?, ?, ?, ?)
     """, (nombre, barbero, servicio, precio, inicio, fin))
     conn.commit()
