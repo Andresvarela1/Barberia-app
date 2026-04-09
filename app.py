@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
 import sqlite3
-st.write("VERSION NUEVA LOGIN"
+st.write("VERSION NUEVA LOGIN")
 st.set_page_config(layout="wide")
 
 # ------------------ BASE DE DATOS ------------------
