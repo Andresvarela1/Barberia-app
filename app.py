@@ -2,8 +2,15 @@ import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
 import sqlite3
+import logging
+from whatsapp import enviar_whatsapp as enviar_whatsapp_twilio
 
 st.set_page_config(layout="wide")
+
+logger = logging.getLogger("barberia_app")
+
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
 
 # ------------------ DB ------------------
 conn = sqlite3.connect("barberia_v2.db", check_same_thread=False)
@@ -18,6 +25,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
     rol TEXT
 )
 """)
+
+c.execute("PRAGMA table_info(usuarios)")
+usuarios_cols = {row[1] for row in c.fetchall()}
+if "telefono" not in usuarios_cols:
+    c.execute("ALTER TABLE usuarios ADD COLUMN telefono TEXT")
 
 # TABLA RESERVAS
 c.execute("""
@@ -49,9 +61,9 @@ barberos = {
 }
 
 servicios = {
-    "Corte": {"duracion": 45, "precio": 10000},
-    "Barba": {"duracion": 30, "precio": 7000},
-    "Corte + Barba": {"duracion": 60, "precio": 15000}
+    "Corte": {"duracion": 45, "precio": 15000},
+    "Barba": {"duracion": 30, "precio": 10000},
+    "Corte + Barba": {"duracion": 60, "precio": 20000}
 }
 
 # ------------------ FUNCIONES ------------------
@@ -60,9 +72,28 @@ def login(usuario, password):
     c.execute("SELECT * FROM usuarios WHERE usuario=? AND password=?", (usuario, password))
     return c.fetchone()
 
-def registrar(usuario, password, rol):
-    c.execute("INSERT INTO usuarios (usuario, password, rol) VALUES (?, ?, ?)", (usuario, password, rol))
+def registrar(usuario, password, rol, telefono=None):
+    c.execute(
+        "INSERT INTO usuarios (usuario, password, rol, telefono) VALUES (?, ?, ?, ?)",
+        (usuario, password, rol, telefono),
+    )
     conn.commit()
+
+
+def obtener_telefono_usuario(usuario):
+    c.execute("SELECT telefono FROM usuarios WHERE usuario=?", (usuario,))
+    row = c.fetchone()
+    return row[0] if row and row[0] else None
+
+
+def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
+    return (
+        f"Hola {nombre}, tu reserva fue confirmada.\n"
+        f"Fecha: {inicio.strftime('%d-%m-%Y')}\n"
+        f"Hora: {inicio.strftime('%H:%M')}\n"
+        f"Barbero: {barbero}\n"
+        f"Servicio: {servicio}"
+    )
 
 def obtener_reservas():
     c.execute("SELECT * FROM reservas")
@@ -125,9 +156,10 @@ if not st.session_state.user:
     elif opcion == "Registrarse (Cliente)":
         nuevo_user = st.text_input("Usuario cliente")
         nuevo_pass = st.text_input("Contraseña", type="password")
+        nuevo_tel = st.text_input("Telefono (+56912345678)")
 
         if st.button("Crear cuenta cliente"):
-            registrar(nuevo_user, nuevo_pass, "cliente")
+            registrar(nuevo_user, nuevo_pass, "cliente", nuevo_tel)
             st.success("Cliente creado")
 
 # ------------------ APP ------------------
@@ -188,6 +220,13 @@ else:
                 fin = inicio + timedelta(minutes=duracion)
 
                 guardar_reserva(nombre, barbero, servicio, precio, inicio.isoformat(), fin.isoformat())
+                telefono_cliente = user[4] if len(user) > 4 else obtener_telefono_usuario(usuario)
+                if telefono_cliente:
+                    mensaje = construir_mensaje_reserva(nombre, inicio, barbero, servicio)
+                    try:
+                        enviar_whatsapp_twilio(telefono_cliente, mensaje)
+                    except Exception as exc:
+                        logger.error("Error al ejecutar el envio de WhatsApp: %s", exc)
                 st.success("Reserva creada ✅")
 
         else:
