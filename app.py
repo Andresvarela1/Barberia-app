@@ -6,7 +6,7 @@ import sqlite3
 st.set_page_config(layout="wide")
 
 # ------------------ DB ------------------
-conn = sqlite3.connect("barberia.db", check_same_thread=False)
+conn = sqlite3.connect("barberia_v2.db", check_same_thread=False)
 c = conn.cursor()
 
 # TABLA USUARIOS
