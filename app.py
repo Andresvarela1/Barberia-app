@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
@@ -342,4 +342,4 @@ def enviar_whatsapp(numero, mensaje):
         from_='whatsapp:+14155238886',  # número sandbox
         to=f'whatsapp:{numero}'
     )
->>>>>>> 1dbeb6f (primer commit)
+
