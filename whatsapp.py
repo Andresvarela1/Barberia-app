@@ -1,32 +1,42 @@
 import logging
 import os
-
 from twilio.rest import Client
 
-
 logger = logging.getLogger(__name__)
-
 
 def enviar_whatsapp(numero, mensaje):
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
     whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
 
+    # Validar variables de entorno
     if not account_sid or not auth_token or not whatsapp_number:
-        logger.error(
-            "Faltan variables de entorno requeridas: "
-            "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y/o TWILIO_WHATSAPP_NUMBER."
-        )
+        print("❌ Faltan variables de entorno de Twilio")
         return False
+
+    # 🔥 EVITAR DOBLE "whatsapp:"
+    if not whatsapp_number.startswith("whatsapp:"):
+        whatsapp_number = f"whatsapp:{whatsapp_number}"
+
+    if not numero.startswith("whatsapp:"):
+        numero = f"whatsapp:{numero}"
 
     try:
         client = Client(account_sid, auth_token)
+
+        print("📲 Enviando WhatsApp...")
+        print("FROM:", whatsapp_number)
+        print("TO:", numero)
+
         client.messages.create(
-            from_=f"whatsapp:{whatsapp_number}",
+            from_=whatsapp_number,
             body=mensaje,
-            to=f"whatsapp:{numero}",
+            to=numero,
         )
+
+        print("✅ WhatsApp enviado correctamente")
         return True
-    except Exception as exc:
-        logger.error("Error al enviar WhatsApp: %s", exc)
+
+    except Exception as e:
+        print("❌ ERROR TWILIO:", e)
         return False
