@@ -2,10 +2,10 @@ import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
 import sqlite3
-st.write("VERSION NUEVA LOGIN")
+
 st.set_page_config(layout="wide")
 
-# ------------------ BASE DE DATOS ------------------
+# ------------------ DB ------------------
 conn = sqlite3.connect("barberia.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -34,13 +34,13 @@ CREATE TABLE IF NOT EXISTS reservas (
 
 conn.commit()
 
-# ------------------ USUARIO ADMIN POR DEFECTO ------------------
+# ADMIN POR DEFECTO
 c.execute("SELECT * FROM usuarios WHERE usuario='admin'")
 if not c.fetchone():
     c.execute("INSERT INTO usuarios (usuario, password, rol) VALUES ('admin','1234','admin')")
     conn.commit()
 
-# ------------------ BARBEROS ------------------
+# ------------------ DATOS ------------------
 barberos = {
     "Andrea": "#FF5733",
     "Andres": "#33C1FF",
@@ -48,11 +48,10 @@ barberos = {
     "Maikel": "#F333FF"
 }
 
-# ------------------ SERVICIOS ------------------
 servicios = {
-    "Corte": {"duracion": 45, "precio": 15000},
+    "Corte": {"duracion": 45, "precio": 10000},
     "Barba": {"duracion": 30, "precio": 7000},
-    "Corte + Barba": {"duracion": 60, "precio": 20000}
+    "Corte + Barba": {"duracion": 60, "precio": 15000}
 }
 
 # ------------------ FUNCIONES ------------------
@@ -69,6 +68,7 @@ def obtener_reservas():
     c.execute("SELECT * FROM reservas")
     data = c.fetchall()
     eventos = []
+
     for r in data:
         eventos.append({
             "id": r[0],
@@ -77,6 +77,7 @@ def obtener_reservas():
             "end": r[6],
             "color": barberos.get(r[2], "#999")
         })
+
     return eventos
 
 def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
@@ -86,19 +87,20 @@ def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
     """, (nombre, barbero, servicio, precio, inicio, fin))
     conn.commit()
 
-def eliminar_reserva(reserva_id):
-    c.execute("DELETE FROM reservas WHERE id=?", (reserva_id,))
-    conn.commit()
-
-# ------------------ LOGIN UI ------------------
+# ------------------ LOGIN ------------------
 
 if "user" not in st.session_state:
     st.session_state.user = None
 
 if not st.session_state.user:
+
     st.title("💈 Barbería Leveling")
 
-    opcion = st.radio("Opción", ["Iniciar sesión", "Registrarse (Barbero)"])
+    opcion = st.radio("Opción", [
+        "Iniciar sesión",
+        "Registrarse (Barbero)",
+        "Registrarse (Cliente)"
+    ])
 
     if opcion == "Iniciar sesión":
         usuario = st.text_input("Usuario")
@@ -114,14 +116,22 @@ if not st.session_state.user:
                 st.error("Datos incorrectos")
 
     elif opcion == "Registrarse (Barbero)":
-        nuevo_user = st.text_input("Nuevo usuario")
-        nuevo_pass = st.text_input("Nueva contraseña", type="password")
+        nuevo_user = st.text_input("Usuario barbero")
+        nuevo_pass = st.text_input("Contraseña", type="password")
 
-        if st.button("Crear cuenta"):
+        if st.button("Crear cuenta barbero"):
             registrar(nuevo_user, nuevo_pass, "barbero")
-            st.success("Barbero registrado")
+            st.success("Barbero creado")
 
-# ------------------ APP SEGÚN ROL ------------------
+    elif opcion == "Registrarse (Cliente)":
+        nuevo_user = st.text_input("Usuario cliente")
+        nuevo_pass = st.text_input("Contraseña", type="password")
+
+        if st.button("Crear cuenta cliente"):
+            registrar(nuevo_user, nuevo_pass, "cliente")
+            st.success("Cliente creado")
+
+# ------------------ APP ------------------
 
 else:
     user = st.session_state.user
@@ -136,22 +146,61 @@ else:
 
     eventos = obtener_reservas()
 
-    # ================== CLIENTE ==================
+    # ================= CLIENTE =================
     if rol == "cliente":
         st.title("📲 Reservar hora")
 
-        nombre = st.text_input("Nombre")
+        nombre = usuario
         barbero = st.selectbox("Barbero", list(barberos.keys()))
         servicio = st.selectbox("Servicio", list(servicios.keys()))
 
-        if st.button("Reservar"):
-            ahora = datetime.now()
-            fin = ahora + timedelta(minutes=servicios[servicio]["duracion"])
+        fecha = st.date_input("Selecciona día")
 
-            guardar_reserva(nombre, barbero, servicio, servicios[servicio]["precio"], ahora.isoformat(), fin.isoformat())
-            st.success("Reserva creada")
+        duracion = servicios[servicio]["duracion"]
+        precio = servicios[servicio]["precio"]
 
-    # ================== BARBERO ==================
+        horarios_disponibles = []
+        inicio_dia = datetime.combine(fecha, datetime.strptime("09:00", "%H:%M").time())
+
+        for i in range(24):
+            hora = inicio_dia + timedelta(minutes=15 * i)
+            fin = hora + timedelta(minutes=duracion)
+
+            if hora.hour >= 21:
+                break
+
+            c.execute("""
+            SELECT * FROM reservas 
+            WHERE barbero=? AND (? < fin AND ? > inicio)
+            """, (barbero, hora.isoformat(), fin.isoformat()))
+
+            if not c.fetchone():
+                horarios_disponibles.append(hora)
+
+        if horarios_disponibles:
+            hora_sel = st.selectbox(
+                "Horarios disponibles",
+                horarios_disponibles,
+                format_func=lambda x: x.strftime("%H:%M")
+            )
+
+            if st.button("Reservar"):
+                inicio = hora_sel
+                fin = inicio + timedelta(minutes=duracion)
+
+                guardar_reserva(nombre, barbero, servicio, precio, inicio.isoformat(), fin.isoformat())
+                st.success("Reserva creada ✅")
+
+        else:
+            st.warning("Sin horarios")
+
+        # VER SUS RESERVAS
+        st.subheader("📅 Mis reservas")
+        c.execute("SELECT * FROM reservas WHERE nombre=?", (nombre,))
+        for r in c.fetchall():
+            st.write(f"{r[3]} con {r[2]} el {r[5]}")
+
+    # ================= BARBERO =================
     elif rol == "barbero":
         st.title("✂️ Panel Barbero")
 
@@ -159,7 +208,7 @@ else:
 
         calendar(events=eventos_filtrados)
 
-        st.subheader("Bloquear horario")
+        st.subheader("🔒 Bloquear horario")
 
         inicio = st.datetime_input("Desde")
         fin = st.datetime_input("Hasta")
@@ -168,7 +217,7 @@ else:
             guardar_reserva("BLOQUEADO", usuario, "Bloqueo", 0, inicio.isoformat(), fin.isoformat())
             st.success("Bloqueado")
 
-    # ================== ADMIN ==================
+    # ================= ADMIN =================
     elif rol == "admin":
         st.title("💈 Panel Admin")
 
