@@ -81,6 +81,7 @@ if modo == "Cliente":
     nombre = st.text_input("Tu nombre")
     barbero = st.selectbox("Elige barbero", list(barberos.keys()))
     servicio = st.selectbox("Servicio", list(servicios.keys()))
+    telefono = st.text_input("Tu WhatsApp (ej: +56912345678)")
 
     duracion = servicios[servicio]["duracion"]
     precio = servicios[servicio]["precio"]
@@ -110,21 +111,41 @@ if modo == "Cliente":
         )
 
         if st.button("Reservar ahora"):
-            inicio = hora_seleccionada
-            fin = inicio + timedelta(minutes=duracion)
+            if not telefono:
+                st.error("Ingresa tu número de WhatsApp")
+            else:
+                inicio = hora_seleccionada
+                fin = inicio + timedelta(minutes=duracion)
 
-            guardar_reserva(
-                nombre,
-                barbero,
-                servicio,
-                precio,
-                inicio.isoformat(),
-                fin.isoformat()
-            )
+                guardar_reserva(
+                    nombre,
+                    barbero,
+                    servicio,
+                    precio,
+                    inicio.isoformat(),
+                    fin.isoformat()
+                )
 
-            st.success("✅ Reserva confirmada")
+                mensaje = f"""
+Hola {nombre} 👋
+
+Tu reserva está confirmada 💈
+
+📅 Fecha: {inicio.strftime("%d/%m/%Y")}
+⏰ Hora: {inicio.strftime("%H:%M")}
+💈 Barbero: {barbero}
+✂️ Servicio: {servicio}
+
+Te esperamos 🔥
+"""
+
+                enviar_whatsapp(telefono, mensaje)
+
+                st.success("✅ Reserva confirmada y enviada por WhatsApp")
+
     else:
         st.warning("❌ No hay horarios disponibles")
+
 
 # ================== MODO BARBERÍA ==================
 
@@ -298,6 +319,7 @@ Te esperamos 🔥
     st.success("✅ Reserva confirmada y enviada por WhatsApp")
 else:
     st.warning("❌ No hay horarios disponibles")
+    
 
 # ================== MODO BARBERÍA ==================
 
