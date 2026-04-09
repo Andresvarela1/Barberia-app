@@ -47,15 +47,18 @@ def obtener_reservas():
     c.execute("SELECT * FROM reservas")
     data = c.fetchall()
     eventos = []
+
     for r in data:
         eventos.append({
             "id": r[0],
             "title": f"{r[1]} - {r[3]} ({r[2]})",
             "start": r[5],
             "end": r[6],
-            "color": barberos[r[2]]
+            "color": barberos.get(r[2], "#999999")
         })
+
     return eventos
+
 
 def hay_conflicto(barbero, inicio, fin):
     c.execute("""
@@ -63,8 +66,9 @@ def hay_conflicto(barbero, inicio, fin):
     WHERE barbero=? 
     AND (? < fin AND ? > inicio)
     """, (barbero, inicio, fin))
-    
+
     return c.fetchone() is not None
+
 
 def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
     c.execute("""
@@ -73,10 +77,11 @@ def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
     """, (nombre, barbero, servicio, precio, inicio, fin))
     conn.commit()
 
+
 def enviar_whatsapp(numero, mensaje):
-    account_sid = "TU_SID"
-    auth_token = "TU_TOKEN"
-    
+    account_sid = "ACf57bce8040ff3d2f855f99cf92bfa936"
+    auth_token = "1790316f37081d770911d94b598d07f0"
+
     client = Client(account_sid, auth_token)
 
     client.messages.create(
@@ -140,35 +145,43 @@ if modo == "Cliente":
                 mensaje = f"""
 Hola {nombre} 👋
 
+Tu reserva está confirmada 💈
+
 📅 {inicio.strftime("%d/%m/%Y")}
 ⏰ {inicio.strftime("%H:%M")}
 💈 {barbero}
 ✂️ {servicio}
+
+Te esperamos 🔥
 """
 
                 enviar_whatsapp(telefono, mensaje)
-                st.success("✅ Reserva confirmada")
+
+                st.success("✅ Reserva confirmada y enviada por WhatsApp")
 
     else:
         st.warning("❌ No hay horarios disponibles")
+
 
 # ================== MODO BARBERÍA ==================
 elif modo == "Barbería":
     st.title("💈 Panel Barbería")
 
-    calendar_options = {
-        "initialView": "timeGridWeek",
-        "locale": "es",
-        "slotMinTime": "09:00:00",
-        "slotMaxTime": "21:00:00",
-        "allDaySlot": False,
-        "editable": True,
-        "selectable": True,
-    }
-
     eventos = obtener_reservas()
 
-    calendar(events=eventos, options=calendar_options)
+    calendar_result = calendar(
+        events=eventos,
+        options={
+            "initialView": "timeGridWeek",
+            "locale": "es",
+            "slotMinTime": "09:00:00",
+            "slotMaxTime": "21:00:00",
+            "allDaySlot": False,
+            "editable": True,
+            "selectable": True,
+        },
+        key="calendar"
+    )
 
     st.subheader("💰 Ingresos")
 
