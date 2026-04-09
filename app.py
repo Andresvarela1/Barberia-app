@@ -155,7 +155,7 @@ elif modo == "Barbería":
     total = c.fetchone()[0]
 
     st.metric("Total generado", f"${total if total else 0}")
-=======
+
 import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
