@@ -154,15 +154,15 @@ if not st.session_state.user:
             st.success("Barbero creado")
 
     elif opcion == "Registrarse (Cliente)":
-    st.subheader("Registro de cliente")
+        st.subheader("Registro de cliente")
 
-    nuevo_user = st.text_input("Usuario cliente")
-    nuevo_pass = st.text_input("Contraseña", type="password")
-    telefono = st.text_input("WhatsApp (+569XXXXXXXX)")
+        nuevo_user = st.text_input("Usuario cliente")
+        nuevo_pass = st.text_input("Contraseña", type="password")
+        telefono = st.text_input("WhatsApp (+569XXXXXXXX)")
 
-    if st.button("Crear cuenta cliente"):
-        if not telefono.startswith("+"):
-            st.error("El número debe incluir código país, ej: +569...")
+        if st.button("Crear cuenta cliente"):
+            if not telefono.startswith("+") or len(telefono) < 10:
+                st.error("Número inválido. Usa formato +569XXXXXXXX")
         else:
             registrar(nuevo_user, nuevo_pass, "cliente", telefono)
             st.success("Cliente creado con teléfono 📲")
