@@ -296,7 +296,6 @@ Te esperamos 🔥
     enviar_whatsapp(telefono, mensaje)
 
     st.success("✅ Reserva confirmada y enviada por WhatsApp")
-    else:
         st.warning("❌ No hay horarios disponibles")
 
 # ================== MODO BARBERÍA ==================
