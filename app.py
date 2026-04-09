@@ -163,9 +163,9 @@ if not st.session_state.user:
         if st.button("Crear cuenta cliente"):
             if not telefono.startswith("+") or len(telefono) < 10:
                 st.error("Número inválido. Usa formato +569XXXXXXXX")
-        else:
-            registrar(nuevo_user, nuevo_pass, "cliente", telefono)
-            st.success("Cliente creado con teléfono 📲")
+            else:
+                registrar(nuevo_user, nuevo_pass, "cliente", telefono)
+                st.success("Cliente creado con teléfono 📲")
 
 # ------------------ APP ------------------
 
