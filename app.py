@@ -74,7 +74,6 @@ def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
     conn.commit()
 
 # ================== MODO CLIENTE ==================
-
 if modo == "Cliente":
     st.title("📲 Reserva tu turno")
 
@@ -142,13 +141,11 @@ Te esperamos 🔥
                 enviar_whatsapp(telefono, mensaje)
 
                 st.success("✅ Reserva confirmada y enviada por WhatsApp")
-
     else:
         st.warning("❌ No hay horarios disponibles")
 
 
 # ================== MODO BARBERÍA ==================
-
 elif modo == "Barbería":
     st.title("💈 Panel Barbería")
 
