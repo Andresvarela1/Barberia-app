@@ -18,12 +18,9 @@ def get_database_url():
     return os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL")
 
 
-@st.cache_resource
 def get_connection():
-    database_url = get_database_url()
-    if not database_url:
-        raise RuntimeError("Falta DATABASE_URL o SUPABASE_DB_URL para conectar PostgreSQL.")
-    return psycopg2.connect(database_url)
+    database_url = os.getenv("DATABASE_URL")
+    return psycopg2.connect(database_url, sslmode="require")
 
 
 conn = get_connection()
