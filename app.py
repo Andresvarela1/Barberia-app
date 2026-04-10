@@ -1,10 +1,9 @@
 import streamlit as st
 from streamlit_calendar import calendar
 from datetime import datetime, timedelta
-import sqlite3
 import logging
 import os
-from pathlib import Path
+import psycopg2
 from whatsapp import enviar_whatsapp as enviar_whatsapp_twilio
 st.write("SUPABASE ACTIVADO")
 st.set_page_config(layout="wide")
@@ -15,60 +14,28 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
 # ------------------ DB ------------------
-def get_db_path():
-    configured_path = os.getenv("BARBERIA_DB_PATH")
-    if configured_path:
-        db_path = Path(configured_path).expanduser()
-    else:
-        db_path = Path.home() / ".streamlit" / "barberia_v2.db"
-
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    return db_path
+def get_database_url():
+    return os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL")
 
 
 @st.cache_resource
 def get_connection():
-    return sqlite3.connect(str(get_db_path()), check_same_thread=False)
+    database_url = get_database_url()
+    if not database_url:
+        raise RuntimeError("Falta DATABASE_URL o SUPABASE_DB_URL para conectar PostgreSQL.")
+    return psycopg2.connect(database_url)
 
 
 conn = get_connection()
 c = conn.cursor()
 
-# TABLA USUARIOS
-c.execute("""
-CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario TEXT,
-    password TEXT,
-    rol TEXT
-)
-""")
+def get_default_barberia_id():
+    c.execute("SELECT id FROM barberias ORDER BY id LIMIT 1")
+    row = c.fetchone()
+    return row[0] if row else None
 
-c.execute("PRAGMA table_info(usuarios)")
-usuarios_cols = {row[1] for row in c.fetchall()}
-if "telefono" not in usuarios_cols:
-    c.execute("ALTER TABLE usuarios ADD COLUMN telefono TEXT")
 
-# TABLA RESERVAS
-c.execute("""
-CREATE TABLE IF NOT EXISTS reservas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT,
-    barbero TEXT,
-    servicio TEXT,
-    precio INTEGER,
-    inicio TEXT,
-    fin TEXT
-)
-""")
-
-conn.commit()
-
-# ADMIN POR DEFECTO
-c.execute("SELECT * FROM usuarios WHERE usuario='admin'")
-if not c.fetchone():
-    c.execute("INSERT INTO usuarios (usuario, password, rol) VALUES ('admin','1234','admin')")
-    conn.commit()
+default_barberia_id = get_default_barberia_id()
 
 # ------------------ DATOS ------------------
 barberos = {
@@ -87,21 +54,63 @@ servicios = {
 # ------------------ FUNCIONES ------------------
 
 def login(usuario, password):
-    c.execute("SELECT * FROM usuarios WHERE usuario=? AND password=?", (usuario, password))
+    c.execute("SELECT * FROM usuarios WHERE usuario=%s AND password=%s", (usuario, password))
     return c.fetchone()
 
-def registrar(usuario, password, rol, telefono=None):
+def registrar(usuario, password, rol, telefono=None, barberia_id=None):
+    barberia_id = barberia_id or default_barberia_id
     c.execute(
-        "INSERT INTO usuarios (usuario, password, rol, telefono) VALUES (?, ?, ?, ?)",
-        (usuario, password, rol, telefono),
+        "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id) VALUES (%s, %s, %s, %s, %s)",
+        (usuario, password, rol, telefono, barberia_id),
     )
     conn.commit()
 
 
 def obtener_telefono_usuario(usuario):
-    c.execute("SELECT telefono FROM usuarios WHERE usuario=?", (usuario,))
+    c.execute("SELECT telefono FROM usuarios WHERE usuario=%s", (usuario,))
     row = c.fetchone()
     return row[0] if row and row[0] else None
+
+
+def registrar_fidelizacion(usuario, barberia_id):
+    c.execute(
+        """
+        UPDATE usuarios
+        SET cortes_acumulados = COALESCE(cortes_acumulados, 0) + 1
+        WHERE usuario = %s AND barberia_id = %s
+        RETURNING cortes_acumulados
+        """,
+        (usuario, barberia_id),
+    )
+    row = c.fetchone()
+    conn.commit()
+    return row[0] if row else None
+
+
+def procesar_beneficio_fidelizacion(usuario, barberia_id):
+    cortes_acumulados = registrar_fidelizacion(usuario, barberia_id)
+    if cortes_acumulados is None or cortes_acumulados < 5:
+        return
+
+    c.execute(
+        """
+        UPDATE usuarios
+        SET cortes_acumulados = 0
+        WHERE usuario = %s AND barberia_id = %s
+        """,
+        (usuario, barberia_id),
+    )
+    conn.commit()
+
+    telefono_cliente = obtener_telefono_usuario(usuario)
+    if telefono_cliente:
+        try:
+            enviar_whatsapp_twilio(
+                telefono_cliente,
+                "🔥 ¡Tienes un descuento en tu próximo corte!",
+            )
+        except Exception as exc:
+            logger.error("Error al enviar beneficio de fidelizacion: %s", exc)
 
 
 def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
@@ -114,7 +123,14 @@ def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
     )
 
 def obtener_reservas():
-    c.execute("SELECT * FROM reservas")
+    barberia_id = st.session_state.get("barberia_id")
+    if not barberia_id:
+        return []
+
+    c.execute(
+        "SELECT * FROM reservas WHERE barberia_id = %s",
+        (barberia_id,),
+    )
     data = c.fetchall()
     eventos = []
 
@@ -130,15 +146,25 @@ def obtener_reservas():
     return eventos
 
 def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
-    c.execute("""INSERT INTO reservas (nombre, barbero, servicio, precio, inicio, fin)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (nombre, barbero, servicio, precio, inicio, fin))
+    barberia_id = st.session_state.get("barberia_id")
+    if not barberia_id:
+        return
+
+    c.execute(
+        """
+        INSERT INTO reservas (nombre, barbero, servicio, precio, inicio, fin, barberia_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (nombre, barbero, servicio, precio, inicio, fin, barberia_id),
+    )
     conn.commit()
 
 # ------------------ LOGIN ------------------
 
 if "user" not in st.session_state:
     st.session_state.user = None
+if "barberia_id" not in st.session_state:
+    st.session_state.barberia_id = None
 
 if not st.session_state.user:
 
@@ -158,6 +184,7 @@ if not st.session_state.user:
             user = login(usuario, password)
             if user:
                 st.session_state.user = user
+                st.session_state.barberia_id = user[5] if len(user) > 5 else None
                 st.success("Bienvenido 🔥")
                 st.rerun()
             else:
@@ -191,17 +218,23 @@ else:
     user = st.session_state.user
     rol = user[3]
     usuario = user[1]
+    barberia_id = st.session_state.get("barberia_id")
 
     st.sidebar.write(f"👤 {usuario} ({rol})")
 
     if st.sidebar.button("Cerrar sesión"):
         st.session_state.user = None
+        st.session_state.barberia_id = None
         st.rerun()
 
     eventos = obtener_reservas()
 
     # ================= CLIENTE =================
     if rol == "cliente":
+        if not barberia_id:
+            st.warning("No hay barberia asociada a la sesión.")
+            st.stop()
+
         st.title("📲 Reservar hora")
 
         nombre = usuario
@@ -223,10 +256,13 @@ else:
             if hora.hour >= 21:
                 break
 
-            c.execute("""
-            SELECT * FROM reservas 
-            WHERE barbero=? AND (? < fin AND ? > inicio)
-            """, (barbero, hora.isoformat(), fin.isoformat()))
+            c.execute(
+                """
+                SELECT * FROM reservas
+                WHERE barberia_id = %s AND barbero = %s AND (%s < fin AND %s > inicio)
+                """,
+                (barberia_id, barbero, hora.isoformat(), fin.isoformat()),
+            )
 
             if not c.fetchone():
                 horarios_disponibles.append(hora)
@@ -243,6 +279,7 @@ else:
                 fin = inicio + timedelta(minutes=duracion)
 
                 guardar_reserva(nombre, barbero, servicio, precio, inicio.isoformat(), fin.isoformat())
+                procesar_beneficio_fidelizacion(usuario, barberia_id)
                 telefono_cliente = user[4] if len(user) > 4 else obtener_telefono_usuario(usuario)
                 if telefono_cliente:
                     mensaje = construir_mensaje_reserva(nombre, inicio, barbero, servicio)
@@ -257,12 +294,19 @@ else:
 
         # VER SUS RESERVAS
         st.subheader("📅 Mis reservas")
-        c.execute("SELECT * FROM reservas WHERE nombre=?", (nombre,))
+        c.execute(
+            "SELECT * FROM reservas WHERE barberia_id = %s AND nombre = %s",
+            (barberia_id, nombre),
+        )
         for r in c.fetchall():
             st.write(f"{r[3]} con {r[2]} el {r[5]}")
 
     # ================= BARBERO =================
     elif rol == "barbero":
+        if not barberia_id:
+            st.warning("No hay barberia asociada a la sesión.")
+            st.stop()
+
         st.title("✂️ Panel Barbero")
 
         eventos_filtrados = [e for e in eventos if usuario in e["title"]]
@@ -280,13 +324,20 @@ else:
 
     # ================= ADMIN =================
     elif rol == "admin":
+        if not barberia_id:
+            st.warning("No hay barberia asociada a la sesión.")
+            st.stop()
+
         st.title("💈 Panel Admin")
 
         calendar(events=eventos)
 
         st.subheader("💰 Ingresos")
 
-        c.execute("SELECT SUM(precio) FROM reservas")
+        c.execute(
+            "SELECT SUM(precio) FROM reservas WHERE barberia_id = %s",
+            (barberia_id,),
+        )
         total = c.fetchone()[0]
 
         st.metric("Total generado", f"${total if total else 0}")
