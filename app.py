@@ -4,35 +4,44 @@ from datetime import datetime, timedelta
 import logging
 import os
 import psycopg2
-from whatsapp import enviar_whatsapp as enviar_whatsapp_twilio
-st.write("SUPABASE ACTIVADO")
+
 st.set_page_config(layout="wide")
 
+# ------------------ LOGGER ------------------
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("barberia_app")
 
-if not logger.handlers:
-    logging.basicConfig(level=logging.INFO)
-
 # ------------------ DB ------------------
-def get_database_url():
-    return os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL")
-
-
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
+    
+    if not database_url:
+        st.error("❌ DATABASE_URL no configurada")
+        st.stop()
+        
     return psycopg2.connect(database_url, sslmode="require")
 
-
-conn = get_connection()
-c = conn.cursor()
-
-def get_default_barberia_id():
-    c.execute("SELECT id FROM barberias ORDER BY id LIMIT 1")
-    row = c.fetchone()
-    return row[0] if row else None
-
-
-default_barberia_id = get_default_barberia_id()
+def run_query(query, params=None, fetch=False):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(query, params)
+        
+        if fetch:
+            data = cur.fetchall()
+        else:
+            data = None
+            
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return data
+        
+    except Exception as e:
+        logger.error(e)
+        st.error("Error en base de datos")
+        return None
 
 # ------------------ DATOS ------------------
 barberos = {
