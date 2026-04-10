@@ -1,6 +1,5 @@
 import logging
 import os
-from twilio.rest import Client
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,7 @@ def enviar_whatsapp(numero, mensaje):
         numero = f"whatsapp:{numero}"
 
     try:
+        from twilio.rest import Client
         client = Client(account_sid, auth_token)
 
         print("📲 Enviando WhatsApp...")
@@ -37,6 +37,9 @@ def enviar_whatsapp(numero, mensaje):
         print("✅ WhatsApp enviado correctamente")
         return True
 
+    except ImportError:
+        logger.error("Twilio no esta instalado en este entorno.")
+        return False
     except Exception as e:
         print("❌ ERROR TWILIO:", e)
         return False

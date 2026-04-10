@@ -3,6 +3,8 @@ from streamlit_calendar import calendar
 from datetime import datetime, timedelta
 import sqlite3
 import logging
+import os
+from pathlib import Path
 from whatsapp import enviar_whatsapp as enviar_whatsapp_twilio
 
 st.set_page_config(layout="wide")
@@ -13,7 +15,23 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
 # ------------------ DB ------------------
-conn = sqlite3.connect("barberia_v2.db", check_same_thread=False)
+def get_db_path():
+    configured_path = os.getenv("BARBERIA_DB_PATH")
+    if configured_path:
+        db_path = Path(configured_path).expanduser()
+    else:
+        db_path = Path.home() / ".streamlit" / "barberia_v2.db"
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return db_path
+
+
+@st.cache_resource
+def get_connection():
+    return sqlite3.connect(str(get_db_path()), check_same_thread=False)
+
+
+conn = get_connection()
 c = conn.cursor()
 
 # TABLA USUARIOS
