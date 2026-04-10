@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 from whatsapp import enviar_whatsapp as enviar_whatsapp_twilio
-
+st.write("SUPABASE ACTIVADO")
 st.set_page_config(layout="wide")
 
 logger = logging.getLogger("barberia_app")
