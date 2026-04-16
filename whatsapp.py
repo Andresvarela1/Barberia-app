@@ -8,12 +8,13 @@ def enviar_whatsapp(numero, mensaje):
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
     whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
 
-    # Validar variables de entorno
     if not account_sid or not auth_token or not whatsapp_number:
-        print("❌ Faltan variables de entorno de Twilio")
+        logger.error(
+            "Faltan variables de entorno de Twilio: "
+            "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y/o TWILIO_WHATSAPP_NUMBER"
+        )
         return False
 
-    # 🔥 EVITAR DOBLE "whatsapp:"
     if not whatsapp_number.startswith("whatsapp:"):
         whatsapp_number = f"whatsapp:{whatsapp_number}"
 
@@ -24,9 +25,7 @@ def enviar_whatsapp(numero, mensaje):
         from twilio.rest import Client
         client = Client(account_sid, auth_token)
 
-        print("📲 Enviando WhatsApp...")
-        print("FROM:", whatsapp_number)
-        print("TO:", numero)
+        logger.info("Enviando WhatsApp desde %s hacia %s", whatsapp_number, numero)
 
         client.messages.create(
             from_=whatsapp_number,
@@ -34,12 +33,12 @@ def enviar_whatsapp(numero, mensaje):
             to=numero,
         )
 
-        print("✅ WhatsApp enviado correctamente")
+        logger.info("WhatsApp enviado correctamente")
         return True
 
     except ImportError:
         logger.error("Twilio no esta instalado en este entorno.")
         return False
     except Exception as e:
-        print("❌ ERROR TWILIO:", e)
+        logger.exception("Error Twilio: %s", e)
         return False
