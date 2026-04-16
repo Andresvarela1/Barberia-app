@@ -139,16 +139,30 @@ def login(usuario, password):
             user = (user[0], user[1], nuevo_hash, user[3], user[4], user[5], user[6])
 
     return user
+def crear_barberia_por_defecto():
+    c.execute("SELECT id FROM barberias LIMIT 1")
+    row = c.fetchone()
+
+    if not row:
+        c.execute("INSERT INTO barberias (nombre) VALUES (%s) RETURNING id", ("Barbería Principal",))
+        conn.commit()
+        return c.fetchone()[0]
+
+    return row[0]
+
+default_barberia_id = crear_barberia_por_defecto()
 
 def registrar(usuario, password, rol, telefono=None, barberia_id=None):
-    usuario = normalizar_texto(usuario)
-    password = normalizar_texto(password)
-    rol = normalizar_texto(rol)
-    telefono = normalizar_texto(telefono) or None
+    barberia_id = barberia_id or default_barberia_id
 
-    if not usuario or not password or not rol:
-        st.error("Usuario, contraseña y rol son obligatorios.")
-        return False
+    if not barberia_id:
+        raise Exception("No existe barbería disponible")
+
+    c.execute(
+        "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id) VALUES (%s, %s, %s, %s, %s)",
+        (usuario, password, rol, telefono, barberia_id),
+    )
+    conn.commit()
 
     barberia_id = barberia_id or get_default_barberia_id()
     if not barberia_id:
