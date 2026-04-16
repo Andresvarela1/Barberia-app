@@ -140,15 +140,18 @@ def login(usuario, password):
 
     return user
 def crear_barberia_por_defecto():
-    c.execute("SELECT id FROM barberias LIMIT 1")
-    row = c.fetchone()
+    data = run_query("SELECT id FROM barberias LIMIT 1", fetch=True)
 
-    if not row:
-        c.execute("INSERT INTO barberias (nombre) VALUES (%s) RETURNING id", ("Barbería Principal",))
-        conn.commit()
-        return c.fetchone()[0]
+    if data:
+        return data[0][0]
 
-    return row[0]
+    result = run_query(
+        "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
+        ("Barbería Principal",),
+        fetch=True
+    )
+
+    return result[0][0] if result else None
 
 default_barberia_id = crear_barberia_por_defecto()
 
