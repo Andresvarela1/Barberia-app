@@ -79,7 +79,7 @@ servicios = {
     "Corte": {"duracion": 45, "precio": 15000},
     "Barba": {"duracion": 30, "precio": 10000},
     "Corte + Barba": {"duracion": 60, "precio": 20000}
-}
+
 
 # ------------------ FUNCIONES ------------------
 
@@ -140,34 +140,24 @@ def login(usuario, password):
 
     return user
 def crear_barberia_por_defecto():
-    data = run_query("SELECT id FROM barberias LIMIT 1", fetch=True)
+    data = fetch_one("SELECT id FROM barberias LIMIT 1")
 
     if data:
-        return data[0][0]
+        return data[0]
 
-    result = run_query(
+    result = execute_write(
         "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
         ("Barbería Principal",),
-        fetch=True
+        fetch_one_result=True
     )
 
-    return result[0][0] if result else None
+    return result[0] if result else None
 
 default_barberia_id = crear_barberia_por_defecto()
 
 def registrar(usuario, password, rol, telefono=None, barberia_id=None):
     barberia_id = barberia_id or default_barberia_id
 
-    if not barberia_id:
-        raise Exception("No existe barbería disponible")
-
-    c.execute(
-        "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id) VALUES (%s, %s, %s, %s, %s)",
-        (usuario, password, rol, telefono, barberia_id),
-    )
-    conn.commit()
-
-    barberia_id = barberia_id or get_default_barberia_id()
     if not barberia_id:
         st.error("No hay barbería configurada para registrar usuarios.")
         return False
