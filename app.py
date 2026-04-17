@@ -79,7 +79,7 @@ servicios = {
     "Corte": {"duracion": 45, "precio": 15000},
     "Barba": {"duracion": 30, "precio": 10000},
     "Corte + Barba": {"duracion": 60, "precio": 20000}
-
+}
 
 # ------------------ FUNCIONES ------------------
 
