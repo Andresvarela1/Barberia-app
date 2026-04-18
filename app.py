@@ -189,6 +189,7 @@ def ensure_database_tables():
             return
 
         with conn.cursor() as cur:
+            # 1. barberias table
             try:
                 cur.execute(
                     """
@@ -206,17 +207,18 @@ def ensure_database_tables():
                 logger.error(f"Error creando tabla 'barberias': {e}")
                 st.error(f"Error creando tabla 'barberias': {e}")
 
+            # 2. usuarios table
             try:
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS usuarios (
                         id SERIAL PRIMARY KEY,
-                        usuario TEXT NOT NULL UNIQUE,
+                        usuario TEXT NOT NULL,
                         password TEXT NOT NULL,
                         rol TEXT NOT NULL,
                         telefono TEXT,
                         cortes_acumulados INTEGER NOT NULL DEFAULT 0,
-                        barberia_id INTEGER NOT NULL,
+                        barberia_id INTEGER,
                         CONSTRAINT fk_usuarios_barberia
                             FOREIGN KEY (barberia_id)
                             REFERENCES barberias(id)
@@ -259,6 +261,7 @@ def ensure_database_tables():
                 logger.error(f"Error creando restricción UNIQUE en 'usuario': {e}")
                 st.error(f"Error creando restricción UNIQUE en 'usuario': {e}")
 
+            # Index on usuarios
             try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_barberia ON usuarios(barberia_id);")
                 conn.commit()
@@ -269,6 +272,7 @@ def ensure_database_tables():
                 logger.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
                 st.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
 
+            # 3. reservas table
             try:
                 cur.execute(
                     """
@@ -296,6 +300,7 @@ def ensure_database_tables():
                 logger.error(f"Error creando tabla 'reservas': {e}")
                 st.error(f"Error creando tabla 'reservas': {e}")
 
+            # Index on reservas
             try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barberia ON reservas(barberia_id);")
                 conn.commit()
@@ -306,47 +311,27 @@ def ensure_database_tables():
                 logger.error(f"Error creando índice 'idx_reservas_barberia': {e}")
                 st.error(f"Error creando índice 'idx_reservas_barberia': {e}")
 
-            # Optional extra columns for compatibility with alternative schemas.
+            # Optional columns
             try:
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente TEXT;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS fecha DATE;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora TIME;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
-                conn.commit()
-                logger.info("✅ Columnas opcionales en 'reservas' añadidas o ya existen")
-            except Exception as e:
-                conn.rollback()
-                all_ok = False
-                logger.error(f"Error alterando tabla 'reservas' (cliente/fecha/hora/estado): {e}")
-                st.error(f"Error alterando tabla 'reservas' (cliente/fecha/hora/estado): {e}")
-
-            try:
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
                 cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
                 conn.commit()
-                logger.info("✅ Columnas 'pagado' y 'monto' en 'reservas' añadidas o actualizadas")
+                logger.info("✅ Columnas opcionales en 'reservas' añadidas o actualizadas")
             except Exception as e:
                 conn.rollback()
                 all_ok = False
-                logger.error(f"Error alterando tabla 'reservas' (pagado/monto): {e}")
-                st.error(f"Error alterando tabla 'reservas' (pagado/monto): {e}")
-
-            # Make barberia_id nullable for SUPER_ADMIN
-            try:
-                cur.execute(
-                    "ALTER TABLE usuarios ALTER COLUMN barberia_id DROP NOT NULL;"
-                )
-                conn.commit()
-                logger.info("✅ barberia_id hecho nullable")
-            except Exception as e:
-                conn.rollback()
-                logger.warning(f"⚠️ No se pudo hacer barberia_id nullable (puede estar bien si ya lo es): {e}")
+                logger.error(f"Error alterando tabla 'reservas': {e}")
+                st.error(f"Error alterando tabla 'reservas': {e}")
 
         if all_ok:
-            conn.commit()
+            logger.info("✅ Todas las tablas y restricciones creadas correctamente")
         else:
-            conn.rollback()
+            logger.warning("⚠️ Algunas operaciones de base de datos fallaron")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -618,10 +603,6 @@ def seed_default_data():
         return False
 
     conn = None
-    super_admin_created = False
-    seed_failed = False
-    error_message = ""
-    
     try:
         conn = get_connection(notify_missing_url=False)
         if conn is None:
@@ -629,145 +610,77 @@ def seed_default_data():
             return False
 
         with conn.cursor() as cur:
-            # 0. ASEGURAR QUE barberia_id ES NULLABLE para SUPER_ADMIN
-            logger.info("📝 Asegurando que barberia_id sea nullable...")
-            try:
-                cur.execute("ALTER TABLE usuarios ALTER COLUMN barberia_id DROP NOT NULL;")
-                logger.info("✅ barberia_id es nullable")
-            except Exception as e:
-                logger.warning(f"⚠️ No se pudo hacer barberia_id nullable (puede estar bien si ya lo es): {e}")
-            
             # 1. Crear barbería Leveling si no existe
             logger.info("📝 Verificando si barbería 'Barberia Leveling' existe...")
             cur.execute("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
             barberia_row = cur.fetchone()
-            
+
             if barberia_row:
                 bid = barberia_row[0]
                 logger.info(f"✅ Barbería Leveling ya existe (ID: {bid})")
             else:
                 logger.info("⚠️ Barbería Leveling NO existe - creando...")
-                try:
-                    cur.execute(
-                        "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
-                        ("Barberia Leveling",),
-                    )
-                    new_bid = cur.fetchone()
-                    if new_bid:
-                        bid = new_bid[0]
-                        logger.info(f"✅ Barbería Leveling creada con ID: {bid}")
-                    else:
-                        logger.error("❌ No se pudo obtener ID de barbería recién creada")
-                        conn.commit()
-                        return False
-                except Exception as e:
-                    error_message = str(e)
-                    logger.error(f"❌ Error creando barbería: {error_message}")
-                    st.sidebar.error(f"❌ DB Error (Barbería): {error_message}")
-                    conn.rollback()
-                    seed_failed = True
-                    raise
+                cur.execute(
+                    "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
+                    ("Barberia Leveling",),
+                )
+                barberia_row = cur.fetchone()
+                if barberia_row and barberia_row[0]:
+                    bid = barberia_row[0]
+                    logger.info(f"✅ Barbería Leveling creada con ID: {bid}")
+                else:
+                    raise Exception("No se pudo crear la barbería por defecto")
 
             # 2. Crear SUPER_ADMIN si no existe
             logger.info("📝 Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...")
             cur.execute("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
             super_admin_row = cur.fetchone()
-            
+
             if super_admin_row:
                 logger.info(f"✅ SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: {super_admin_row[0]})")
             else:
                 logger.info("⚠️ SUPER_ADMIN 'JoanBeatsAD' NO existe - creando...")
-                try:
-                    super_admin_hash = hash_password("suguha09")
-                    logger.info(f"📝 Hash generado: {super_admin_hash[:30]}...")
-                    
-                    # Insertar con barberia_id = NULL
-                    cur.execute(
-                        """
-                        INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        ("JoanBeatsAD", super_admin_hash, "SUPER_ADMIN", None, None, 0),
-                    )
-                    logger.info("✅ INSERT SUPER_ADMIN ejecutado - esperando commit...")
-                    super_admin_created = True
-                    
-                except Exception as insert_err:
-                    error_message = str(insert_err)
-                    logger.error(f"❌ Error en INSERT SUPER_ADMIN: {error_message}")
-                    logger.exception("Stack trace completo:")
-                    
-                    # Mostrar en Streamlit para visibilidad inmediata
-                    st.sidebar.error(f"❌ DB Error (SUPER_ADMIN): {error_message}")
-                    
-                    conn.rollback()
-                    seed_failed = True
-                    raise
+                password_hash = hash_password("suguha09")
+                cur.execute(
+                    "INSERT INTO usuarios (usuario, password, rol, barberia_id) VALUES (%s, %s, %s, %s)",
+                    ("JoanBeatsAD", password_hash, "SUPER_ADMIN", None),
+                )
+                logger.info("✅ INSERT SUPER_ADMIN ejecutado")
 
             # 3. Crear barberos si no existen
             logger.info("📝 Verificando barberos...")
             pwd_barb = hash_password("barbero123")
-            
             for bu in ("Yor", "Andres", "Andrea", "Maikel"):
                 cur.execute("SELECT id FROM usuarios WHERE usuario = %s", (bu,))
                 if cur.fetchone():
                     logger.info(f"✅ Barbero '{bu}' ya existe")
                     continue
-                
-                try:
-                    cur.execute(
-                        """
-                        INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (bu, pwd_barb, "BARBERO", None, bid, 0),
-                    )
-                    logger.info(f"✅ Barbero '{bu}' creado")
-                except Exception as e:
-                    error_message = str(e)
-                    logger.error(f"❌ Error creando barbero '{bu}': {error_message}")
-                    st.sidebar.error(f"❌ DB Error ({bu}): {error_message}")
-                    conn.rollback()
-                    seed_failed = True
-                    raise
+
+                cur.execute(
+                    "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (bu, pwd_barb, "BARBERO", None, bid, 0),
+                )
+                logger.info(f"✅ Barbero '{bu}' creado")
 
         conn.commit()
         logger.info("✅ Commit exitoso - verificando SUPER_ADMIN...")
-        
-        # 4. POST-INSERT VERIFICATION: Verificar que SUPER_ADMIN fue creado realmente
-        conn_verify = None
+
         try:
-            conn_verify = get_connection(notify_missing_url=False)
-            if conn_verify:
-                with conn_verify.cursor() as cur_verify:
-                    cur_verify.execute("SELECT id, usuario, rol FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
-                    verify_row = cur_verify.fetchone()
-                    if verify_row:
-                        logger.info(f"✅ VERIFICACIÓN EXITOSA: SUPER_ADMIN 'JoanBeatsAD' confirmado en BD (ID: {verify_row[0]}, Rol: {verify_row[2]})")
-                    else:
-                        logger.error("❌ VERIFICACIÓN FALLIDA: SUPER_ADMIN 'JoanBeatsAD' NO encontrado después del commit")
-                        st.sidebar.error("❌ SUPER_ADMIN creation failed - user not found after insert")
-                        seed_failed = True
-        except Exception as e:
-            logger.error(f"❌ Error en post-verificación: {str(e)}")
-            st.sidebar.error(f"❌ Verification Error: {str(e)}")
-            seed_failed = True
-        finally:
-            if conn_verify:
-                conn_verify.close()
-        
-        if not seed_failed:
-            logger.info("✅ seed_default_data() completado exitosamente")
-            return super_admin_created
-        else:
+            user_check = fetch_one("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
+            if user_check:
+                logger.info("✅ SUPER_ADMIN listo en la base de datos")
+                return True
+            st.sidebar.error("SUPER_ADMIN no se pudo crear")
             return False
-        
+        except Exception as e:
+            st.sidebar.error(f"Seed error: {str(e)}")
+            return False
+
     except Exception as e:
         if conn:
             conn.rollback()
-        error_message = str(e)
-        logger.exception(f"❌ Error fatal en seed_default_data: {error_message}")
-        st.sidebar.error(f"❌ Seed Fatal Error: {error_message}")
+        logger.exception("❌ Error en seed_default_data")
+        st.sidebar.error(f"Seed error: {str(e)}")
         return False
     finally:
         if conn:
@@ -777,11 +690,11 @@ def seed_default_data():
 try:
     ensure_database_tables()
     
-    st.sidebar.write("🔄 Running seed_default_data()...")
+    st.sidebar.write("Running seed...")
     seed_result = seed_default_data()
     
     if seed_result:
-        st.sidebar.success("✅ SUPER_ADMIN 'JoanBeatsAD' listo y verificado")
+        st.sidebar.success("SUPER_ADMIN listo")
     elif seed_result is False:
         st.sidebar.error("❌ Seed falló - SUPER_ADMIN NO garantizado")
     
