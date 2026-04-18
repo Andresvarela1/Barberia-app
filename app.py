@@ -1342,26 +1342,47 @@ def mostrar_reservas_dataframe(rows):
         st.info("📭 No hay reservas para mostrar.")
         return
 
-    display = []
-    for r in rows:
-        fecha_str = str(r[3]) if r[3] is not None else ""
-        hora_str = str(r[4]) if r[4] is not None else ""
-        cliente = r[5] or r[6]
-        monto = r[11] if len(r) > 11 else r[8]
-        pagado = "✅ Pagado" if (len(r) > 10 and r[10]) else "⏳ Pendiente"
-        
-        display.append({
-            "🆔 ID": r[0],
-            "💇 Barbero": r[1],
-            "✂️ Servicio": r[2],
-            "📅 Fecha": fecha_str,
-            "🕐 Hora": hora_str,
-            "👤 Cliente": cliente,
-            "💰 Monto": f"${monto}" if monto else "-",
-            "📊 Estado": pagado,
-        })
-    
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    ordered = sorted(
+        rows,
+        key=lambda r: (
+            r[3] if r[3] is not None else datetime.min.date(),
+            r[4] if r[4] is not None else datetime.min.time(),
+        ),
+    )
+
+    grouped = {}
+    for r in ordered:
+        fecha_raw = r[3] if len(r) > 3 else None
+        if hasattr(fecha_raw, "strftime"):
+            fecha_label = fecha_raw.strftime("%A, %d %b %Y")
+        else:
+            fecha_label = str(fecha_raw or "Sin fecha")
+        grouped.setdefault(fecha_label, []).append(r)
+
+    for fecha_label, items in grouped.items():
+        st.markdown(f"### {fecha_label}")
+        for r in items:
+            hora_raw = r[4] if len(r) > 4 else None
+            hora_label = hora_raw.strftime("%H:%M") if hasattr(hora_raw, "strftime") else str(hora_raw or "--:--")
+            servicio = r[2] if len(r) > 2 else ""
+            barbero = r[1] if len(r) > 1 else ""
+            cliente = (r[5] if len(r) > 5 else None) or (r[6] if len(r) > 6 else None) or "Cliente desconocido"
+            monto = (r[11] if len(r) > 11 and r[11] is not None else None) or (r[8] if len(r) > 8 else 0)
+            estado = bool(r[10]) if len(r) > 10 else False
+            estado_label = "✅ Pagado" if estado else "⏳ Pendiente"
+            estado_color = "#1f7a1f" if estado else "#b22222"
+            descripcion = f"**{hora_label} · {servicio}**"
+
+            with st.container():
+                cols = st.columns([3, 2, 2, 1], gap="small")
+                cols[0].markdown(descripcion)
+                cols[1].markdown(f"👤 {cliente}")
+                cols[2].markdown(f"💇 {barbero} · 💰 ${monto}")
+                cols[3].markdown(
+                    f"<span style='color: {estado_color}; font-weight: 700;'>{estado_label}</span>",
+                    unsafe_allow_html=True,
+                )
+        st.markdown("---")
 
 
 def ui_marcar_pagado_reservas(rows, key_prefix):
@@ -1823,52 +1844,7 @@ try:
                             st.rerun()
                         else:
                             st.error("❌ Datos incorrectos. Intenta nuevamente.")
-                            # Debug: Mostrar información para troubleshooting
-                            with st.expander("🔧 Información de Depuración"):
-                                st.write(f"📝 Usuario ingresado: `{usuario}`")
-                                
-                                # Buscar usuario en BD
-                                debug_user = fetch_one(
-                                    "SELECT id, usuario, password FROM usuarios WHERE usuario=%s",
-                                    (usuario,),
-                                )
-                                
-                                if debug_user:
-                                    st.success(f"✅ Usuario encontrado en BD")
-                                    st.write(f"  - ID: {debug_user[0]}")
-                                    st.write(f"  - Usuario: {debug_user[1]}")
-                                    st.write(f"  - Hash: {debug_user[2][:30]}...")
-                                    st.write(f"  - Es bcrypt: {es_hash_bcrypt(debug_user[2])}")
-                                    
-                                    # Verificar password
-                                    pwd_check = verificar_password(password, debug_user[2])
-                                    if pwd_check:
-                                        st.success("✅ Contraseña correcta")
-                                    else:
-                                        st.error("❌ Contraseña incorrecta")
-                                        st.info("💡 Verifica que la contraseña sea correcta (respeta mayúsculas/minúsculas)")
-                                else:
-                                    st.error(f"❌ Usuario NO encontrado en BD")
-                                    st.info("💡 Verifica el nombre de usuario")
-                                    
-                                # Verificar DB
-                                st.write(f"🗄️ BD disponible: {db_ok}")
 
-            elif opcion == "✨ Registrar barbería":
-                st.markdown("### Crea tu barbería")
-                with st.form("register_form"):
-                    nb = st.text_input("🏢 Nombre de la barbería", placeholder="Ej: Barbería Premium")
-                    ad_u = st.text_input("👤 Usuario administrador", placeholder="Tu usuario")
-                    ad_p = st.text_input("🔐 Contraseña", type="password", placeholder="Contraseña segura")
-                    crear = st.form_submit_button("✅ Crear barbería", use_container_width=True, disabled=not db_ok)
-                
-                if crear:
-                    with st.spinner("⏳ Creando tu barbería..."):
-                        registrar_barberia(nb, ad_u, ad_p)
-
-# ------------------ APP ------------------
-
-    else:
         user = st.session_state.user
         rol = user[3] if user and len(user) > 3 else None
         usuario = user[1] if user and len(user) > 1 else None
@@ -1889,22 +1865,15 @@ try:
 
         # ===== SIDEBAR =====
         with st.sidebar:
-            st.markdown("---")
-            st.markdown("### 👤 Cuenta")
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.markdown(f"**{usuario}**")
-                st.caption(nr.replace("_", " "))
-            with col2:
-                st.markdown("✅")
-            
-            # Get barberia name
+            st.markdown("## 💈 Barbería Leveling")
+            st.markdown(f"**{usuario or 'Invitado'}**")
+            st.caption(f"Rol: {nr.replace('_', ' ')}")
+
             barberia_name = "Principal"
             if barberia_id:
                 b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
                 if b_name_row:
                     barberia_name = b_name_row[0]
-            
             st.markdown(f"**Barbería:** {barberia_name}")
             st.markdown("---")
 
@@ -1927,9 +1896,9 @@ try:
                 st.markdown("---")
 
             st.markdown("### 🗺️ Navegación")
-            nav_opts = ["Dashboard", "Reservas", "Barberos", "Configuración"]
+            nav_opts = ["Dashboard", "Agenda", "Barberos", "Configuración"]
             if nr == "CLIENTE":
-                nav_opts = ["Dashboard", "Reservas"]
+                nav_opts = ["Dashboard", "Agenda"]
             seccion = st.radio("", nav_opts, key=f"nav_main_{nr}", label_visibility="collapsed")
 
             st.markdown("---")
@@ -1961,18 +1930,26 @@ try:
                 st.stop()
 
             if seccion == "Dashboard":
-                st.markdown("# 📊 Mi Panel")
+                st.markdown("## 📊 Mi Panel")
                 
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("⏳ Cargando tus métricas..."):
+                    with st.spinner("Cargando datos..."):
                         total_reservas, hoy_reservas, _ = calcular_metricas_cliente(barberia_id, usuario)
-                    
-                    render_dashboard_cards(2, [
-                        {"label": "📅 Tus Reservas", "value": total_reservas},
-                        {"label": "🎯 Hoy", "value": hoy_reservas},
+                    render_dashboard_cards(4, [
+                        {"label": "📅 Total Reservas", "value": total_reservas},
+                        {"label": "🎯 Reservas Hoy", "value": hoy_reservas},
+                        {"label": "💰 Ingresos", "value": "$0"},
+                        {"label": "👥 Barberos", "value": len(listar_usuarios_barberos(barberia_id))},
                     ])
+                    st.markdown("---")
+                    st.markdown("### 💡 Información Útil")
+                    col_tip1, col_tip2 = st.columns(2, gap="large")
+                    with col_tip1:
+                        st.success("✨ Obtén descuento cada 5 cortes")
+                    with col_tip2:
+                        st.info("⏰ Cancela con 1 hora de anticipación")
                     
                     st.markdown("---")
                     st.markdown("### 💡 Información Útil")
@@ -1982,8 +1959,8 @@ try:
                     with col_tip2:
                         st.info("⏰ Cancela con 1 hora de anticipación")
 
-            if seccion == "Reservas":
-                st.markdown("# 📱 Mis Reservas")
+            if seccion == "Agenda":
+                st.markdown("## 📅 Mi Agenda")
 
                 tab_calendario, tab_crear, tab_lista = st.tabs([
                     "📅 Calendario",
@@ -2073,7 +2050,7 @@ try:
                     if not db_ok:
                         st.info("Lista de reservas no disponible sin base de datos.")
                     else:
-                        with st.spinner("⏳ Cargando tus reservas..."):
+                        with st.spinner("Cargando datos..."):
                             mis_reservas = listar_reservas_filtradas(barberia_id, "CLIENTE", usuario)
                         if mis_reservas:
                             mostrar_reservas_dataframe(mis_reservas)
@@ -2088,7 +2065,7 @@ try:
                 st.stop()
 
             if seccion == "Dashboard":
-                st.markdown("# 📊 Mi Panel · Barbero")
+                st.markdown("## 📊 Mi Panel · Barbero")
                 
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
@@ -2113,8 +2090,8 @@ try:
                         for r in hoy_reservas_list[:5]:
                             st.caption(f"🕐 {r[4]} - {r[5] or r[6]} ({r[2]})")
 
-            if seccion == "Reservas":
-                st.markdown("# 📅 Mi Agenda")
+            if seccion == "Agenda":
+                st.markdown("## 📅 Mi Agenda")
                 
                 tab_cal, tab_crear, tab_lista = st.tabs([
                     "📆 Calendario",
@@ -2125,7 +2102,7 @@ try:
                 # TAB: CALENDARIO
                 with tab_cal:
                     if db_ok:
-                        with st.spinner("⏳ Cargando tu agenda..."):
+                        with st.spinner("Cargando datos..."):
                             eventos_barbero = obtener_reservas(usuario)
                         render_agenda_interactiva(eventos_barbero, usuario, read_only=False)
                     else:
@@ -2151,11 +2128,11 @@ try:
                             st.info("📭 No hay reservas")
 
             if seccion == "Barberos":
-                st.markdown("# 👥 Equipo")
+                st.markdown("## 👥 Equipo")
                 st.info("👨‍💼 Solo el administrador de la barbería gestiona el equipo de barberos.")
 
             if seccion == "Configuración":
-                st.markdown("# ⚙️ Configuración")
+                st.markdown("## ⚙️ Configuración")
                 st.info("✨ Preferencias y ajustes próximamente.")
 
         # ================= ADMIN =================
@@ -2165,12 +2142,12 @@ try:
                 st.stop()
 
             if seccion == "Dashboard":
-                st.markdown("# 📊 Panel Administrativo")
+                st.markdown("## 📊 Panel Administrativo")
                 
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("⏳ Cargando métricas de la barbería..."):
+                    with st.spinner("Cargando datos..."):
                         total_reservas, hoy_reservas, total_ingresos, num_barberos = calcular_metricas_admin(barberia_id)
                     
                     render_dashboard_cards(4, [
@@ -2199,8 +2176,8 @@ try:
                         for r in hoy_reservas_list[:5]:
                             st.caption(f"🕐 {r[4]} - {r[5] or r[6]} con {r[1]} ({r[2]})")
 
-            if seccion == "Reservas":
-                st.markdown("# 📅 Agenda")
+            if seccion == "Agenda":
+                st.markdown("## 📅 Agenda")
                 
                 tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
                     "📆 Calendario",
@@ -2232,7 +2209,7 @@ try:
                             opciones_filtro_barberos_ui(barberia_id),
                             key="tabla_admin_filtro",
                         )
-                        with st.spinner("⏳ Cargando reservas..."):
+                        with st.spinner("Cargando datos..."):
                             rows_adm = listar_reservas_filtradas(
                                 barberia_id, "ADMIN", usuario, filtro_barbero=filtro_adm
                             )
@@ -2247,7 +2224,7 @@ try:
                 with tab_ingresos:
                     st.markdown("### 💰 Ingresos")
                     if db_ok:
-                        with st.spinner("⏳ Cargando datos de ingresos..."):
+                        with st.spinner("Cargando datos..."):
                             total_row = fetch_one(
                                 "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE",
                                 (barberia_id,),
@@ -2268,7 +2245,7 @@ try:
                                 st.caption(f"💇 {barbero_name}: ${ingreso}")
 
             if seccion == "Barberos":
-                st.markdown("# 👥 Gestión de Barberos")
+                st.markdown("## 👥 Gestión de Barberos")
                 
                 with st.container(border=True):
                     st.markdown("### ➕ Nuevo Barbero")
@@ -2298,18 +2275,18 @@ try:
                     st.info("📭 No hay barberos registrados aún")
 
             if seccion == "Configuración":
-                st.markdown("# ⚙️ Configuración")
+                st.markdown("## ⚙️ Configuración")
                 st.info("✨ Datos de la barbería y preferencias próximamente.")
 
         # ================= SUPER_ADMIN =================
         elif nr == "SUPER_ADMIN":
             if seccion == "Dashboard":
-                st.markdown("# 📊 Panel Global (Super Admin)")
+                st.markdown("## 📊 Panel Global (Super Admin)")
                 
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("⏳ Cargando métricas globales..."):
+                    with st.spinner("Cargando datos..."):
                         num_barberias, num_usuarios, num_reservas, total_ingresos, hoy_count = calcular_metricas_super_admin(bid_ctx)
                     
                     render_dashboard_cards(5, [
@@ -2320,8 +2297,8 @@ try:
                         {"label": "💰 Ingresos Totales", "value": f"${total_ingresos}"},
                     ])
 
-            if seccion == "Reservas":
-                st.markdown("# 📅 Agenda Global")
+            if seccion == "Agenda":
+                st.markdown("## 📅 Agenda Global")
                 
                 tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
                     "📆 Calendario",
@@ -2391,7 +2368,7 @@ try:
                         st.info("Selecciona una barbería para ver ingresos")
 
             if seccion == "Barberos":
-                st.markdown("# 👥 Barberos (Contexto)")
+                st.markdown("## 👥 Barberos (Contexto)")
                 if bid_ctx:
                     with st.spinner("⏳ Cargando barberos..."):
                         barberos_data = listar_usuarios_barberos(bid_ctx)
@@ -2407,7 +2384,7 @@ try:
                     st.info("🏢 Selecciona una barbería en la barra lateral.")
 
             if seccion == "Configuración":
-                st.markdown("# ⚙️ Configuración Global")
+                st.markdown("## ⚙️ Configuración Global")
                 st.info("✨ Parámetros de plataforma próximamente.")
 
         else:
