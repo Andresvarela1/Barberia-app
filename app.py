@@ -57,7 +57,9 @@ def _masked_postgres_url(parsed):
     return f"{parsed.scheme}://{auth}{host}:{port}{db_part}"
 
 
-def get_connection(*, notify_missing_url: bool = True):
+@st.cache_resource
+def get_connection_cached():
+    """Cached database connection pool."""
     global _db_url_missing_notified
     database_url = get_database_url()
 
@@ -68,59 +70,63 @@ def get_connection(*, notify_missing_url: bool = True):
             "de despliegue (sin hardcodear credenciales en el código)."
         )
         logger.error(message)
-        if notify_missing_url and not _db_url_missing_notified:
+        if not _db_url_missing_notified:
             _db_url_missing_notified = True
-            st.error(message)
         return None
 
     try:
         database_url = database_url.strip()
 
         if "[YOUR-PASSWORD]" in database_url:
-            st.error("You must replace [YOUR-PASSWORD] with your real Supabase password")
             return None
 
         parsed = urlparse(database_url)
         if parsed.scheme not in ("postgresql", "postgres"):
-            st.error("DATABASE_URL must start with postgresql:// (Supabase Postgres)")
             return None
 
         host = parsed.hostname
         port = parsed.port or 5432
         dbname = (parsed.path or "").lstrip("/")
 
-        if not host:
-            st.error("DATABASE_URL is invalid: missing hostname")
-            return None
-        if not dbname:
-            st.error("DATABASE_URL is invalid: missing database name in path (e.g. /postgres)")
+        if not host or not dbname:
             return None
 
         masked = _masked_postgres_url(parsed)
-        logger.info("Postgres target: %s", masked)
+        logger.info("📌 Conexión PostgreSQL cacheada: %s", masked)
 
         try:
             socket.getaddrinfo(host, port)
         except socket.gaierror:
-            st.error(
-                "Host cannot be resolved. Verify Supabase URL or try pooler connection"
-            )
+            logger.error("Host resolution failed")
             return None
 
-        return psycopg2.connect(
+        conn = psycopg2.connect(
             database_url,
             sslmode="require",
             connect_timeout=5,
             options="-c statement_timeout=8000",
         )
-    except psycopg2.OperationalError as e:
-        logger.exception("Error al conectar con PostgreSQL (OperationalError)")
-        st.error(str(e))
-        return None
+        logger.info("✅ Conexión a DB cacheada exitosamente")
+        return conn
     except Exception as e:
         logger.exception("Error al conectar con PostgreSQL")
-        st.error(str(e))
         return None
+
+
+def get_connection(*, notify_missing_url: bool = True):
+    """Get connection (cached when possible, fresh on notify_missing_url=True)."""
+    if notify_missing_url:
+        conn = get_connection_cached()
+        if conn is None and not _db_url_missing_notified:
+            message = (
+                "DATABASE_URL o SUPABASE_DB_URL no está configurada. "
+                "Define una de estas variables de entorno en el sistema o en la configuración "
+                "de despliegue (sin hardcodear credenciales en el código)."
+            )
+            st.error(message)
+        return conn
+    else:
+        return get_connection_cached()
 
 
 def is_db_available():
@@ -303,13 +309,17 @@ def ensure_database_tables():
             # Index on reservas
             try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barberia ON reservas(barberia_id);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero ON reservas(barbero);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_pagado ON reservas(pagado);")
                 conn.commit()
-                logger.info("✅ Índice 'idx_reservas_barberia' creado o ya existe")
+                logger.info("✅ Índices de 'reservas' creados o ya existen")
             except Exception as e:
                 conn.rollback()
                 all_ok = False
-                logger.error(f"Error creando índice 'idx_reservas_barberia': {e}")
-                st.error(f"Error creando índice 'idx_reservas_barberia': {e}")
+                logger.error(f"Error creando índices de 'reservas': {e}")
+                st.error(f"Error creando índices de 'reservas': {e}")
 
             # Optional columns
             try:
@@ -705,6 +715,7 @@ except Exception as e:
     default_barberia_id = None
 
 
+@st.cache_data(ttl=60)
 def listar_usuarios_barberos(barberia_id):
     if not barberia_id:
         return []
@@ -838,45 +849,46 @@ def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
         f"Servicio: {servicio}"
     )
 
+@st.cache_data(ttl=60)
 def obtener_reservas_raw(barbero_filtro=None):
     if not st.session_state.get("db_available", True):
         return []
-
-    user = st.session_state.get("user")
-    if not user:
-        return []
-
-    rol = normalizar_rol(user[3])
-    uid = user[1]
-    bid = effective_barberia_id()
-    super_all = rol == "SUPER_ADMIN" and st.session_state.get("super_admin_all_barberias")
-
-    if not super_all and not bid:
-        return []
-
-    sql = """
-        SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id
-        FROM reservas
-        WHERE 1=1
-    """
-    params = []
-
-    if not super_all:
-        sql += " AND barberia_id = %s"
-        params.append(bid)
-
-    if rol == "BARBERO":
-        sql += " AND barbero = %s"
-        params.append(uid)
-    elif barbero_filtro and rol in ("ADMIN", "SUPER_ADMIN"):
-        sql += " AND barbero = %s"
-        params.append(barbero_filtro)
-
-    sql += " ORDER BY inicio"
+    
     try:
+        user = st.session_state.get("user")
+        if not user:
+            return []
+
+        rol = normalizar_rol(user[3])
+        uid = user[1]
+        bid = effective_barberia_id()
+        super_all = rol == "SUPER_ADMIN" and st.session_state.get("super_admin_all_barberias")
+
+        if not super_all and not bid:
+            return []
+
+        sql = """
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id
+            FROM reservas
+            WHERE 1=1
+        """
+        params = []
+
+        if not super_all:
+            sql += " AND barberia_id = %s"
+            params.append(bid)
+
+        if rol == "BARBERO":
+            sql += " AND barbero = %s"
+            params.append(uid)
+        elif barbero_filtro and rol in ("ADMIN", "SUPER_ADMIN"):
+            sql += " AND barbero = %s"
+            params.append(barbero_filtro)
+
+        sql += " ORDER BY inicio"
         return fetch_all(sql, tuple(params)) or []
-    except Exception:
-        logger.exception("obtener_reservas_raw")
+    except Exception as e:
+        logger.exception("Error en obtener_reservas_raw")
         return []
 
 
@@ -1272,6 +1284,7 @@ def insertar_reserva_con_fecha_hora(
             conn.close()
 
 
+@st.cache_data(ttl=60)
 def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_barbero=None):
     """Listado con permisos: CLIENTE sus reservas; BARBERO solo su usuario en barbero; ADMIN barbería; SUPER_ADMIN todo o filtro."""
     nr = normalizar_rol(rol_tag)
@@ -1332,7 +1345,7 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
         sql += " ORDER BY inicio DESC NULLS LAST"
         return fetch_all(sql, tuple(params)) or []
 
-    except Exception:
+    except Exception as e:
         logger.exception("Error listando reservas")
         return []
 
@@ -1674,6 +1687,7 @@ def render_modo_sin_db_banner():
 
 # ================= MÉTRICAS HELPERS =================
 
+@st.cache_data(ttl=60)
 def calcular_metricas_cliente(barberia_id, usuario):
     """Calcula métricas para cliente."""
     if not barberia_id or not st.session_state.get("db_available", True):
@@ -1692,6 +1706,7 @@ def calcular_metricas_cliente(barberia_id, usuario):
         return 0, 0, 0
 
 
+@st.cache_data(ttl=60)
 def calcular_metricas_barbero(barberia_id, usuario):
     """Calcula métricas para barbero."""
     if not barberia_id or not st.session_state.get("db_available", True):
@@ -1712,6 +1727,7 @@ def calcular_metricas_barbero(barberia_id, usuario):
         return 0, 0, 0
 
 
+@st.cache_data(ttl=60)
 def calcular_metricas_admin(barberia_id):
     """Calcula métricas para admin."""
     if not barberia_id or not st.session_state.get("db_available", True):
@@ -1744,6 +1760,7 @@ def calcular_metricas_admin(barberia_id):
         return 0, 0, 0, 0
 
 
+@st.cache_data(ttl=60)
 def calcular_metricas_super_admin(barberia_id):
     """Calcula métricas globales para super admin."""
     if not st.session_state.get("db_available", True):
@@ -1833,7 +1850,8 @@ try:
                             nr_login = normalizar_rol(user[3])
                             if nr_login == "SUPER_ADMIN":
                                 st.session_state.barberia_id = None
-                                fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
+                                with st.spinner("⏳ Cargando barberías..."):
+                                    fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
                                 st.session_state.barberia_context_id = fb[0] if fb else None
                                 st.session_state.super_admin_all_barberias = False
                             else:
@@ -1871,15 +1889,24 @@ try:
 
             barberia_name = "Principal"
             if barberia_id:
-                b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
-                if b_name_row:
-                    barberia_name = b_name_row[0]
+                if "barberia_name" not in st.session_state or st.session_state.get("cached_barberia_id") != barberia_id:
+                    with st.spinner("⏳ Cargando barbería..."):
+                        b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
+                    st.session_state.barberia_name = b_name_row[0] if b_name_row else "Principal"
+                    st.session_state.cached_barberia_id = barberia_id
+                barberia_name = st.session_state.barberia_name
             st.markdown(f"**Barbería:** {barberia_name}")
             st.markdown("---")
 
             if nr == "SUPER_ADMIN":
                 st.markdown("### 🏢 Contexto")
-                b_list = fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
+                if "barberias_list" not in st.session_state:
+                    with st.spinner("⏳ Cargando barberías..."):
+                        b_list = fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
+                    st.session_state.barberias_list = b_list
+                else:
+                    b_list = st.session_state.barberias_list
+                    
                 if b_list:
                     etiquetas = {f"{r[1]}": r[0] for r in b_list}
                     claves = list(etiquetas.keys())
@@ -1935,13 +1962,14 @@ try:
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("Cargando datos..."):
+                    with st.spinner("⏳ Cargando métricas..."):
                         total_reservas, hoy_reservas, _ = calcular_metricas_cliente(barberia_id, usuario)
+                        num_barberos_cached = len(listar_usuarios_barberos(barberia_id))
                     render_dashboard_cards(4, [
                         {"label": "📅 Total Reservas", "value": total_reservas},
                         {"label": "🎯 Reservas Hoy", "value": hoy_reservas},
                         {"label": "💰 Ingresos", "value": "$0"},
-                        {"label": "👥 Barberos", "value": len(listar_usuarios_barberos(barberia_id))},
+                        {"label": "👥 Barberos", "value": num_barberos_cached},
                     ])
                     st.markdown("---")
                     st.markdown("### 💡 Información Útil")
@@ -2070,7 +2098,7 @@ try:
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("⏳ Cargando tus métricas..."):
+                    with st.spinner("⏳ Cargando métricas..."):
                         total_reservas, hoy_reservas, total_ingresos = calcular_metricas_barbero(barberia_id, usuario)
                     
                     render_dashboard_cards(3, [
@@ -2147,7 +2175,7 @@ try:
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("Cargando datos..."):
+                    with st.spinner("⏳ Cargando métricas..."):
                         total_reservas, hoy_reservas, total_ingresos, num_barberos = calcular_metricas_admin(barberia_id)
                     
                     render_dashboard_cards(4, [
@@ -2286,7 +2314,7 @@ try:
                 if not db_ok:
                     st.info("📊 Métricas no disponibles sin base de datos.")
                 else:
-                    with st.spinner("Cargando datos..."):
+                    with st.spinner("⏳ Cargando métricas globales..."):
                         num_barberias, num_usuarios, num_reservas, total_ingresos, hoy_count = calcular_metricas_super_admin(bid_ctx)
                     
                     render_dashboard_cards(5, [
