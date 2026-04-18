@@ -344,9 +344,9 @@ def ensure_database_tables():
                 logger.warning(f"⚠️ No se pudo hacer barberia_id nullable (puede estar bien si ya lo es): {e}")
 
         if all_ok:
-            logger.info("✅ Todas las tablas y restricciones creadas correctamente")
+            conn.commit()
         else:
-            logger.warning("⚠️ Algunas operaciones de base de datos fallaron")
+            conn.rollback()
     except Exception as e:
         if conn:
             conn.rollback()
