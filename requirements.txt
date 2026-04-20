@@ -4,3 +4,4 @@ streamlit-calendar
 twilio
 bcrypt
 python-dotenv
+mercadopago
