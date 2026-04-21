@@ -1417,82 +1417,18 @@ def mostrar_detalles_reserva(reserva_id):
     estado_color = "#16a34a" if pagado else "#f59e0b"
     monto = reserva.get('monto', 0)
     
-    # AgendaPro-style card
-    st.markdown(f"""
-    <div style="
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border-left: 5px solid {estado_color};
-        border-radius: 12px;
-        padding: 20px;
-        margin: 12px 0;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    ">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-            <div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">👤 CLIENTE</div>
-                <div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div>
-            </div>
-            <div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">✂️ SERVICIO</div>
-                <div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div>
-            </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-            <div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">🕐 HORA</div>
-                <div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div>
-                <div style="font-size: 12px; color: #666;">{fecha_str}</div>
-            </div>
-            <div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">💰 MONTO</div>
-                <div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div>
-            </div>
-        </div>
-        
-        <div style="border-top: 1px solid #333; padding-top: 12px;">
-            <div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">
-                {estado}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Build the inner card with all reservation details - FLEX LAYOUT
+    inner_card_html = f"""<div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">👤 CLIENTE</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">✂️ SERVICIO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div></div></div><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">🕐 HORA</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div><div style="font-size: 12px; color: #666;">{fecha_str}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">💰 MONTO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div></div></div><div style="border-top: 1px solid #333; padding-top: 12px;"><div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">{estado}</div></div>"""
     
-    st.markdown("")
+    # Wrap in premium container - MAIN WRAPPER
+    card_html = f"""<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"><h3 style="margin: 0 0 20px 0; color: white; font-size: 20px;">💈 Tu reserva</h3>{inner_card_html}</div>"""
     
-    # Action buttons
-    user = st.session_state.get("user")
-    nr = normalizar_rol(user[3]) if user else ""
+    # DEBUG: Verify HTML is string type
+    st.write(f"🔍 Type: {type(card_html).__name__}, Valid HTML: {card_html.startswith('<div')}")
     
-    # Only show buttons if user has permission
-    if nr != "CLIENTE":
-        col1, col2 = st.columns(2)
-        
-        # Mark as paid button
-        if not pagado:
-            with col1:
-                if st.button(
-                    "✅ Marcar Pagado",
-                    key=f"btn_pagado_{reserva_id}",
-                    use_container_width=True
-                ):
-                    if marcar_reserva_pagada(reserva_id):
-                        st.success("✅ Pago registrado")
-                        st.session_state.mostrar_detalles_reserva = False
-                        st.rerun()
-        
-        # Cancel/Delete button
-        with col2:
-            if st.button(
-                "❌ Cancelar",
-                key=f"btn_cancelar_{reserva_id}",
-                use_container_width=True,
-                type="secondary"
-            ):
-                if eliminar_reserva(reserva_id):
-                    st.success("✅ Reserva cancelada")
-                    st.session_state.mostrar_detalles_reserva = False
-                    st.rerun()
+    # CLEAN ISOLATED RENDER BLOCK - NOT IN ANY COLUMN CONTEXT
+    st.markdown("### 💈 Tu reserva")
+    st.markdown(card_html, unsafe_allow_html=True)
     
     return reserva
 
@@ -2361,13 +2297,20 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
     if st.session_state.get("mostrar_detalles_reserva") and st.session_state.get("reserva_seleccionada_id"):
         reserva_id = st.session_state.get("reserva_seleccionada_id")
         
-        # Create a nice details container
-        col_details_left, col_details_right = st.columns([2, 1])
+        # RENDER HTML OUTSIDE OF COLUMN CONTEXT - FULL WIDTH
+        mostrar_detalles_reserva(reserva_id)
         
-        with col_details_left:
-            mostrar_detalles_reserva(reserva_id)
+        # Action buttons below
+        col_btn_left, col_btn_right = st.columns([1, 1])
         
-        with col_details_right:
+        with col_btn_left:
+            if st.button("✅ Marcar Pagado", key="btn_pagado_action", use_container_width=True):
+                if marcar_reserva_pagada(reserva_id):
+                    st.success("✅ Pago registrado")
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+        
+        with col_btn_right:
             if st.button("✕ Cerrar Detalles", key="btn_cerrar_detalles", use_container_width=True, type="secondary"):
                 st.session_state.mostrar_detalles_reserva = False
                 st.session_state.reserva_seleccionada_id = None
@@ -2572,6 +2515,9 @@ def obtener_horarios_disponibles(barberia_id, barbero_id, fecha, duracion_minuto
 
 def flujo_reserva_publica():
     """Premium public booking flow without login required (AgendaPro style)."""
+    # Import time type at function start to avoid UnboundLocalError with datetime
+    from datetime import time as time_type
+    
     if "booking_step" not in st.session_state:
         st.session_state.booking_step = 1
     
@@ -2825,8 +2771,23 @@ def flujo_reserva_publica():
                 )
                 
                 if time_button_clicked:
-                    st.session_state.booking_data["fecha"] = fecha
-                    st.session_state.booking_data["hora"] = hora.time()
+                    # Safe type handling for hora
+                    try:
+                        if isinstance(hora, datetime):
+                            hora_final = hora.time()
+                        elif isinstance(hora, time_type):
+                            hora_final = hora
+                        else:
+                            raise ValueError(f"Invalid hora type: {type(hora)}")
+                        
+                        st.session_state.booking_data["fecha"] = fecha
+                        st.session_state.booking_data["hora"] = hora_final
+                        logger.info(f"✅ Booking time set: {type(hora).__name__} → {hora_final}")
+                    except Exception as e:
+                        logger.error(f"❌ Error setting booking time: {str(e)}")
+                        st.error(f"Error al seleccionar hora: {str(e)}")
+                        st.stop()
+                    
                     st.session_state.booking_step = 4
                     st.rerun()
     
@@ -3464,103 +3425,81 @@ def render_home_screen():
         
         col1, col2, col3 = st.columns(3, gap="large")
         
-        # CUSTOM CSS FOR CARD BUTTONS
+        # CUSTOM CSS FOR PREMIUM CARD BUTTONS
         st.markdown("""
         <style>
-        .card-button-container {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-        
-        /* Style for the card buttons */
-        button[data-testid="baseButton-secondary"] {
-            height: auto !important;
-            min-height: 180px !important;
+        /* Base button styling for all card buttons */
+        div.stButton > button {
+            height: 180px !important;
             border-radius: 16px !important;
-            font-size: 16px !important;
+            font-size: 20px !important;
             font-weight: 600 !important;
+            border: none !important;
             transition: all 0.3s ease !important;
             white-space: pre-line !important;
-            line-height: 1.6 !important;
+            line-height: 1.8 !important;
             padding: 40px 20px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             flex-direction: column !important;
             text-align: center !important;
+            color: white !important;
+            cursor: pointer !important;
         }
         
-        /* Login card styling */
-        .card-login button {
+        /* Hover effects - scale and shadow */
+        div.stButton > button:hover {
+            transform: translateY(-4px) scale(1.02) !important;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25) !important;
+        }
+        
+        /* Login card - First button */
+        div.stButton:nth-of-type(1) > button {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-            color: white !important;
-            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3) !important;
-            border: none !important;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3) !important;
         }
         
-        .card-login button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 24px rgba(102, 126, 234, 0.4) !important;
+        div.stButton:nth-of-type(1) > button:hover {
+            box-shadow: 0 16px 32px rgba(102, 126, 234, 0.5) !important;
         }
         
-        /* Register card styling */
-        .card-register button {
+        /* Register card - Second button */
+        div.stButton:nth-of-type(2) > button {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-            color: white !important;
-            box-shadow: 0 8px 16px rgba(245, 87, 108, 0.3) !important;
-            border: none !important;
+            box-shadow: 0 8px 20px rgba(245, 87, 108, 0.3) !important;
         }
         
-        .card-register button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 24px rgba(245, 87, 108, 0.4) !important;
+        div.stButton:nth-of-type(2) > button:hover {
+            box-shadow: 0 16px 32px rgba(245, 87, 108, 0.5) !important;
         }
         
-        /* Booking card styling */
-        .card-booking button {
+        /* Booking card - Third button */
+        div.stButton:nth-of-type(3) > button {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-            color: white !important;
-            box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3) !important;
-            border: none !important;
+            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3) !important;
         }
         
-        .card-booking button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 24px rgba(79, 172, 254, 0.4) !important;
+        div.stButton:nth-of-type(3) > button:hover {
+            box-shadow: 0 16px 32px rgba(79, 172, 254, 0.5) !important;
         }
         </style>
         """, unsafe_allow_html=True)
         
         with col1:
-            card_html1 = """
-            <div class="card-login">
-            """
-            st.markdown(card_html1, unsafe_allow_html=True)
             if st.button("🔑\n\nIniciar Sesión\n\nAccede a tu cuenta", key="home_login", use_container_width=True):
                 st.session_state.view = "login"
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
         
         with col2:
-            card_html2 = """
-            <div class="card-register">
-            """
-            st.markdown(card_html2, unsafe_allow_html=True)
             if st.button("✨\n\nRegistrar Barbería\n\nCrea tu barbería", key="home_registro", use_container_width=True):
                 st.session_state.view = "registro"
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
         
         with col3:
-            card_html3 = """
-            <div class="card-booking">
-            """
-            st.markdown(card_html3, unsafe_allow_html=True)
             if st.button("📅\n\nReservar Cita\n\nAgenda tu corte", key="home_reserva", use_container_width=True):
                 st.session_state.view = "reserva"
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_landing_publico(barberia):
