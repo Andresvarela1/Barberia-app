@@ -32,6 +32,22 @@ CREATE TABLE IF NOT EXISTS reservas (
         ON DELETE RESTRICT
 );
 
+CREATE TABLE IF NOT EXISTS servicios (
+    id SERIAL PRIMARY KEY,
+    barberia_id INTEGER NOT NULL,
+    nombre TEXT NOT NULL,
+    duracion_minutos INTEGER NOT NULL,
+    precio INTEGER NOT NULL,
+    descripcion TEXT,
+    icono TEXT DEFAULT '✂️',
+    CONSTRAINT fk_servicios_barberia
+        FOREIGN KEY (barberia_id)
+        REFERENCES barberias(id)
+        ON DELETE CASCADE,
+    UNIQUE(barberia_id, nombre)
+);
+
+CREATE INDEX IF NOT EXISTS idx_servicios_barberia ON servicios(barberia_id);
 CREATE INDEX IF NOT EXISTS idx_reservas_barberia ON reservas(barberia_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_barberia ON usuarios(barberia_id);
 

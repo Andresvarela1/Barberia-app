@@ -232,7 +232,8 @@ def ensure_database_tables():
                     """
                     CREATE TABLE IF NOT EXISTS barberias (
                         id SERIAL PRIMARY KEY,
-                        nombre TEXT NOT NULL UNIQUE
+                        nombre TEXT NOT NULL UNIQUE,
+                        slug TEXT UNIQUE
                     );
                     """
                 )
@@ -350,10 +351,54 @@ def ensure_database_tables():
                 logger.error(f"Error creando tabla 'reservas': {e}")
                 st.error(f"Error creando tabla 'reservas': {e}")
 
-            # Index on reservas
+            # 4. servicios table
             try:
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barberia ON reservas(barberia_id);")
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero ON reservas(barbero);")
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS servicios (
+                        id SERIAL PRIMARY KEY,
+                        barberia_id INTEGER NOT NULL,
+                        nombre TEXT NOT NULL,
+                        duracion_minutos INTEGER NOT NULL,
+                        precio INTEGER NOT NULL,
+                        descripcion TEXT,
+                        icono TEXT DEFAULT '✂️',
+                        CONSTRAINT fk_servicios_barberia
+                            FOREIGN KEY (barberia_id)
+                            REFERENCES barberias(id)
+                            ON DELETE CASCADE,
+                        UNIQUE(barberia_id, nombre)
+                    );
+                    """
+                )
+                conn.commit()
+                logger.info("✅ Tabla 'servicios' creada o ya existe")
+            except Exception as e:
+                conn.rollback()
+                all_ok = False
+                logger.error(f"Error creando tabla 'servicios': {e}")
+                st.error(f"Error creando tabla 'servicios': {e}")
+
+            # Index on servicios
+            try:
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_servicios_barberia ON servicios(barberia_id);")
+                conn.commit()
+                logger.info("✅ Índice 'idx_servicios_barberia' creado o ya existe")
+            except Exception as e:
+                conn.rollback()
+                all_ok = False
+                logger.error(f"Error creando índice 'idx_servicios_barberia': {e}")
+                st.error(f"Error creando índice 'idx_servicios_barberia': {e}")
+
+            # Optional columns for barberias
+            try:
+                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;")
+                conn.commit()
+                logger.info("✅ Columna slug en tabla 'barberias' asegurada")
+            except Exception as e:
+                conn.rollback()
+                logger.warning(f"⚠️ Error añadiendo columna slug: {e}")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_pagado ON reservas(pagado);")
@@ -375,11 +420,13 @@ def ensure_database_tables():
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS barbero_id INTEGER;")
                 cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
                 conn.commit()
                 logger.info("✅ Columnas opcionales en 'reservas' añadidas o actualizadas")
                 logger.info("✅ payment_id column ensured")
                 logger.info("✅ updated_at column ensured")
+                logger.info("✅ barbero_id column ensured")
             except Exception as e:
                 conn.rollback()
                 all_ok = False
@@ -813,7 +860,7 @@ def listar_usuarios_barberos(barberia_id):
     try:
         return fetch_all(
             """
-            SELECT usuario, rol FROM usuarios
+            SELECT id, usuario FROM usuarios
             WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'
             ORDER BY usuario
             """,
@@ -1246,10 +1293,10 @@ def obtener_reservas_raw(barbero_filtro=None):
             params.append(bid)
 
         if rol == "BARBERO":
-            sql += " AND barbero = %s"
-            params.append(uid)
+            sql += " AND barbero_id = %s"
+            params.append(user[0])  # Use user ID instead of username
         elif barbero_filtro and rol in ("ADMIN", "SUPER_ADMIN"):
-            sql += " AND barbero = %s"
+            sql += " AND barbero_id = %s"
             params.append(barbero_filtro)
 
         sql += " ORDER BY inicio"
@@ -1454,6 +1501,9 @@ def agrupar_por_barbero(events):
     """Group calendar events by barber for multi-barber layout. Handle both events and raw reservations."""
     barberos_dict = {}
     
+    if not events:
+        return barberos_dict
+    
     for item in events:
         try:
             # Handle event dictionary format from construir_eventos_calendario
@@ -1468,7 +1518,7 @@ def agrupar_por_barbero(events):
                 # Log unexpected format and skip
                 logger.warning(f"Unexpected item format in agrupar_por_barbero: {type(item)}")
         except Exception as e:
-            logger.warning(f"Error processing item in agrupar_por_barbero: {e}")
+            logger.warning(f"Error processing item in agrupar_por_barbero: {traceback.format_exc()}")
             continue
     
     return barberos_dict
@@ -1477,14 +1527,18 @@ def agrupar_por_barbero(events):
 def render_calendario_multi_barbero(reservas, read_only=False):
     """Render multiple calendars in columns, one per barber (AgendaPro style layout)."""
     if not reservas:
-        st.info("📭 No hay reservas para mostrar en el calendario.")
+        st.warning("⚠️ No hay reservas para mostrar en el calendario.")
         return
     
     # Group reservations by barber
-    barberos_dict = agrupar_por_barbero(reservas)
+    try:
+        barberos_dict = agrupar_por_barbero(reservas)
+    except Exception as e:
+        st.error(f"Error al agrupar reservas:\n{traceback.format_exc()}")
+        return
     
     if not barberos_dict:
-        st.info("📭 No hay reservas para mostrar.")
+        st.warning("⚠️ No hay reservas para mostrar. Verifique los datos.")
         return
     
     # Professional header with legend
@@ -1506,70 +1560,80 @@ def render_calendario_multi_barbero(reservas, read_only=False):
     num_barbers = len(barberos_dict)
     cols = st.columns(num_barbers) if num_barbers <= 3 else st.columns(3)  # Max 3 columns
     
-    for idx, (barbero_id, reservas_barbero) in enumerate(sorted(barberos_dict.items())):
-        # Get barber name from first reservation
-        barber_name = reservas_barbero[0][1] if reservas_barbero else f"Barbero {barbero_id}"
-        
-        col_index = idx % len(cols)
-        with cols[col_index]:
-            # Subheader for barber
-            st.subheader(f"💈 {barber_name}")
+    for idx, (barbero_info, reservas_barbero) in enumerate(sorted(barberos_dict.items())):
+        try:
+            # Extract barber ID and name from key tuple
+            barbero_id, barber_name = barbero_info if isinstance(barbero_info, tuple) else (barbero_info, str(barbero_info))
             
-            # Convert reservations to events for this barber
-            eventos_barbero = construir_eventos_calendario(reservas_barbero)
-            
-            if not eventos_barbero:
-                st.info(f"Sin reservas para {barber_name}")
+            if not reservas_barbero:
                 continue
             
-            # Calendar options (no resources)
-            options = {
-                "initialView": "timeGridWeek",
-                "editable": not read_only,
-                "selectable": not read_only,
-                "allDaySlot": False,
-                "slotMinTime": "09:00:00",
-                "slotMaxTime": "21:00:00",
-                "slotDuration": "00:30:00",
-                "slotLabelInterval": "00:30:00",
-                "height": 600,
-                "contentHeight": "auto",
-                "headerToolbar": {
-                    "left": "prev,next today",
-                    "center": "title",
-                    "right": "dayGridMonth,timeGridWeek,timeGridDay",
-                },
-                "slotLabelFormat": {
-                    "meridiem": False,
-                    "hour": "2-digit",
-                    "minute": "2-digit",
-                },
-                "eventDisplay": "block",
-                "eventTimeFormat": {
-                    "meridiem": False,
-                    "hour": "2-digit",
-                    "minute": "2-digit",
-                },
-                "nowIndicator": True,
-                "scrollTime": "09:00:00",
-                "dayMaxEvents": 6,
-                "eventBackgroundColor": "transparent",
-                "eventBorderColor": "transparent",
-                "eventTextColor": "#FFFFFF",
-            }
-            
-            try:
-                calendar_state = calendar(
-                    events=eventos_barbero,
-                    options=options,
-                    key=f"calendario_barbero_{barbero_id}",
-                )
+            col_index = idx % len(cols)
+            with cols[col_index]:
+                # Subheader for barber
+                st.subheader(f"💈 {barber_name}")
                 
-                if calendar_state and calendar_state.get("eventClick"):
-                    manejar_interaccion_calendario(calendar_state)
-            except Exception as e:
-                logger.exception(f"Error displaying calendar for barber {barbero_id}")
-                st.error(f"Error al mostrar calendario para {barber_name}: {str(e)}")
+                # Convert reservations to events for this barber
+                try:
+                    eventos_barbero = construir_eventos_calendario(reservas_barbero)
+                except Exception as e:
+                    st.error(f"Error construyendo eventos para {barber_name}:\n{traceback.format_exc()}")
+                    continue
+                
+                if not eventos_barbero:
+                    st.info(f"Sin reservas para {barber_name}")
+                    continue
+                
+                # Calendar options (no resources)
+                options = {
+                    "initialView": "timeGridWeek",
+                    "editable": not read_only,
+                    "selectable": not read_only,
+                    "allDaySlot": False,
+                    "slotMinTime": "09:00:00",
+                    "slotMaxTime": "21:00:00",
+                    "slotDuration": "00:30:00",
+                    "slotLabelInterval": "00:30:00",
+                    "height": 600,
+                    "contentHeight": "auto",
+                    "headerToolbar": {
+                        "left": "prev,next today",
+                        "center": "title",
+                        "right": "dayGridMonth,timeGridWeek,timeGridDay",
+                    },
+                    "slotLabelFormat": {
+                        "meridiem": False,
+                        "hour": "2-digit",
+                        "minute": "2-digit",
+                    },
+                    "eventDisplay": "block",
+                    "eventTimeFormat": {
+                        "meridiem": False,
+                        "hour": "2-digit",
+                        "minute": "2-digit",
+                    },
+                    "nowIndicator": True,
+                    "scrollTime": "09:00:00",
+                    "dayMaxEvents": 6,
+                    "eventBackgroundColor": "transparent",
+                    "eventBorderColor": "transparent",
+                    "eventTextColor": "#FFFFFF",
+                }
+                
+                try:
+                    calendar_state = calendar(
+                        events=eventos_barbero,
+                        options=options,
+                        key=f"calendario_barbero_{barbero_id}_{idx}",
+                    )
+                    
+                    if calendar_state and calendar_state.get("eventClick"):
+                        manejar_interaccion_calendario(calendar_state)
+                except Exception as e:
+                    st.error(f"Error al mostrar calendario para {barber_name}:\n{traceback.format_exc()}")
+        except Exception as e:
+            logger.error(f"Error processing barber {barbero_info}: {traceback.format_exc()}")
+            continue
 
 
 def obtener_reservas(barbero=None):
@@ -1805,15 +1869,15 @@ def eliminar_reserva(reserva_id):
 
     rol_u = normalizar_rol(user[3])
     uid = user[1]
-    cli = prev[8] if len(prev) > 8 else None
+    cli = prev.get("cliente")
 
-    if rol_u == "BARBERO" and prev[2] != uid:
+    if rol_u == "BARBERO" and prev.get("barbero") != uid:
         st.error("Sin permiso para eliminar esta reserva.")
         return False
-    if rol_u == "ADMIN" and prev[7] != st.session_state.get("barberia_id"):
+    if rol_u == "ADMIN" and prev.get("barberia_id") != st.session_state.get("barberia_id"):
         st.error("Sin permiso para eliminar esta reserva.")
         return False
-    if rol_u == "CLIENTE" and (cli or prev[1]) != uid:
+    if rol_u == "CLIENTE" and (cli or prev.get("nombre")) != uid:
         st.error("Sin permiso para eliminar esta reserva.")
         return False
 
@@ -1823,7 +1887,7 @@ def eliminar_reserva(reserva_id):
         return bool(
             execute_write(
                 "DELETE FROM reservas WHERE id = %s AND barberia_id = %s",
-                (reserva_id, prev[7]),
+                (reserva_id, prev.get("barberia_id")),
             )
         )
     except Exception as e:
@@ -1835,7 +1899,8 @@ def eliminar_reserva(reserva_id):
 def insertar_reserva_con_fecha_hora(
     barberia_id,
     cliente_usuario,
-    barbero,
+    barbero_id,
+    barbero_nombre,
     servicio,
     fecha,
     hora,
@@ -1860,10 +1925,10 @@ def insertar_reserva_con_fecha_hora(
             cur.execute(
                 """
                 SELECT id FROM reservas
-                WHERE barberia_id = %s AND barbero = %s AND fecha = %s AND hora = %s
+                WHERE barberia_id = %s AND barbero_id = %s AND fecha = %s AND hora = %s
                 LIMIT 1
                 """,
-                (barberia_id, barbero, fecha, hora),
+                (barberia_id, barbero_id, fecha, hora),
             )
             if cur.fetchone():
                 conn.rollback()
@@ -1874,12 +1939,12 @@ def insertar_reserva_con_fecha_hora(
                 """
                 SELECT id FROM reservas
                 WHERE barberia_id = %s
-                  AND barbero = %s
+                  AND barbero_id = %s
                   AND inicio < %s
                   AND fin > %s
                 LIMIT 1
                 """,
-                (barberia_id, barbero, fin, inicio),
+                (barberia_id, barbero_id, fin, inicio),
             )
             if cur.fetchone():
                 conn.rollback()
@@ -1889,15 +1954,16 @@ def insertar_reserva_con_fecha_hora(
             cur.execute(
                 """
                 INSERT INTO reservas (
-                    nombre, barbero, servicio, precio, inicio, fin, barberia_id,
+                    nombre, barbero, barbero_id, servicio, precio, inicio, fin, barberia_id,
                     cliente, fecha, hora, estado, monto, pagado
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
                 RETURNING id
                 """,
                 (
                     cliente_usuario,
-                    barbero,
+                    barbero_nombre,
+                    barbero_id,
                     servicio,
                     precio,
                     inicio,
@@ -1959,14 +2025,18 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
             bid = barberia_id_arg or effective_barberia_id()
             if not bid:
                 return []
+            user = st.session_state.get("user")
+            user_id = user[0] if user else None
+            if not user_id:
+                return []
             results = fetch_all(
                 f"""
                 SELECT {cols}
                 FROM reservas
-                WHERE barberia_id = %s AND barbero = %s
+                WHERE barberia_id = %s AND barbero_id = %s
                 ORDER BY inicio DESC NULLS LAST
                 """,
-                (bid, usuario_login),
+                (bid, user_id),
             ) or []
             return [normalizar_reserva(r) for r in results]
 
@@ -1974,7 +2044,7 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
             sql = f"SELECT {cols} FROM reservas WHERE 1=1"
             params = []
             if filtro_barbero and filtro_barbero != "Todos":
-                sql += " AND barbero = %s"
+                sql += " AND barbero_id = %s"
                 params.append(filtro_barbero)
             sql += " ORDER BY inicio DESC NULLS LAST"
             results = fetch_all(sql, tuple(params)) or []
@@ -1987,7 +2057,7 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
         sql = f"SELECT {cols} FROM reservas WHERE barberia_id = %s"
         params = [bid]
         if filtro_barbero and filtro_barbero != "Todos":
-            sql += " AND barbero = %s"
+            sql += " AND barbero_id = %s"
             params.append(filtro_barbero)
         sql += " ORDER BY inicio DESC NULLS LAST"
         results = fetch_all(sql, tuple(params)) or []
@@ -2238,11 +2308,11 @@ def manejar_interaccion_calendario(calendar_state):
             if reserva:
                 with st.spinner("⏳ Actualizando reserva..."):
                     actualizar_reserva(
-                        reserva[0],
-                        reserva[1],
-                        reserva[2],
-                        reserva[3],
-                        reserva[4],
+                        reserva.get("id"),
+                        reserva.get("nombre"),
+                        reserva.get("barbero"),
+                        reserva.get("servicio"),
+                        reserva.get("precio"),
                         normalizar_datetime(evento.get("start")),
                         normalizar_datetime(evento.get("end")),
                     )
@@ -2362,7 +2432,7 @@ def render_gestion_agenda(barbero_actual=None):
         st.info("No hay reservas para editar.")
         return
 
-    ids_reservas = [r[0] for r in reservas]
+    ids_reservas = [r.get("id") for r in reservas]
     reserva_id_guardada = st.session_state.get("reserva_seleccionada_id")
     index_inicial = ids_reservas.index(reserva_id_guardada) if reserva_id_guardada in ids_reservas else 0
 
@@ -2371,22 +2441,22 @@ def render_gestion_agenda(barbero_actual=None):
         ids_reservas,
         index=index_inicial,
         format_func=lambda rid: next(
-            f"{r[5].strftime('%d-%m %H:%M') if hasattr(r[5], 'strftime') else r[5]} - {r[1]} ({r[2]})"
+            f"{r.get('inicio').strftime('%d-%m %H:%M') if hasattr(r.get('inicio'), 'strftime') else r.get('inicio')} - {r.get('nombre')} ({r.get('barbero')})"
             for r in reservas
-            if r[0] == rid
+            if r.get("id") == rid
         ),
     )
-    reserva = next(r for r in reservas if r[0] == reserva_id)
+    reserva = next(r for r in reservas if r.get("id") == reserva_id)
     st.session_state.reserva_seleccionada_id = reserva_id
 
     with st.form("editar_reserva_calendario"):
-        servicio_idx = servicio_options.index(reserva[3]) if reserva[3] in servicio_options else 0
-        barbero_idx = barbero_options.index(reserva[2]) if reserva[2] in barbero_options else 0
-        nombre_editado = st.text_input("Cliente", value=reserva[1])
+        servicio_idx = servicio_options.index(reserva.get("servicio")) if reserva.get("servicio") in servicio_options else 0
+        barbero_idx = barbero_options.index(reserva.get("barbero")) if reserva.get("barbero") in barbero_options else 0
+        nombre_editado = st.text_input("Cliente", value=reserva.get("nombre", ""))
         servicio_editado = st.selectbox("Servicio", servicio_options, index=servicio_idx, key="agenda_servicio_editado")
         barbero_editado = st.selectbox("Barbero", barbero_options, index=barbero_idx, key="agenda_barbero_editado")
-        inicio_editado = st.datetime_input("Inicio", value=reserva[5], key="agenda_inicio_editado")
-        fin_editado = st.datetime_input("Fin", value=reserva[6], key="agenda_fin_editado")
+        inicio_editado = st.datetime_input("Inicio", value=reserva.get("inicio"), key="agenda_inicio_editado")
+        fin_editado = st.datetime_input("Fin", value=reserva.get("fin"), key="agenda_fin_editado")
 
         actualizar = st.form_submit_button("Guardar cambios")
         eliminar = st.form_submit_button("Eliminar reserva")
@@ -2423,6 +2493,668 @@ def render_modo_sin_db_banner():
             "Inicio de sesión, registro, reservas y sincronización de agenda están desactivados. "
             "Puedes revisar la interfaz; configura `DATABASE_URL` o `SUPABASE_DB_URL` para el modo completo."
         )
+
+
+# ================= PUBLIC BOOKING FLOW (NO LOGIN) =================
+
+def obtener_barberos_disponibles(barberia_id):
+    """Get all active barbers for a barbershop."""
+    if not barberia_id:
+        logger.warning("obtener_barberos_disponibles: barberia_id is empty or None")
+        return []
+    try:
+        results = fetch_all(
+            """
+            SELECT id, usuario AS nombre FROM usuarios 
+            WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'
+            ORDER BY usuario
+            """,
+            (barberia_id,)
+        )
+        logger.info(f"obtener_barberos_disponibles: barberia_id={barberia_id}, found {len(results) if results else 0} barbers: {results}")
+        return results or []
+    except Exception as e:
+        logger.exception(f"Error getting barbers for barberia_id={barberia_id}: {str(e)}")
+        return []
+
+
+def obtener_horarios_disponibles(barberia_id, barbero_id, fecha, duracion_minutos):
+    """
+    Get available time slots for a barber on a specific date.
+    Returns list of available times (30-min intervals from 09:00 to 20:30).
+    """
+    if not barberia_id or not barbero_id or not fecha:
+        logger.warning(f"obtener_horarios_disponibles: missing params - barberia_id={barberia_id}, barbero_id={barbero_id}, fecha={fecha}")
+        return []
+    
+    try:
+        from datetime import time as time_type
+        
+        # Get all reservations for this barber on this date
+        reservas = fetch_all(
+            """
+            SELECT inicio, fin FROM reservas
+            WHERE barberia_id = %s AND barbero_id = %s AND DATE(inicio) = %s
+            ORDER BY inicio
+            """,
+            (barberia_id, barbero_id, fecha)
+        )
+        
+        logger.info(f"obtener_horarios_disponibles: found {len(reservas) if reservas else 0} existing reservations for barbero_id={barbero_id} on {fecha}")
+        
+        # Generate all 30-minute slots
+        horarios_disponibles = []
+        slot_time = datetime.combine(fecha, time_type(9, 0))  # Start at 09:00
+        fin_dia = datetime.combine(fecha, time_type(21, 0))   # End at 21:00
+        
+        while slot_time < fin_dia:
+            slot_end = slot_time + timedelta(minutes=duracion_minutos)
+            
+            # Check if this slot conflicts with any reservation
+            disponible = True
+            for res_inicio, res_fin in (reservas or []):
+                # Check for overlap
+                if slot_time < res_fin and slot_end > res_inicio:
+                    disponible = False
+                    break
+            
+            if disponible:
+                horarios_disponibles.append(slot_time.time())
+            
+            slot_time += timedelta(minutes=30)
+        
+        logger.info(f"obtener_horarios_disponibles: returning {len(horarios_disponibles)} available slots for duration={duracion_minutos}min")
+        return horarios_disponibles
+    except Exception as e:
+        logger.exception(f"Error getting available times for barbero={barbero_id}, fecha={fecha}: {str(e)}")
+        return []
+
+
+def flujo_reserva_publica():
+    """Premium public booking flow without login required (AgendaPro style)."""
+    if "booking_step" not in st.session_state:
+        st.session_state.booking_step = 1
+    
+    if "booking_data" not in st.session_state:
+        st.session_state.booking_data = {}
+    
+    if "selected_fecha" not in st.session_state:
+        st.session_state.selected_fecha = datetime.now().date()
+    
+    # ===== HANDLE PRE-SELECTED SERVICE FROM LANDING PAGE =====
+    # If user clicked a service card on landing, populate booking_data and skip to barber selection
+    if "preselected_service" in st.session_state and st.session_state.preselected_service:
+        preselected = st.session_state.preselected_service
+        if preselected.get("nombre"):
+            # Only populate if not already populated (preserve user selections)
+            if not st.session_state.booking_data.get("servicio"):
+                st.session_state.booking_data["servicio"] = preselected["nombre"]
+                st.session_state.booking_data["duracion"] = preselected["duracion"]
+                st.session_state.booking_data["precio"] = preselected["precio"]
+                st.session_state.booking_step = 2  # Skip to barber selection
+                # Clear preselected service after using it
+                st.session_state.preselected_service = None
+                st.rerun()
+    
+    barberia_id = effective_barberia_id()
+    if not barberia_id:
+        st.error("❌ Barbería no disponible. Contacta al administrador.")
+        return
+    
+    # Progress bar
+    progress = (st.session_state.booking_step - 1) / 5 * 100
+    st.progress(int(progress) / 100, text=f"Paso {st.session_state.booking_step} de 5")
+    
+    # ===== STEP 1: SELECT SERVICE =====
+    if st.session_state.booking_step == 1:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                       background-clip: text;">✂️ Elige tu corte</h1>
+            <p style="color: #666; margin-top: 8px;">Tu próximo corte está a 30 segundos</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Service cards in 2-column grid - fully clickable
+        st.markdown("""
+        <style>
+            .service-card-container {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+                margin: 24px 0;
+            }
+            @media (max-width: 768px) {
+                .service-card-container {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        cols = st.columns(2)
+        for idx, (servicio, datos) in enumerate(servicios.items()):
+            col_idx = idx % 2
+            with cols[col_idx]:
+                # Clickable service button card
+                button_clicked = st.button(
+                    f"✂️  {servicio}\n\n⏱️ {datos['duracion']} min\n${datos['precio']:,}",
+                    key=f"service_btn_{servicio}",
+                    use_container_width=True,
+                    help=f"Seleccionar {servicio}"
+                )
+                
+                if button_clicked:
+                    # Show success feedback
+                    st.success(f"✅ {servicio} seleccionado! Cargando disponibilidad...")
+                    
+                    # Store selection
+                    st.session_state.booking_data["servicio"] = servicio
+                    st.session_state.booking_data["duracion"] = datos["duracion"]
+                    st.session_state.booking_data["precio"] = datos["precio"]
+                    
+                    # Smooth transition with spinner
+                    import time
+                    with st.spinner("Cargando disponibilidad..."):
+                        time.sleep(0.3)
+                    
+                    st.session_state.booking_step = 2
+                    st.rerun()
+    
+    # ===== STEP 2: SELECT BARBER =====
+    elif st.session_state.booking_step == 2:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                       background-clip: text;">� Elige tu barbero</h1>
+            <p style="color: #666; margin-top: 8px;">¿Con quién quieres tu corte?</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_back, col_space = st.columns([1, 9])
+        with col_back:
+            if st.button("🔄 Cambiar servicio", key="back_to_service_premium", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.rerun()
+        
+        # Display pre-selected service confirmation
+        if st.session_state.booking_data.get("servicio"):
+            servicio_nombre = st.session_state.booking_data["servicio"]
+            servicio_duracion = st.session_state.booking_data.get("duracion", 0)
+            servicio_precio = st.session_state.booking_data.get("precio", 0)
+            precio_fmt = f"${servicio_precio:,}".replace(",", ".")
+            
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+                padding: 16px 20px;
+                border-radius: 12px;
+                border-left: 4px solid #667eea;
+                margin-bottom: 24px;
+            ">
+                <p style="margin: 0; color: #333; font-size: 0.95em;">
+                    <strong>✂️ Servicio seleccionado:</strong> {servicio_nombre} • ⏱️ {servicio_duracion} min • {precio_fmt}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Debug info
+        logger.info(f"Step 2 - Barberos: barberia_id={barberia_id}")
+        
+        barberos = obtener_barberos_disponibles(barberia_id)
+        logger.info(f"Step 2 - Barberos returned: {barberos}")
+        
+        # Show debug info in UI
+        with st.expander("🔍 Debug Info", expanded=False):
+            st.write(f"**barberia_id**: {barberia_id}")
+            st.write(f"**barberos found**: {len(barberos) if barberos else 0}")
+            st.write(f"**barberos data**: {barberos}")
+        
+        if not barberos:
+            st.info("ℹ️ Mostrando todos los barberos disponibles...")
+            # Fallback: try to get all active barbers directly
+            try:
+                barberos = fetch_all(
+                    """
+                    SELECT id, usuario AS nombre FROM usuarios 
+                    WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'
+                    ORDER BY usuario
+                    """,
+                    (barberia_id,)
+                )
+                logger.warning(f"Step 2 - Fallback query returned {len(barberos) if barberos else 0} barbers: {barberos}")
+            except Exception as e:
+                logger.exception(f"Step 2 - Fallback query failed: {str(e)}")
+                barberos = []
+        
+        if not barberos:
+            st.error("❌ No hay barberos disponibles. Contacta al local.")
+            st.stop()
+            return
+        
+        # Barber clickable cards in responsive grid
+        cols = st.columns(min(3, len(barberos)))
+        for idx, (barbero_id, barbero_nombre) in enumerate(barberos):
+            with cols[idx % len(cols)]:
+                # Single fully-clickable card button with embedded styling
+                if st.button(
+                    f"💈\n\n{barbero_nombre}\n\n✓ DISPONIBLE",
+                    key=f"barber_select_{barbero_id}",
+                    use_container_width=True,
+                    help=f"Seleccionar a {barbero_nombre}"
+                ):
+                    # Store barber selection
+                    st.session_state.booking_data["barbero_id"] = barbero_id
+                    st.session_state.booking_data["barbero_nombre"] = barbero_nombre
+                    
+                    # Smooth transition
+                    import time
+                    with st.spinner(f"Cargando disponibilidad con {barbero_nombre}..."):
+                        time.sleep(0.3)
+                    
+                    st.session_state.booking_step = 3
+                    st.rerun()
+    
+    # ===== STEP 3: SELECT DATE & TIME =====
+    elif st.session_state.booking_step == 3:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                       background-clip: text;">📅 Elige tu fecha y hora</h1>
+            <p style="color: #666; margin-top: 8px;">¿Cuándo te gustaría venir?</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_back, col_space = st.columns([1, 9])
+        with col_back:
+            if st.button("← Atrás", key="back_to_barber_premium", use_container_width=True):
+                st.session_state.booking_step = 2
+                st.rerun()
+        
+        # Date picker
+        fecha = st.date_input(
+            "📅 Selecciona una fecha",
+            value=st.session_state.selected_fecha,
+            min_value=datetime.now().date(),
+            max_value=datetime.now().date() + timedelta(days=30),
+            key="booking_fecha_premium",
+            label_visibility="collapsed"
+        )
+        st.session_state.selected_fecha = fecha
+        
+        # Debug Step 3
+        logger.info(f"Step 3 - Date selection: fecha={fecha}, barbero_id={st.session_state.booking_data.get('barbero_id')}, duracion={st.session_state.booking_data.get('duracion')}")
+        
+        # Get available times
+        horarios = obtener_horarios_disponibles(
+            barberia_id,
+            st.session_state.booking_data["barbero_id"],
+            fecha,
+            st.session_state.booking_data["duracion"]
+        )
+        
+        logger.info(f"Step 3 - Horarios returned: {len(horarios) if horarios else 0} available slots")
+        
+        # Show debug info in UI
+        with st.expander("🔍 Debug Info", expanded=False):
+            st.write(f"**fecha**: {fecha}")
+            st.write(f"**barbero_id**: {st.session_state.booking_data.get('barbero_id')}")
+            st.write(f"**duracion**: {st.session_state.booking_data.get('duracion')} min")
+            st.write(f"**horarios found**: {len(horarios) if horarios else 0}")
+        
+        if not horarios:
+            st.warning("⚠️ No hay horarios disponibles para esta fecha. Selecciona otra fecha.")
+            st.stop()
+            return
+        
+        # Time slots in premium grid
+        st.markdown("""
+        <div style="margin: 24px 0;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 16px; font-weight: 500;">
+                🕐 Horarios disponibles
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 4-column grid of time slot buttons
+        cols = st.columns(4)
+        for idx, hora in enumerate(horarios):
+            col_idx = idx % 4
+            with cols[col_idx]:
+                hora_str = hora.strftime("%H:%M")
+                time_button_clicked = st.button(
+                    f"🕐\n{hora_str}",
+                    key=f"time_btn_{idx}_{hora_str}",
+                    use_container_width=True,
+                    help=f"Seleccionar {hora_str}"
+                )
+                
+                if time_button_clicked:
+                    st.session_state.booking_data["fecha"] = fecha
+                    st.session_state.booking_data["hora"] = hora.time()
+                    
+                    # Smooth transition
+                    import time
+                    with st.spinner("Confirmando disponibilidad..."):
+                        time.sleep(0.3)
+                    
+                    st.session_state.booking_step = 4
+                    st.rerun()
+    
+    # ===== STEP 4: ENTER PERSONAL INFO =====
+    elif st.session_state.booking_step == 4:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                       background-clip: text;">👤 Último paso!</h1>
+            <p style="color: #666; margin-top: 8px;">Cuéntanos quién eres</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_back, col_space = st.columns([1, 9])
+        with col_back:
+            if st.button("← Atrás", key="back_to_datetime_premium", use_container_width=True):
+                st.session_state.booking_step = 3
+                st.rerun()
+        
+        with st.form("booking_form_datos_premium"):
+            st.markdown("**Información de contacto**")
+            
+            nombre = st.text_input(
+                "📝 Nombre completo",
+                placeholder="Ej: Juan Pérez",
+                key="booking_nombre_premium",
+                help="Nombre como aparecerá en tu reserva"
+            )
+            
+            telefono = st.text_input(
+                "📞 Teléfono",
+                placeholder="Ej: +56 9 1234 5678",
+                key="booking_telefono_premium",
+                help="Usaremos este número para confirmarte"
+            )
+            
+            email = st.text_input(
+                "📧 Email (opcional)",
+                placeholder="Ej: tu@email.com",
+                key="booking_email_premium",
+                help="Para recibir confirmación de tu reserva"
+            )
+            
+            st.markdown("---")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submit_btn = st.form_submit_button("📋 Ver resumen", use_container_width=True, type="primary")
+            
+            if submit_btn:
+                errors = []
+                if not nombre or len(nombre) < 3:
+                    errors.append("• Nombre debe tener al menos 3 caracteres")
+                if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
+                    errors.append("• Teléfono debe tener al menos 9 dígitos")
+                if email and "@" not in email:
+                    errors.append("• Email no válido")
+                
+                if errors:
+                    st.error("❌ Revisa los siguientes errores:\n" + "\n".join(errors))
+                else:
+                    st.session_state.booking_data["nombre"] = nombre
+                    st.session_state.booking_data["telefono"] = telefono
+                    st.session_state.booking_data["email"] = email
+                    st.session_state.booking_step = 5
+                    st.rerun()
+    
+    # ===== STEP 5: REVIEW & CONFIRM =====
+    elif st.session_state.booking_step == 5:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                       background-clip: text;">✨ ¡Casi listo!</h1>
+            <p style="color: #666; margin-top: 8px;">Repasa todo antes de confirmar</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_back, col_space = st.columns([1, 9])
+        with col_back:
+            if st.button("← Atrás", key="back_to_datos_premium"):
+                st.session_state.booking_step = 4
+                st.rerun()
+        
+        data = st.session_state.booking_data
+        
+        # Premium summary card
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 32px;
+            border-radius: 20px;
+            color: white;
+            margin-bottom: 32px;
+            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.3);
+        ">
+            <h2 style="margin: 0 0 24px 0; font-size: 24px;">Tu reserva</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Servicio</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold;">{data.get('servicio', 'N/A')}</p>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Barbero</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold;">{data.get('barbero_nombre', 'N/A')}</p>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 24px;">
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Fecha</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold;">{data.get('fecha', 'N/A')}</p>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Hora</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold;">{data.get('hora', 'N/A')}</p>
+                </div>
+            </div>
+            
+            <div style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 16px;">
+                <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Monto total</p>
+                <p style="margin: 8px 0 0 0; font-size: 32px; font-weight: bold;">${data.get('precio', 0):,}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Personal info section
+        st.markdown("""
+        <div style="
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        ">
+            <h3 style="margin: 0 0 16px 0; color: #333;">📋 Tus datos</h3>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"**Nombre**\n{data.get('nombre', 'N/A')}", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"**Teléfono**\n{data.get('telefono', 'N/A')}", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"**Email**\n{data.get('email', 'N/A') or '—'}", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("❌ Cancelar", key="cancel_booking_step5", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
+        
+        with col2:
+            if st.button("✅ Agendar mi cita ✂️", key="confirm_booking_step5", use_container_width=True, type="primary", help="Confirma tu reserva"):
+                # Create reservation
+                with st.spinner("⏳ Creando tu reserva..."):
+                    reserva_id = insertar_reserva_con_fecha_hora(
+                        barberia_id,
+                        normalizar_texto(data.get('nombre', '')),
+                        data.get('barbero_id'),
+                        data.get('barbero_nombre'),
+                        data.get('servicio'),
+                        data.get('fecha'),
+                        data.get('hora'),
+                        data.get('precio'),
+                        data.get('duracion'),
+                    )
+                    
+                    if reserva_id:
+                        # Generate payment link
+                        with st.spinner("📲 Generando enlace de pago..."):
+                            pago_url = crear_pago_mercadopago(
+                                reserva_id,
+                                data.get('precio', 0),
+                                f"Reserva barbería: {data.get('servicio')}",
+                                data.get('email'),
+                                show_errors=True
+                            )
+                            
+                            if pago_url:
+                                st.session_state.booking_step = 6
+                                st.session_state.booking_data["pago_url"] = pago_url
+                                st.session_state.booking_data["reserva_id"] = reserva_id
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Reserva confirmada pero no se pudo generar el enlace de pago. Contacta al local.")
+                    else:
+                        st.error("❌ Error al crear la reserva. Intenta nuevamente.")
+    
+    # ===== STEP 6: SUCCESS SCREEN =====
+    elif st.session_state.booking_step == 6:
+        data = st.session_state.booking_data
+        
+        # Animated success screen
+        st.markdown("""
+        <div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 80px; margin-bottom: 16px; animation: bounce 1s infinite;">
+                ✅
+            </div>
+            <h1 style="margin: 0 0 16px 0; color: #16a34a; font-size: 32px;">
+                ¡Reserva confirmada!
+            </h1>
+            <p style="color: #666; font-size: 18px; margin: 0;">
+                Tu cita ha sido registrada exitosamente
+            </p>
+        </div>
+        <style>
+            @keyframes bounce {{
+                0%, 100% {{ transform: translateY(0); }}
+                50% {{ transform: translateY(-10px); }}
+            }}
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Success details
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%);
+            padding: 28px;
+            border-radius: 16px;
+            border: 2px solid #86efac;
+            margin-bottom: 24px;
+        ">
+            <h3 style="margin: 0 0 20px 0; color: #16a34a;">📅 Detalles de tu cita</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Número de reserva</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">#{data.get('reserva_id', 'N/A')}</p>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Servicio</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">{data.get('servicio', 'N/A')}</p>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Barbero</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">{data.get('barbero_nombre', 'N/A')}</p>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Monto</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">${data.get('precio', 0):,}</p>
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid rgba(22, 163, 74, 0.2); padding-top: 20px; margin-top: 20px;">
+                <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Fecha y hora</p>
+                <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">
+                    {data.get('fecha', 'N/A')} a las {data.get('hora', 'N/A')}
+                </p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Payment section
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 24px;">
+            <h3 style="color: #333; margin-bottom: 12px;">💳 Completar pago</h3>
+            <p style="color: #666; margin: 0; font-size: 14px;">
+                Haz clic en el botón para ir a MercadoPago y completar el pago
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Payment button
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.link_button(
+                "🔗 Ir a pagar",
+                url=data.get('pago_url', '#'),
+                use_container_width=True,
+                help="Se abrirá MercadoPago en una nueva ventana"
+            )
+        
+        # Info section
+        st.markdown("""
+        <div style="
+            background: #fef3c7;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+            margin-bottom: 24px;
+        ">
+            <p style="margin: 0; color: #92400e; font-size: 14px;">
+                <strong>ℹ️ Información importante:</strong><br>
+                • Recibirás una confirmación en tu teléfono<br>
+                • La cita es válida solo después de pagar<br>
+                • Puedes cancelar hasta 24 horas antes
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("← Ir al inicio", key="home_booking_step6", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
+        
+        with col2:
+            if st.button("✏️ Nueva reserva", key="new_booking_step6", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
 
 
 # ================= MÉTRICAS HELPERS =================
@@ -2485,7 +3217,7 @@ def calcular_metricas_cliente(barberia_id, usuario):
 
 
 @st.cache_data(ttl=45)
-def calcular_metricas_barbero(barberia_id, usuario):
+def calcular_metricas_barbero(barberia_id, barbero_id):
     """Fast cached barber metrics with optimized queries."""
     if not barberia_id or not st.session_state.get("db_available", True):
         return 0, 0, 0
@@ -2500,9 +3232,9 @@ def calcular_metricas_barbero(barberia_id, usuario):
                 COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
                 COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos
             FROM reservas 
-            WHERE barberia_id = %s AND barbero = %s
+            WHERE barberia_id = %s AND barbero_id = %s
             """,
-            (hoy, barberia_id, usuario),
+            (hoy, barberia_id, barbero_id),
         )
         
         if metrics:
@@ -2582,102 +3314,424 @@ def render_dashboard_cards(col_count, cards_data):
             st.metric(card["label"], card["value"], card.get("delta", None))
 
 
-# ================= BOOKING WITHOUT LOGIN =================
+# ================= MULTI-BARBERIA PUBLIC ACCESS =================
 
-def show_reserva_cliente():
-    """Show booking form for unauthenticated clients."""
-    st.markdown("### 📅 Reservar Cita")
+def obtener_barberia_por_slug(slug):
+    """Get barberia by slug for public booking."""
+    if not slug:
+        return None
+    try:
+        result = fetch_one(
+            "SELECT id, nombre, slug FROM barberias WHERE slug = %s",
+            (slug,),
+        )
+        if result:
+            return {
+                "id": result[0],
+                "nombre": result[1],
+                "slug": result[2],
+            }
+        return None
+    except Exception as e:
+        logger.exception(f"Error getting barberia by slug: {str(e)}")
+        return None
+
+
+def obtener_servicios(barberia_id):
+    """Load services from database for a barberia."""
+    if not barberia_id:
+        return []
+    try:
+        results = fetch_all(
+            """SELECT id, nombre, duracion_minutos, precio, descripcion, icono 
+               FROM servicios 
+               WHERE barberia_id = %s 
+               ORDER BY id ASC""",
+            (barberia_id,),
+        )
+        servicios_list = []
+        for row in results:
+            servicios_list.append({
+                "id": row[0],
+                "nombre": row[1],
+                "duracion": row[2],
+                "precio": row[3],
+                "descripcion": row[4],
+                "icono": row[5] or "✂️",
+            })
+        # If no services in DB, return empty list (UI will show message)
+        return servicios_list
+    except Exception as e:
+        logger.exception(f"Error loading services for barberia {barberia_id}: {e}")
+        return []
+
+
+def render_home_screen():
+    """Render the home screen with 3 main options."""
+    st.set_page_config(
+        page_title="Barbería Leveling",
+        page_icon="💈",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     
-    default_barberia_id = st.session_state.get("default_barberia_id")
-    
-    if not default_barberia_id:
-        st.error("❌ No hay barbería disponible. Por favor, registra una barbería primero.")
-        return
-    
-    db_ok = st.session_state.get("db_available", True)
-    if not db_ok:
-        st.warning("⚠️ No hay base de datos: no puedes crear reservas en modo demo.")
-        return
-    
-    with st.container(border=True):
-        st.markdown("#### Completa el formulario para reservar tu cita")
+    col_center = st.columns([1, 2, 1])
+    with col_center[1]:
+        st.markdown("# 💈 Barbería Leveling")
+        st.markdown("**Tu plataforma de reservas profesional**")
+        st.markdown("---")
+        st.markdown("")
         
-        with st.spinner("⏳ Cargando barberos disponibles..."):
-            barber_list = listar_usuarios_barberos(default_barberia_id)
-            barber_opts = [x[0] for x in barber_list] if barber_list else list(barberos.keys())
+        # 3 main buttons in clean layout
+        st.markdown("<h3 style='text-align: center; margin-top: 40px;'>¿Qué deseas hacer?</h3>", unsafe_allow_html=True)
+        st.markdown("")
         
-        with st.form("form_reserva_sin_login"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nombre = st.text_input("👤 Nombre", placeholder="Tu nombre completo")
-            with col2:
-                telefono = st.text_input("📱 Teléfono", placeholder="Tu número de teléfono")
-            
-            col3, col4 = st.columns(2)
-            with col3:
-                barbero_sel = st.selectbox("💇 Barbero", barber_opts, key="cliente_barbero_sin_login")
-            with col4:
-                servicio_sel = st.selectbox("✂️ Servicio", list(servicios.keys()), key="cliente_servicio_sin_login")
-            
-            col5, col6 = st.columns(2)
-            with col5:
-                fecha_sel = st.date_input("📅 Fecha", key="cliente_fecha_sin_login")
-            with col6:
-                hora_sel = st.time_input("🕐 Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sin_login")
-            
-            enviar = st.form_submit_button("✅ Reservar Cita", use_container_width=True)
+        col1, col2, col3 = st.columns(3, gap="large")
         
-        if enviar:
-            if not nombre or not nombre.strip():
-                st.error("❌ Por favor, ingresa tu nombre.")
-                return
+        with col1:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 40px 20px;
+                border-radius: 16px;
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                min-height: 180px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+            ">
+                <div style="font-size: 48px; margin-bottom: 12px;">🔑</div>
+                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Iniciar Sesión</div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Accede a tu cuenta</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Iniciar Sesión", key="home_login", use_container_width=True):
+                st.session_state.view = "login"
+                st.rerun()
+        
+        with col2:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                padding: 40px 20px;
+                border-radius: 16px;
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                min-height: 180px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                box-shadow: 0 8px 16px rgba(245, 87, 108, 0.3);
+            ">
+                <div style="font-size: 48px; margin-bottom: 12px;">✨</div>
+                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Registrar Barbería</div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Crea tu barbería</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Registrar Barbería", key="home_registro", use_container_width=True):
+                st.session_state.view = "registro"
+                st.rerun()
+        
+        with col3:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                padding: 40px 20px;
+                border-radius: 16px;
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                min-height: 180px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3);
+            ">
+                <div style="font-size: 48px; margin-bottom: 12px;">📅</div>
+                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Reservar Cita</div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Agenda tu corte</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Reservar Cita", key="home_reserva", use_container_width=True):
+                st.session_state.view = "reserva"
+                st.rerun()
+
+
+def render_landing_publico(barberia):
+    """Render authentic barberia landing page with barber-focused experience."""
+    barberia_id = barberia["id"]
+    barberia_name = barberia.get("nombre", "Barbería")
+    
+    # Initialize landing state - use barberia-specific key
+    landing_key = f"show_landing_barberia_{barberia_id}"
+    if landing_key not in st.session_state:
+        st.session_state[landing_key] = True
+    
+    # Initialize pre-selected service (for clicking on cards)
+    if "preselected_service" not in st.session_state:
+        st.session_state.preselected_service = None
+    
+    # Load services from database
+    servicios_list = obtener_servicios(barberia_id)
+    
+    # Back button navigation
+    col1, col2, col3 = st.columns([0.5, 19, 0.5], gap="small")
+    with col1:
+        if st.button("←", key="back_landing", help="Volver al inicio", use_container_width=True):
+            st.session_state.view = "home"
+            st.session_state[landing_key] = True
+            st.session_state.preselected_service = None
+            st.rerun()
+    
+    # Authentic Barberia Hero Section - warm & welcoming
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        padding: 80px 60px;
+        border-radius: 20px;
+        text-align: center;
+        margin: 40px 0 60px 0;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+    ">
+        <div style="position: relative; z-index: 1;">
+            <h1 style="
+                font-size: 4.5em;
+                color: #FFD700;
+                margin: 0 0 20px 0;
+                font-weight: 800;
+                text-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+                letter-spacing: -1px;
+            ">✂️ {barberia_name}</h1>
             
-            if not telefono or not telefono.strip():
-                st.error("❌ Por favor, ingresa tu teléfono.")
-                return
+            <p style="
+                font-size: 1.6em;
+                color: #ffffff;
+                margin: 0 0 16px 0;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            ">Tu estilo, tu flow</p>
             
-            with st.spinner("⏳ Procesando reserva..."):
-                duracion = servicios[servicio_sel]["duracion"]
-                precio = servicios[servicio_sel]["precio"]
+            <p style="
+                font-size: 1.1em;
+                color: rgba(255, 255, 255, 0.9);
+                margin: 0;
+                max-width: 600px;
+                margin-left: auto;
+                margin-right: auto;
+                line-height: 1.6;
+            ">Barberos expertos en tu barrio. Cortes clásicos y modernos.</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Simplified Trust Section - authentic barberia vibes
+    st.markdown("""
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 30px;
+        margin: 60px 0;
+    ">
+        <div style="
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+            padding: 35px;
+            border-radius: 16px;
+            text-align: center;
+            border-left: 4px solid #FFD700;
+            backdrop-filter: blur(10px);
+        ">
+            <div style="font-size: 3em; margin-bottom: 12px;">⚡</div>
+            <h3 style="color: #1a1a1a; margin: 0 0 8px 0; font-size: 1.2em; font-weight: 700;">Reserva en segundos</h3>
+            <p style="color: #666; margin: 0; font-size: 0.95em; line-height: 1.5;">Elige tu corte, barbero y horario</p>
+        </div>
+        
+        <div style="
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(56, 142, 60, 0.05) 100%);
+            padding: 35px;
+            border-radius: 16px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+            backdrop-filter: blur(10px);
+        ">
+            <div style="font-size: 3em; margin-bottom: 12px;">✓</div>
+            <h3 style="color: #1a1a1a; margin: 0 0 8px 0; font-size: 1.2em; font-weight: 700;">Confirmación inmediata</h3>
+            <p style="color: #666; margin: 0; font-size: 0.95em; line-height: 1.5;">Te llega por WhatsApp al instante</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Services Section - Interactive & Barber-Focused
+    if servicios_list:
+        st.markdown("""
+        <div style="margin: 80px 0 60px 0;">
+            <h2 style="
+                text-align: center;
+                color: #1a1a1a;
+                margin: 0 0 50px 0;
+                font-size: 2.5em;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+            ">Elige tu corte</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Display services in responsive grid - CLICKABLE
+        num_services = len(servicios_list)
+        if num_services == 1:
+            cols = st.columns(1)
+            cols_list = [cols]
+        elif num_services == 2:
+            cols = st.columns(2, gap="large")
+            cols_list = cols
+        else:
+            cols = st.columns(min(3, num_services), gap="large")
+            cols_list = cols
+        
+        gradients = [
+            ("linear-gradient(135deg, #667eea 0%, #764ba2 100%)", "rgba(102, 126, 234, 0.15)"),
+            ("linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", "rgba(245, 87, 108, 0.15)"),
+            ("linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", "rgba(79, 172, 254, 0.15)"),
+        ]
+        
+        for idx, servicio in enumerate(servicios_list):
+            col = cols_list[idx % len(cols_list)] if isinstance(cols_list[0], object) else cols_list[idx]
+            gradient, shadow_color = gradients[idx % len(gradients)]
+            
+            with col:
+                # Format price with thousand separator
+                precio_formateado = f"${servicio['precio']:,}".replace(",", ".")
                 
-                reserva_id = insertar_reserva_con_fecha_hora(
-                    default_barberia_id,
-                    nombre.strip(),
-                    barbero_sel,
-                    servicio_sel,
-                    fecha_sel,
-                    hora_sel,
-                    precio,
-                    duracion,
+                # Clickable service button - looks like card, acts like button
+                button_clicked = st.button(
+                    label=f"{servicio['icono']}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n⏱️ {servicio['duracion']} min • {precio_formateado}",
+                    key=f"service_card_{servicio['id']}",
+                    use_container_width=True,
+                    help=f"Seleccionar {servicio['nombre']}"
                 )
                 
-                if reserva_id:
-                    # Send WhatsApp confirmation
-                    try:
-                        inicio_msg = datetime.combine(fecha_sel, hora_sel)
-                        mensaje = construir_mensaje_reserva(
-                            nombre.strip(), inicio_msg, barbero_sel, servicio_sel
-                        )
-                        enviar_whatsapp_twilio(telefono.strip(), mensaje)
-                    except Exception as exc:
-                        logger.exception("Error al enviar WhatsApp: %s", exc)
-                    
-                    st.success("✅ Reserva creada correctamente")
-                    st.markdown("---")
-                    
-                    # Generate payment link
-                    st.markdown("### 💳 Completar Pago")
-                    url_pago = crear_pago_mercadopago(
-                        reserva_id,
-                        precio,
-                        f"Reserva barbería - {servicio_sel}"
-                    )
-                    
-                    if url_pago:
-                        st.info("📌 Por favor, completa el pago para confirmar tu cita.")
-                        st.link_button("💳 Pagar ahora", url_pago, use_container_width=True)
-                    else:
-                        st.warning("⚠️ No se pudo generar el enlace de pago. Tu reserva se ha creado sin pago.")
+                if button_clicked:
+                    st.session_state.preselected_service = {
+                        "nombre": servicio["nombre"],
+                        "duracion": servicio["duracion"],
+                        "precio": servicio["precio"],
+                    }
+                    st.session_state[landing_key] = False
+                    st.session_state.booking_step = 2  # Skip to barber selection
+                    st.rerun()
+    else:
+        st.info("📋 Los servicios se mostrarán aquí una vez configurados")
+    
+    # Spacer
+    st.markdown("<div style='margin: 60px 0;'></div>", unsafe_allow_html=True)
+    
+    # Friendly CTA Section - Barber Shop Vibe
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        padding: 60px 40px;
+        border-radius: 20px;
+        text-align: center;
+        margin: 40px 0;
+        box-shadow: 0 12px 40px rgba(255, 215, 0, 0.25);
+    ">
+        <h2 style="
+            color: #1a1a1a;
+            margin: 0 0 20px 0;
+            font-size: 2.2em;
+            font-weight: 700;
+        ">Selecciona tu servicio y agenda 🎯</h2>
+        
+        <p style="
+            color: #333;
+            margin: 0;
+            font-size: 1.05em;
+            line-height: 1.6;
+        ">O toca el botón de abajo para empezar sin elegir</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Main CTA Button - Personal & Action-Driven
+    st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
+    
+    col_btn_1, col_btn_2, col_btn_3 = st.columns([1, 2, 1])
+    with col_btn_2:
+        cta_clicked = st.button(
+            "📅 Agendar mi cita",
+            key="barberia_cta_button",
+            use_container_width=True,
+            help="Comienza tu reserva ahora",
+        )
+        
+        if cta_clicked:
+            st.session_state[landing_key] = False
+            st.session_state.booking_step = 1  # Go to service selection
+            st.rerun()
+    
+    # Footer - Authentic Barberia Message
+    st.markdown("""
+    <div style="
+        text-align: center;
+        margin-top: 60px;
+        padding: 30px;
+        color: #999;
+        font-size: 0.95em;
+        line-height: 1.8;
+    ">
+        <p style="margin: 0;">✂️ Barbería profesional • 💈 Barberos expertos • 🎯 Tu estilo</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
+
+
+
+
+def render_booking_publico(barberia_slug):
+    """Render public booking interface for a specific barberia."""
+    # Load barberia from slug
+    barberia = obtener_barberia_por_slug(barberia_slug)
+    if not barberia:
+        st.error("❌ Barbería no encontrada")
+        st.stop()
+        return
+    
+    barberia_id = barberia["id"]
+    
+    # Set page config
+    st.set_page_config(
+        page_title=f"Reserva en {barberia['nombre']}",
+        page_icon="💈",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Store barberia context in session state temporarily
+    st.session_state.barberia_id = barberia_id
+    st.session_state.public_mode = True
+    
+    # Initialize landing page state - use barberia-specific key
+    landing_key = f"show_landing_barberia_{barberia_id}"
+    if landing_key not in st.session_state:
+        st.session_state[landing_key] = True
+    
+    # Show landing page or booking flow
+    if st.session_state.get(landing_key, True):
+        render_landing_publico(barberia)
+        # Don't show booking flow when landing page is visible
+        return
+    
+    # Run the existing public booking flow (only shown after user clicks CTA)
+    flujo_reserva_publica()
+
+
+# ================= BOOKING WITHOUT LOGIN =================
+
 
 
 # ------------------ LOGIN ------------------
@@ -2697,6 +3751,10 @@ try:
         st.session_state.reserva_seleccionada_id = None
     if "mostrar_detalles_reserva" not in st.session_state:
         st.session_state.mostrar_detalles_reserva = False
+    if "view" not in st.session_state:
+        st.session_state.view = "home"
+    if "public_mode" not in st.session_state:
+        st.session_state.public_mode = False
 
     st.session_state["db_available"] = is_db_available()
     db_ok = st.session_state["db_available"]
@@ -2704,68 +3762,96 @@ try:
 
     st.write("🔵 APP START")
 
+    # ===== URL ROUTING =====
+    # Check if accessing public booking via URL parameter
+    barberia_slug = st.query_params.get("barberia")
+    
+    if barberia_slug:
+        # Public booking mode - show booking interface directly
+        render_booking_publico(barberia_slug)
+        st.stop()
+    else:
+        # Reset barberia_id to default when no slug (to prevent carryover from previous public booking)
+        st.session_state.barberia_id = default_barberia_id
+    
     # ===== LOGIN SCREEN =====
-    if not st.session_state.user:
+    # Initialize view state if not set
+    if "view" not in st.session_state:
+        st.session_state.view = "home"
+    
+    # Route based on view state
+    if st.session_state.view == "home":
+        render_home_screen()
+    
+    elif st.session_state.view == "login":
+        # Show login form
         st.set_page_config(layout="wide")
         col_center = st.columns([1, 2, 1])
         with col_center[1]:
-            st.markdown("# 💈 Barbería Leveling")
-            st.markdown("**Tu plataforma de reservas profesional**")
-            st.markdown("---")
+            if st.button("← Volver al inicio", key="back_to_home"):
+                st.session_state.view = "home"
+                st.rerun()
+            st.markdown("### Accede a tu cuenta")
+            with st.form("login_form"):
+                usuario = st.text_input("👤 Usuario", placeholder="Tu usuario")
+                password = st.text_input("🔐 Contraseña", type="password", placeholder="Tu contraseña")
+                entrar = st.form_submit_button("✅ Entrar", use_container_width=True, disabled=not db_ok)
 
-            if not db_ok:
-                st.warning(
-                    "⚠️ Inicio de sesión y registro están desactivados: no hay base de datos (modo demo)."
-                )
-
-            opcion = st.radio("Selecciona una opción", [
-                "🔑 Iniciar sesión",
-                "✨ Registrar barbería",
-                "📅 Reservar cita",
-            ], key="login_option")
-
-            if opcion == "🔑 Iniciar sesión":
-                st.markdown("### Accede a tu cuenta")
-                with st.form("login_form"):
-                    usuario = st.text_input("👤 Usuario", placeholder="Tu usuario")
-                    password = st.text_input("🔐 Contraseña", type="password", placeholder="Tu contraseña")
-                    entrar = st.form_submit_button("✅ Entrar", use_container_width=True, disabled=not db_ok)
-
-                if entrar:
-                    try:
-                        with st.spinner("🔍 Verificando credenciales..."):
-                            user = login(usuario, password)
-                            if user:
-                                # Store session state before rerun
-                                st.session_state.user = user
-                                # Normalize and store role immediately
-                                raw_rol = user[3] if len(user) > 3 else None
-                                st.session_state.rol = normalizar_rol(raw_rol)
-                                nr_login = st.session_state.rol
-                                st.write("🟢 LOGIN OK")
-                                if nr_login == "SUPER_ADMIN":
-                                    st.session_state.barberia_id = None
-                                    with st.spinner("⏳ Cargando barberías..."):
-                                        fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-                                    st.session_state.barberia_context_id = fb[0] if fb else None
-                                    st.session_state.super_admin_all_barberias = False
-                                else:
-                                    bid_u = user[5] if len(user) > 5 else None
-                                    st.session_state.barberia_id = bid_u or default_barberia_id
-                                    st.session_state.barberia_context_id = st.session_state.barberia_id
-                                st.success("✅ ¡Bienvenido!")
-                                st.rerun()
+            if entrar:
+                try:
+                    with st.spinner("🔍 Verificando credenciales..."):
+                        user = login(usuario, password)
+                        if user:
+                            st.session_state.user = user
+                            raw_rol = user[3] if len(user) > 3 else None
+                            st.session_state.rol = normalizar_rol(raw_rol)
+                            nr_login = st.session_state.rol
+                            if nr_login == "SUPER_ADMIN":
+                                st.session_state.barberia_id = None
+                                with st.spinner("⏳ Cargando barberías..."):
+                                    fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
+                                st.session_state.barberia_context_id = fb[0] if fb else None
+                                st.session_state.super_admin_all_barberias = False
                             else:
-                                st.error("❌ Datos incorrectos. Intenta nuevamente.")
-                    except Exception as e:
-                        logger.exception("Error en login")
-                        st.error(f"Error en login: {str(e)}")
-            
-            elif opcion == "📅 Reservar cita":
-                show_reserva_cliente()
+                                bid_u = user[5] if len(user) > 5 else None
+                                st.session_state.barberia_id = bid_u or default_barberia_id
+                                st.session_state.barberia_context_id = st.session_state.barberia_id
+                            st.success("✅ ¡Bienvenido!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Datos incorrectos. Intenta nuevamente.")
+                except Exception as e:
+                    logger.exception("Error en login")
+                    st.error(f"Error en login: {str(e)}")
+    
+    elif st.session_state.view == "registro":
+        # Show registration form
+        st.set_page_config(layout="wide")
+        col_center = st.columns([1, 2, 1])
+        with col_center[1]:
+            if st.button("← Volver al inicio", key="back_to_home_reg"):
+                st.session_state.view = "home"
+                st.rerun()
+            st.markdown("### ✨ Registra tu Barbería")
+            # This would be your existing registration logic
+            st.info("Funcionalidad de registro - implementar según necesites")
+    
+    elif st.session_state.view == "reserva":
+        # Show public booking
+        st.set_page_config(layout="wide")
+        col_center = st.columns([1, 2, 1])
+        with col_center[1]:
+            if st.button("← Volver al inicio", key="back_to_home_res"):
+                st.session_state.view = "home"
+                st.rerun()
+            flujo_reserva_publica()
+    
+    # If user is logged in, skip to main app
+    if st.session_state.user:
+        st.rerun()
+    
+    st.stop()
 
-        # CRITICAL: Stop execution here ONLY when NOT logged in
-        st.stop()
 
     # ===== MAIN APP (Only runs if logged in) =====
     st.write("🟡 MAIN APP STARTING")
@@ -3042,7 +4128,7 @@ try:
             else:
                 with st.spinner("⏳ Cargando métricas..."):
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
-                    total_reservas, hoy_reservas, total_ingresos = calcular_metricas_barbero(barberia_id, usuario)
+                    total_reservas, hoy_reservas, total_ingresos = calcular_metricas_barbero(barberia_id, user[0])
                 
                 # Dashboard header metrics
                 col1, col2, col3 = st.columns(3, gap="large")
@@ -3297,10 +4383,10 @@ try:
                     st.markdown("#### 📊 Desglose por Barbero")
                     with st.spinner("⏳ Cargando desglose..."):
                         barberos_list = listar_usuarios_barberos(barberia_id)
-                        for barbero_name, _ in barberos_list:
+                        for barbero_id_val, barbero_name in barberos_list:
                             barbero_ingresos = fetch_one(
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero = %s AND pagado = TRUE",
-                                (barberia_id, barbero_name),
+                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                                (barberia_id, barbero_id_val),
                             )
                             ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
                             st.caption(f"💇 {barbero_name}: ${ingreso}")
@@ -3464,10 +4550,10 @@ try:
                     st.markdown("#### 📊 Desglose por Barbero")
                     with st.spinner("⏳ Cargando desglose..."):
                         barberos_list = listar_usuarios_barberos(bid_ctx)
-                        for barbero_name, _ in barberos_list:
+                        for barbero_id_val, barbero_name in barberos_list:
                             barbero_ingresos = fetch_one(
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero = %s AND pagado = TRUE",
-                                (bid_ctx, barbero_name),
+                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                                (bid_ctx, barbero_id_val),
                             )
                             ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
                             st.caption(f"💇 {barbero_name}: ${ingreso}")
@@ -3499,4 +4585,4 @@ try:
 
 except Exception as e:
     logger.exception("Unhandled exception in Streamlit app")
-    st.error(f"Error en la aplicación: {str(e)}")
+    st.error(f"Error en la aplicación:\n{traceback.format_exc()}")
