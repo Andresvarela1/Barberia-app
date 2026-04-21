@@ -2646,19 +2646,10 @@ def flujo_reserva_publica():
                 )
                 
                 if button_clicked:
-                    # Show success feedback
-                    st.success(f"✅ {servicio} seleccionado! Cargando disponibilidad...")
-                    
-                    # Store selection
+                    # Store selection and advance (fast transition)
                     st.session_state.booking_data["servicio"] = servicio
                     st.session_state.booking_data["duracion"] = datos["duracion"]
                     st.session_state.booking_data["precio"] = datos["precio"]
-                    
-                    # Smooth transition with spinner
-                    import time
-                    with st.spinner("Cargando disponibilidad..."):
-                        time.sleep(0.3)
-                    
                     st.session_state.booking_step = 2
                     st.rerun()
     
@@ -2745,15 +2736,9 @@ def flujo_reserva_publica():
                     use_container_width=True,
                     help=f"Seleccionar a {barbero_nombre}"
                 ):
-                    # Store barber selection
+                    # Store barber selection and advance
                     st.session_state.booking_data["barbero_id"] = barbero_id
                     st.session_state.booking_data["barbero_nombre"] = barbero_nombre
-                    
-                    # Smooth transition
-                    import time
-                    with st.spinner(f"Cargando disponibilidad con {barbero_nombre}..."):
-                        time.sleep(0.3)
-                    
                     st.session_state.booking_step = 3
                     st.rerun()
     
@@ -2810,11 +2795,18 @@ def flujo_reserva_publica():
             st.stop()
             return
         
+        # Show urgency if limited slots
+        num_slots = len(horarios)
+        urgency_message = ""
+        if num_slots <= 4:
+            urgency_message = "<div style='color: #dc2626; font-weight: 600; margin-bottom: 16px;'>🔥 Quedan pocos horarios disponibles hoy</div>"
+        
         # Time slots in premium grid
-        st.markdown("""
+        st.markdown(f"""
         <div style="margin: 24px 0;">
+            {urgency_message}
             <p style="font-size: 16px; color: #333; margin-bottom: 16px; font-weight: 500;">
-                🕐 Horarios disponibles
+                🕐 Horarios disponibles ({num_slots})
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -2835,12 +2827,6 @@ def flujo_reserva_publica():
                 if time_button_clicked:
                     st.session_state.booking_data["fecha"] = fecha
                     st.session_state.booking_data["hora"] = hora.time()
-                    
-                    # Smooth transition
-                    import time
-                    with st.spinner("Confirmando disponibilidad..."):
-                        time.sleep(0.3)
-                    
                     st.session_state.booking_step = 4
                     st.rerun()
     
@@ -3041,17 +3027,20 @@ def flujo_reserva_publica():
     elif st.session_state.booking_step == 6:
         data = st.session_state.booking_data
         
-        # Animated success screen
+        # Visual reward 🎉
+        st.balloons()
+        
+        # Animated success screen - SIMPLE & CLEAR
         st.markdown("""
         <div style="text-align: center; padding: 40px 20px;">
             <div style="font-size: 80px; margin-bottom: 16px; animation: bounce 1s infinite;">
-                ✅
+                🔥
             </div>
             <h1 style="margin: 0 0 16px 0; color: #16a34a; font-size: 32px;">
-                ¡Reserva confirmada!
+                🔥 Tu cita está confirmada
             </h1>
-            <p style="color: #666; font-size: 18px; margin: 0;">
-                Tu cita ha sido registrada exitosamente
+            <p style="color: #16a34a; font-size: 18px; margin: 0; font-weight: 600;">
+                Te esperamos 💈
             </p>
         </div>
         <style>
@@ -3062,95 +3051,182 @@ def flujo_reserva_publica():
         </style>
         """, unsafe_allow_html=True)
         
-        # Success details
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%);
-            padding: 28px;
-            border-radius: 16px;
-            border: 2px solid #86efac;
-            margin-bottom: 24px;
-        ">
-            <h3 style="margin: 0 0 20px 0; color: #16a34a;">📅 Detalles de tu cita</h3>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Número de reserva</p>
-                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">#{data.get('reserva_id', 'N/A')}</p>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Servicio</p>
-                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">{data.get('servicio', 'N/A')}</p>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Barbero</p>
-                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">{data.get('barbero_nombre', 'N/A')}</p>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Monto</p>
-                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">${data.get('precio', 0):,}</p>
-                </div>
-            </div>
-            
-            <div style="border-top: 1px solid rgba(22, 163, 74, 0.2); padding-top: 20px; margin-top: 20px;">
-                <p style="margin: 0; font-size: 12px; color: #65a30d; text-transform: uppercase; letter-spacing: 1px;">Fecha y hora</p>
-                <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">
-                    {data.get('fecha', 'N/A')} a las {data.get('hora', 'N/A')}
+        # PAYMENT SECTION - PRIORITY #1
+        if data.get('pago_url'):
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+                padding: 24px;
+                border-radius: 16px;
+                border: 3px solid #dc2626;
+                margin-bottom: 28px;
+                text-align: center;
+                box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);
+            ">
+                <p style="margin: 0 0 12px 0; color: #7f1d1d; font-weight: 700; font-size: 18px;">
+                    💳 Finaliza tu pago ahora
+                </p>
+                <p style="margin: 0 0 16px 0; color: #991b1b; font-weight: 600; font-size: 15px;">
+                    ⏱️ Tu hora está bloqueada temporalmente para ti
+                </p>
+                <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">
+                    Completa el pago para asegurar tu cita • Sin pago se libera la hora
                 </p>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            
+            # PRIMARY PAYMENT BUTTON
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.link_button(
+                    "💳 Pagar ahora",
+                    url=data.get('pago_url', '#'),
+                    use_container_width=True,
+                    help="Finaliza el pago en MercadoPago"
+                )
+            
+            # SECURITY SIGNAL - TRUST BUILDER
+            st.markdown("""
+            <div style="
+                text-align: center;
+                margin-top: 12px;
+                padding: 8px;
+                font-size: 13px;
+                color: #22c55e;
+                font-weight: 600;
+            ">
+                🔒 Pago seguro con MercadoPago
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # DATA PRIVACY SIGNAL - ADDITIONAL TRUST
+            st.markdown("""
+            <div style="
+                text-align: center;
+                margin-top: 8px;
+                padding: 6px;
+                font-size: 12px;
+                color: #666;
+                font-weight: 500;
+            ">
+                🔒 No guardamos datos de tu tarjeta
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # TIME REASSURANCE - URGENCY + CONFIDENCE
+            st.markdown("""
+            <div style="
+                text-align: center;
+                margin-top: 12px;
+                padding: 8px;
+                font-size: 12px;
+                color: #3b82f6;
+                font-weight: 600;
+                background: rgba(59, 130, 246, 0.08);
+                border-radius: 8px;
+            ">
+                ⏳ Te tomará menos de 30 segundos completar tu reserva
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Payment section
+        # NEXT STEPS - Notification message
         st.markdown("""
-        <div style="text-align: center; margin-bottom: 24px;">
-            <h3 style="color: #333; margin-bottom: 12px;">💳 Completar pago</h3>
-            <p style="color: #666; margin: 0; font-size: 14px;">
-                Haz clic en el botón para ir a MercadoPago y completar el pago
+        <div style="
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            padding: 16px;
+            border-radius: 12px;
+            border-left: 4px solid #3b82f6;
+            margin-bottom: 24px;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 14px;">
+                📲 Te enviamos la confirmación a WhatsApp<br>
+                <span style="font-size: 13px; font-weight: 400;">Revisa tu teléfono para más detalles</span>
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Payment button
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.link_button(
-                "🔗 Ir a pagar",
-                url=data.get('pago_url', '#'),
-                use_container_width=True,
-                help="Se abrirá MercadoPago en una nueva ventana"
-            )
+        # BOOKING SUMMARY - EXPANDABLE/SECONDARY
+        with st.expander("📋 Ver detalles de tu cita", expanded=False):
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%);
+                padding: 24px;
+                border-radius: 12px;
+                border: 1px solid #86efac;
+            ">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">SERVICIO</p>
+                        <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('servicio', 'N/A')}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">BARBERO</p>
+                        <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('barbero_nombre', 'N/A')}</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);">
+                    <div>
+                        <p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">FECHA Y HORA</p>
+                        <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('fecha', 'N/A')} • {data.get('hora', 'N/A')}</p>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">MONTO</p>
+                        <p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">${data.get('precio', 0):,}</p>
+                    </div>
+                </div>
+                <div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;">
+                    <p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">NÚMERO DE RESERVA</p>
+                    <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">#{data.get('reserva_id', 'N/A')}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Info section
+        # TRUST SIGNAL - SECONDARY
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(74, 222, 128, 0.05) 100%);
+            padding: 14px;
+            border-radius: 10px;
+            border-left: 3px solid #22c55e;
+            margin-bottom: 20px;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #16a34a; font-weight: 600; font-size: 13px;">
+                ⭐ Más de 100 clientes ya se depilaron aquí
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # INFO SECTION - COMPACT
         st.markdown("""
         <div style="
             background: #fef3c7;
-            padding: 16px;
+            padding: 14px;
             border-radius: 8px;
-            border-left: 4px solid #f59e0b;
+            border-left: 3px solid #f59e0b;
             margin-bottom: 24px;
         ">
-            <p style="margin: 0; color: #92400e; font-size: 14px;">
-                <strong>ℹ️ Información importante:</strong><br>
-                • Recibirás una confirmación en tu teléfono<br>
-                • La cita es válida solo después de pagar<br>
-                • Puedes cancelar hasta 24 horas antes
+            <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;">
+                <strong>✓ Tu hora está reservada</strong><br>
+                <strong>✓ Confirmación en tu WhatsApp</strong><br>
+                <strong>✓ Cancela hasta 24h antes</strong>
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Action buttons
-        col1, col2 = st.columns(2)
+        # ACTION BUTTONS - CLEAR HIERARCHY
+        col1, col2 = st.columns([1, 1])
         
         with col1:
-            if st.button("← Ir al inicio", key="home_booking_step6", use_container_width=True):
+            if st.button("🏠 Volver al inicio", key="home_booking_step6", use_container_width=True):
                 st.session_state.booking_step = 1
                 st.session_state.booking_data = {}
                 st.session_state.selected_fecha = datetime.now().date()
                 st.rerun()
         
         with col2:
-            if st.button("✏️ Nueva reserva", key="new_booking_step6", use_container_width=True):
+            if st.button("➕ Otra cita", key="new_booking_step6", use_container_width=True):
                 st.session_state.booking_step = 1
                 st.session_state.booking_data = {}
                 st.session_state.selected_fecha = datetime.now().date()
@@ -3388,77 +3464,103 @@ def render_home_screen():
         
         col1, col2, col3 = st.columns(3, gap="large")
         
+        # CUSTOM CSS FOR CARD BUTTONS
+        st.markdown("""
+        <style>
+        .card-button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        
+        /* Style for the card buttons */
+        button[data-testid="baseButton-secondary"] {
+            height: auto !important;
+            min-height: 180px !important;
+            border-radius: 16px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+            white-space: pre-line !important;
+            line-height: 1.6 !important;
+            padding: 40px 20px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-direction: column !important;
+            text-align: center !important;
+        }
+        
+        /* Login card styling */
+        .card-login button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3) !important;
+            border: none !important;
+        }
+        
+        .card-login button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 24px rgba(102, 126, 234, 0.4) !important;
+        }
+        
+        /* Register card styling */
+        .card-register button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+            color: white !important;
+            box-shadow: 0 8px 16px rgba(245, 87, 108, 0.3) !important;
+            border: none !important;
+        }
+        
+        .card-register button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 24px rgba(245, 87, 108, 0.4) !important;
+        }
+        
+        /* Booking card styling */
+        .card-booking button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+            color: white !important;
+            box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3) !important;
+            border: none !important;
+        }
+        
+        .card-booking button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 24px rgba(79, 172, 254, 0.4) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         with col1:
-            st.markdown("""
-            <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px 20px;
-                border-radius: 16px;
-                text-align: center;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                min-height: 180px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
-            ">
-                <div style="font-size: 48px; margin-bottom: 12px;">🔑</div>
-                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Iniciar Sesión</div>
-                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Accede a tu cuenta</div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("Iniciar Sesión", key="home_login", use_container_width=True):
+            card_html1 = """
+            <div class="card-login">
+            """
+            st.markdown(card_html1, unsafe_allow_html=True)
+            if st.button("🔑\n\nIniciar Sesión\n\nAccede a tu cuenta", key="home_login", use_container_width=True):
                 st.session_state.view = "login"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with col2:
-            st.markdown("""
-            <div style="
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                padding: 40px 20px;
-                border-radius: 16px;
-                text-align: center;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                min-height: 180px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                box-shadow: 0 8px 16px rgba(245, 87, 108, 0.3);
-            ">
-                <div style="font-size: 48px; margin-bottom: 12px;">✨</div>
-                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Registrar Barbería</div>
-                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Crea tu barbería</div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("Registrar Barbería", key="home_registro", use_container_width=True):
+            card_html2 = """
+            <div class="card-register">
+            """
+            st.markdown(card_html2, unsafe_allow_html=True)
+            if st.button("✨\n\nRegistrar Barbería\n\nCrea tu barbería", key="home_registro", use_container_width=True):
                 st.session_state.view = "registro"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with col3:
-            st.markdown("""
-            <div style="
-                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                padding: 40px 20px;
-                border-radius: 16px;
-                text-align: center;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                min-height: 180px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3);
-            ">
-                <div style="font-size: 48px; margin-bottom: 12px;">📅</div>
-                <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 8px;">Reservar Cita</div>
-                <div style="font-size: 13px; color: rgba(255,255,255,0.8);">Agenda tu corte</div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("Reservar Cita", key="home_reserva", use_container_width=True):
+            card_html3 = """
+            <div class="card-booking">
+            """
+            st.markdown(card_html3, unsafe_allow_html=True)
+            if st.button("📅\n\nReservar Cita\n\nAgenda tu corte", key="home_reserva", use_container_width=True):
                 st.session_state.view = "reserva"
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_landing_publico(barberia):
@@ -3779,6 +3881,17 @@ try:
     if "view" not in st.session_state:
         st.session_state.view = "home"
     
+    # If user is already logged in, skip auth screens and go to main app
+    if st.session_state.get("user") and st.session_state.view in ["home", "login", "registro", "reserva"]:
+        st.session_state.view = st.session_state.get("view", "dashboard")
+        # Force navigation to appropriate dashboard
+        if st.session_state.get("user_role") == "SUPER_ADMIN":
+            st.session_state.view = "dashboard_admin"
+        elif st.session_state.get("user_role") == "BARBERO":
+            st.session_state.view = "dashboard_barbero"
+        else:
+            st.session_state.view = "dashboard"
+    
     # Route based on view state
     if st.session_state.view == "home":
         render_home_screen()
@@ -3803,8 +3916,10 @@ try:
                         user = login(usuario, password)
                         if user:
                             st.session_state.user = user
+                            st.session_state.user_id = user[0]
                             raw_rol = user[3] if len(user) > 3 else None
                             st.session_state.rol = normalizar_rol(raw_rol)
+                            st.session_state.user_role = st.session_state.rol
                             nr_login = st.session_state.rol
                             if nr_login == "SUPER_ADMIN":
                                 st.session_state.barberia_id = None
@@ -3812,10 +3927,17 @@ try:
                                     fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
                                 st.session_state.barberia_context_id = fb[0] if fb else None
                                 st.session_state.super_admin_all_barberias = False
+                                st.session_state.view = "dashboard_admin"
+                            elif nr_login == "BARBERO":
+                                bid_u = user[5] if len(user) > 5 else None
+                                st.session_state.barberia_id = bid_u or default_barberia_id
+                                st.session_state.barberia_context_id = st.session_state.barberia_id
+                                st.session_state.view = "dashboard_barbero"
                             else:
                                 bid_u = user[5] if len(user) > 5 else None
                                 st.session_state.barberia_id = bid_u or default_barberia_id
                                 st.session_state.barberia_context_id = st.session_state.barberia_id
+                                st.session_state.view = "dashboard"
                             st.success("✅ ¡Bienvenido!")
                             st.rerun()
                         else:
@@ -3846,11 +3968,32 @@ try:
                 st.rerun()
             flujo_reserva_publica()
     
-    # If user is logged in, skip to main app
-    if st.session_state.user:
+    elif st.session_state.view in ["dashboard_admin", "dashboard_barbero", "dashboard"]:
+        # User is logged in, proceed to main app
+        pass
+    
+    else:
+        # Default to home if view is unknown
+        st.session_state.view = "home"
         st.rerun()
     
-    st.stop()
+    # If user is logged in and has a valid dashboard view, proceed to main app
+    # Otherwise, if user is logged in but no valid view, redirect to dashboard
+    if st.session_state.get("user") and st.session_state.view not in ["home", "login", "registro", "reserva"]:
+        # Proceed to main app (don't stop here)
+        pass
+    elif st.session_state.get("user") and st.session_state.view in ["home", "login", "registro", "reserva"]:
+        # User logged in but on public view - redirect
+        if st.session_state.get("user_role") == "SUPER_ADMIN":
+            st.session_state.view = "dashboard_admin"
+        elif st.session_state.get("user_role") == "BARBERO":
+            st.session_state.view = "dashboard_barbero"
+        else:
+            st.session_state.view = "dashboard"
+        st.rerun()
+    elif not st.session_state.get("user"):
+        # User not logged in, stop here
+        st.stop()
 
 
     # ===== MAIN APP (Only runs if logged in) =====
