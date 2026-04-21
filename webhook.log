@@ -1,0 +1,73 @@
+2026-04-20 16:27:17,843 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 16:55:45,254 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 17:12:46,987 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 17:23:14,681 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 17:23:15,255 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:15:36,136 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:15:36,583 - webhook - INFO - Notification type: payment, ID: 131084402390
+2026-04-20 18:15:37,653 - webhook - ERROR - HTTP error fetching payment 131084402390: 404 Client Error: Not Found for url: https://api.mercadopago.com/v1/payments/131084402390
+2026-04-20 18:15:37,657 - webhook - ERROR - Could not fetch payment details for 131084402390
+2026-04-20 18:15:37,661 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:15:37,670 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:15:38,777 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:16:24,054 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 18:16:59,876 - webhook - INFO - Notification type: payment, ID: 130956986009
+2026-04-20 18:17:00,881 - webhook - ERROR - HTTP error fetching payment 130956986009: 404 Client Error: Not Found for url: https://api.mercadopago.com/v1/payments/130956986009
+2026-04-20 18:17:00,883 - webhook - ERROR - Could not fetch payment details for 130956986009
+2026-04-20 18:17:00,887 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:00,893 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:01,462 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:37,280 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:37,834 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:38,737 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:39,252 - webhook - ERROR - Missing type or id in webhook payload
+2026-04-20 18:17:40,976 - webhook - INFO - Notification type: payment, ID: 130953595591
+2026-04-20 18:17:41,870 - webhook - ERROR - HTTP error fetching payment 130953595591: 404 Client Error: Not Found for url: https://api.mercadopago.com/v1/payments/130953595591
+2026-04-20 18:17:41,871 - webhook - ERROR - Could not fetch payment details for 130953595591
+2026-04-20 18:17:42,301 - webhook - INFO - Notification type: payment, ID: 130956959489
+2026-04-20 18:17:43,199 - webhook - ERROR - HTTP error fetching payment 130956959489: 404 Client Error: Not Found for url: https://api.mercadopago.com/v1/payments/130956959489
+2026-04-20 18:17:43,200 - webhook - ERROR - Could not fetch payment details for 130956959489
+2026-04-20 18:29:04,693 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 18:29:52,097 - webhook - INFO - Extracted payment_id: 40161012530, notification_type: None
+2026-04-20 18:29:52,097 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:29:52,238 - webhook - INFO - Extracted payment_id: 155684921946, notification_type: payment
+2026-04-20 18:29:53,264 - webhook - INFO - Payment details - Status: approved, Reference: 6, Amount: 15000
+2026-04-20 18:29:53,949 - webhook - ERROR - Error updating reservation 6: column "payment_id" of relation "reservas" does not exist
+LINE 5:                 payment_id = '155684921946',
+                        ^
+
+2026-04-20 18:29:53,951 - webhook - ERROR - Failed to update reservation 6
+2026-04-20 18:29:53,954 - webhook - INFO - Extracted payment_id: 155684921946, notification_type: None
+2026-04-20 18:29:53,954 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:29:53,958 - webhook - INFO - Extracted payment_id: 40161012530, notification_type: None
+2026-04-20 18:29:53,958 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:36:30,682 - webhook - INFO - Extracted payment_id: 155682842506, notification_type: payment
+2026-04-20 18:36:31,746 - webhook - INFO - Payment details - Status: approved, Reference: 5, Amount: 15000
+2026-04-20 18:36:33,489 - webhook - INFO - Extracted payment_id: 154927236319, notification_type: None
+2026-04-20 18:36:33,489 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:36:35,296 - webhook - INFO - Extracted payment_id: 40131811061, notification_type: None
+2026-04-20 18:36:35,296 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:36:36,127 - webhook - INFO - Extracted payment_id: 40160553064, notification_type: None
+2026-04-20 18:36:36,127 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:36:36,233 - webhook - INFO - Extracted payment_id: 155682842506, notification_type: None
+2026-04-20 18:36:36,233 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:36:36,554 - webhook - INFO - Extracted payment_id: 154927236319, notification_type: payment
+2026-04-20 18:36:37,597 - webhook - INFO - Payment details - Status: approved, Reference: 5, Amount: 15000
+2026-04-20 18:38:25,218 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 18:39:10,910 - webhook - INFO - Extracted payment_id: 155686413236, notification_type: payment
+2026-04-20 18:39:12,069 - webhook - INFO - Payment details - Status: approved, Reference: 8, Amount: 20000
+2026-04-20 18:39:12,765 - webhook - INFO - Extracted payment_id: 155686413236, notification_type: None
+2026-04-20 18:39:12,765 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:39:12,773 - webhook - INFO - Extracted payment_id: 40161348850, notification_type: None
+2026-04-20 18:39:12,773 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:39:55,084 - webhook - INFO - Extracted payment_id: 40161348850, notification_type: None
+2026-04-20 18:39:55,084 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:40:36,961 - __main__ - INFO - Starting webhook server on 0.0.0.0:8000
+2026-04-20 18:41:22,336 - webhook - INFO - Extracted payment_id: 40161432492, notification_type: None
+2026-04-20 18:41:22,337 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:41:22,697 - webhook - INFO - Extracted payment_id: 154931537231, notification_type: payment
+2026-04-20 18:41:23,754 - webhook - INFO - Payment details - Status: approved, Reference: 9, Amount: 15000
+2026-04-20 18:41:24,455 - webhook - INFO - Extracted payment_id: 40161432492, notification_type: None
+2026-04-20 18:41:24,455 - webhook - INFO - Ignoring notification type: None
+2026-04-20 18:42:07,156 - webhook - INFO - Extracted payment_id: 154931537231, notification_type: None
+2026-04-20 18:42:07,156 - webhook - INFO - Ignoring notification type: None

@@ -5,3 +5,6 @@ twilio
 bcrypt
 python-dotenv
 mercadopago
+fastapi
+uvicorn
+requests

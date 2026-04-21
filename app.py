@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import socket
+import traceback
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import bcrypt
@@ -186,7 +187,7 @@ def execute_query(query, params=None, fetch=None):
             
             if attempt == max_retries - 1:
                 logger.exception("Error en base de datos después de reintentos")
-                st.error(str(e))
+                st.error(f"Error en base de datos:\n{traceback.format_exc()}")
                 return None
             else:
                 logger.warning("⚠️ Error en base de datos, reintentando... (intento %d)", attempt + 1)
@@ -372,9 +373,13 @@ def ensure_database_tables():
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
                 cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
                 cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
                 conn.commit()
                 logger.info("✅ Columnas opcionales en 'reservas' añadidas o actualizadas")
+                logger.info("✅ payment_id column ensured")
+                logger.info("✅ updated_at column ensured")
             except Exception as e:
                 conn.rollback()
                 all_ok = False
@@ -389,7 +394,7 @@ def ensure_database_tables():
         if conn:
             conn.rollback()
         logger.exception("Error al asegurar tablas de base de datos")
-        st.error(str(e))
+        st.error(f"Error de base de datos:\n{traceback.format_exc()}")
     finally:
         # Don't close connection - keep it in session state
         pass
@@ -941,6 +946,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
                 }
             ],
             "external_reference": str(reserva_id),
+            "notification_url": "https://splendid-morphine-maximize.ngrok-free.dev/webhook",
         }
         
         # Add back URLs if configured
@@ -1039,7 +1045,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
         return
     
     # Filter unpaid reservations
-    unpaid = [r for r in rows if len(r) > 10 and not r[10]]
+    unpaid = [r for r in rows if not r.get("pagado", False)]
     if not unpaid:
         return
     
@@ -1055,11 +1061,11 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
             st.error("❌ MERCADOPAGO_ACCESS_TOKEN no está en .env")
     
     for r in unpaid:
-        reserva_id = r[0]
-        servicio = r[2] if len(r) > 2 else "Servicio"
-        monto = (r[11] if len(r) > 11 and r[11] is not None else None) or (r[8] if len(r) > 8 else 0)
-        fecha = r[3] if len(r) > 3 else None
-        hora = r[4] if len(r) > 4 else None
+        reserva_id = r.get("id")
+        servicio = r.get("servicio", "Servicio")
+        monto = r.get("monto") or r.get("precio") or 0
+        fecha = r.get("fecha")
+        hora = r.get("hora")
         
         fecha_label = fecha.strftime("%d/%m/%Y") if hasattr(fecha, "strftime") else str(fecha)
         hora_label = hora.strftime("%H:%M") if hasattr(hora, "strftime") else str(hora)
@@ -1184,9 +1190,33 @@ def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
         f"Servicio: {servicio}"
     )
 
+
+def normalizar_reserva(r):
+    """
+    Normalize reservation tuple to dict.
+    Handles schema: id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto
+    Indices:      0    1        2          3      4     5        6       7       8       9       10       11
+    """
+    if isinstance(r, dict):
+        return r
+    if not r or len(r) < 6:
+        return {}
+    
+    return {
+        "id": r[0],
+        "barbero": r[1],
+        "servicio": r[2],
+        "fecha": r[3],
+        "hora": r[4],
+        "cliente": r[5],
+        "pagado": r[10] if len(r) > 10 else False,
+        "monto": r[11] if len(r) > 11 else (r[8] if len(r) > 8 else 0),
+    }
+
+
 @st.cache_data(ttl=30)
 def obtener_reservas_raw(barbero_filtro=None):
-    """Fast cached reservations query with minimal overhead."""
+    """Fast cached reservations query with minimal overhead - returns list of dicts."""
     if not st.session_state.get("db_available", True):
         return []
     
@@ -1205,7 +1235,7 @@ def obtener_reservas_raw(barbero_filtro=None):
 
         # Optimized single query with proper indexing
         sql = """
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto
             FROM reservas
             WHERE 1=1
         """
@@ -1223,51 +1253,99 @@ def obtener_reservas_raw(barbero_filtro=None):
             params.append(barbero_filtro)
 
         sql += " ORDER BY inicio"
-        return fetch_all(sql, tuple(params)) or []
+        results = fetch_all(sql, tuple(params)) or []
+        
+        # Convert tuples to dictionaries for consistent access
+        reservas_dict = []
+        for r in results:
+            reservas_dict.append({
+                "id": r[0],
+                "nombre": r[1],
+                "barbero": r[2],
+                "servicio": r[3],
+                "precio": r[4],
+                "inicio": r[5],
+                "fin": r[6],
+                "barberia_id": r[7],
+                "pagado": r[8] if len(r) > 8 else False,
+                "monto": r[9] if len(r) > 9 else r[4],
+            })
+        return reservas_dict
     except Exception as e:
         logger.exception("Error en obtener_reservas_raw")
         return []
 
 
 def construir_eventos_calendario(reservas):
-    """Construye eventos del calendario con información extendida."""
+    """Construye eventos del calendario con colores por estado de pago (AgendaPro style)."""
     eventos = []
 
     for r in reservas:
-        es_bloqueo = r[1] == "BLOQUEADO" or r[3] == "Bloqueo"
-        cliente = r[1]
-        barbero = r[2]
-        servicio = r[3]
-        fecha_inicio = r[5]
-        fecha_fin = r[6]
+        # Handle both dict and tuple formats for backward compatibility
+        if isinstance(r, dict):
+            es_bloqueo = r.get("nombre", "") == "BLOQUEADO" or r.get("servicio", "") == "Bloqueo"
+            cliente = r.get("nombre", "Desconocido")
+            barbero_id = r.get("barbero", "unknown")
+            servicio = r.get("servicio", "")
+            fecha_inicio = r.get("inicio")
+            fecha_fin = r.get("fin")
+            pagado = r.get("pagado", False)
+            reserva_id = r.get("id")
+        else:
+            # Legacy tuple format - try to unpack (id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto)
+            try:
+                es_bloqueo = r[1] == "BLOQUEADO" or r[3] == "Bloqueo"
+                cliente = r[1]
+                barbero_id = r[2]
+                servicio = r[3]
+                fecha_inicio = r[5]
+                fecha_fin = r[6]
+                pagado = r[8] if len(r) > 8 else False
+                reserva_id = r[0]
+            except (IndexError, TypeError):
+                logger.warning(f"Unexpected reservation format: {r}")
+                continue
         
-        # Crear título más informativo
+        # Crear título en formato moderno
         if es_bloqueo:
             titulo = "🚫 BLOQUEADO"
         else:
-            titulo = f"👤 {cliente} - {servicio}"
+            titulo = f"{cliente} • {servicio}"
+        
+        # Color by payment status: Green for paid, Orange for pending
+        if es_bloqueo:
+            color = "#666666"
+            border_color = "#4b5563"
+        elif pagado:
+            color = "#16a34a"  # Green for paid
+            border_color = "#15803d"
+        else:
+            color = "#f59e0b"  # Orange for pending
+            border_color = "#d97706"
         
         # Convert datetime to ISO format strings for JSON serialization
         inicio_iso = fecha_inicio.isoformat() if hasattr(fecha_inicio, "isoformat") else str(fecha_inicio)
         fin_iso = fecha_fin.isoformat() if hasattr(fecha_fin, "isoformat") else str(fecha_fin)
         
         eventos.append({
-            "id": str(r[0]),
+            "id": str(reserva_id),
             "title": titulo,
             "start": inicio_iso,
             "end": fin_iso,
-            "color": "#666666" if es_bloqueo else barberos.get(barbero, "#999999"),
-            "borderColor": "#000000",
+            "resourceId": str(barbero_id),  # For resource-based calendar views
+            "color": color,
+            "borderColor": border_color,
             "textColor": "#FFFFFF",
             "extendedProps": {
-                "id": r[0],
+                "id": reserva_id,
                 "nombre": cliente,
-                "barbero": barbero,
+                "barbero": barbero_id,
                 "servicio": servicio,
-                "precio": r[4],
+                "monto": r.get("monto") if isinstance(r, dict) else (r[4] if len(r) > 4 else 0),
+                "pagado": pagado,
                 "bloqueo": es_bloqueo,
-                "inicio": inicio_iso,  # Convert to ISO string
-                "fin": fin_iso,  # Convert to ISO string
+                "inicio": inicio_iso,
+                "fin": fin_iso,
             },
         })
 
@@ -1275,37 +1353,223 @@ def construir_eventos_calendario(reservas):
 
 
 def mostrar_detalles_reserva(reserva_id):
-    """Muestra detalles detallados de una reserva en un expander."""
+    """Muestra detalles detallados de una reserva con opciones de interacción (estilo AgendaPro)."""
     reserva = obtener_reserva_por_id(reserva_id)
     if not reserva:
-        st.error("Reserva no encontrada")
+        st.error("❌ Reserva no encontrada")
+        return None
+    
+    # Extract details
+    cliente = reserva.get('nombre', 'Desconocido')
+    servicio = reserva.get('servicio', '')
+    inicio = reserva.get("inicio")
+    inicio_str = inicio.strftime("%H:%M") if hasattr(inicio, "strftime") else str(inicio)
+    fecha_str = inicio.strftime("%d/%m/%Y") if hasattr(inicio, "strftime") else ""
+    pagado = reserva.get("pagado", False)
+    estado = "✅ Pagado" if pagado else "⏳ Pendiente"
+    estado_color = "#16a34a" if pagado else "#f59e0b"
+    monto = reserva.get('monto', 0)
+    
+    # AgendaPro-style card
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-left: 5px solid {estado_color};
+        border-radius: 12px;
+        padding: 20px;
+        margin: 12px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    ">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">👤 CLIENTE</div>
+                <div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">✂️ SERVICIO</div>
+                <div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">🕐 HORA</div>
+                <div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div>
+                <div style="font-size: 12px; color: #666;">{fecha_str}</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 4px;">💰 MONTO</div>
+                <div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div>
+            </div>
+        </div>
+        
+        <div style="border-top: 1px solid #333; padding-top: 12px;">
+            <div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">
+                {estado}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("")
+    
+    # Action buttons
+    user = st.session_state.get("user")
+    nr = normalizar_rol(user[3]) if user else ""
+    
+    # Only show buttons if user has permission
+    if nr != "CLIENTE":
+        col1, col2 = st.columns(2)
+        
+        # Mark as paid button
+        if not pagado:
+            with col1:
+                if st.button(
+                    "✅ Marcar Pagado",
+                    key=f"btn_pagado_{reserva_id}",
+                    use_container_width=True
+                ):
+                    if marcar_reserva_pagada(reserva_id):
+                        st.success("✅ Pago registrado")
+                        st.session_state.mostrar_detalles_reserva = False
+                        st.rerun()
+        
+        # Cancel/Delete button
+        with col2:
+            if st.button(
+                "❌ Cancelar",
+                key=f"btn_cancelar_{reserva_id}",
+                use_container_width=True,
+                type="secondary"
+            ):
+                if eliminar_reserva(reserva_id):
+                    st.success("✅ Reserva cancelada")
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+    
+    return reserva
+
+
+def agrupar_por_barbero(events):
+    """Group calendar events by barber for multi-barber layout. Handle both events and raw reservations."""
+    barberos_dict = {}
+    
+    for item in events:
+        try:
+            # Handle event dictionary format from construir_eventos_calendario
+            if isinstance(item, dict):
+                barbero_id = item.get("resourceId", "unknown")
+                barber_name = item.get("title", "").split("•")[0].strip() or "Barbero"
+                key = (barbero_id, barber_name)
+                if key not in barberos_dict:
+                    barberos_dict[key] = []
+                barberos_dict[key].append(item)
+            else:
+                # Log unexpected format and skip
+                logger.warning(f"Unexpected item format in agrupar_por_barbero: {type(item)}")
+        except Exception as e:
+            logger.warning(f"Error processing item in agrupar_por_barbero: {e}")
+            continue
+    
+    return barberos_dict
+
+
+def render_calendario_multi_barbero(reservas, read_only=False):
+    """Render multiple calendars in columns, one per barber (AgendaPro style layout)."""
+    if not reservas:
+        st.info("📭 No hay reservas para mostrar en el calendario.")
         return
     
-    with st.container(border=True):
-        st.markdown("### 📋 Detalles de la Reserva")
+    # Group reservations by barber
+    barberos_dict = agrupar_por_barbero(reservas)
+    
+    if not barberos_dict:
+        st.info("📭 No hay reservas para mostrar.")
+        return
+    
+    # Professional header with legend
+    col_title, col_legend = st.columns([2, 1])
+    with col_title:
+        st.markdown(f"### 📅 Vista Multi-Barbero")
+    
+    with col_legend:
+        st.markdown("""
+        <div style="display: flex; gap: 12px; font-size: 11px; padding: 8px;">
+            <div><span style="display: inline-block; width: 10px; height: 10px; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span><strong>Pagado</strong></div>
+            <div><span style="display: inline-block; width: 10px; height: 10px; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span><strong>Pendiente</strong></div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Create columns for each barber
+    num_barbers = len(barberos_dict)
+    cols = st.columns(num_barbers) if num_barbers <= 3 else st.columns(3)  # Max 3 columns
+    
+    for idx, (barbero_id, reservas_barbero) in enumerate(sorted(barberos_dict.items())):
+        # Get barber name from first reservation
+        barber_name = reservas_barbero[0][1] if reservas_barbero else f"Barbero {barbero_id}"
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**🆔 ID:** {reserva[0]}")
-            st.markdown(f"**👤 Cliente:** {reserva[1]}")
-            st.markdown(f"**💇 Barbero:** {reserva[2]}")
-        
-        with col2:
-            st.markdown(f"**✂️ Servicio:** {reserva[3]}")
-            st.markdown(f"**💰 Precio:** ${reserva[4]}")
-            st.markdown(f"**🆔 Barbería ID:** {reserva[7]}")
-        
-        st.markdown("---")
-        st.markdown("**⏰ Horario:**")
-        col_time1, col_time2 = st.columns(2)
-        with col_time1:
-            inicio_str = reserva[5].strftime("%d-%m-%Y %H:%M") if hasattr(reserva[5], "strftime") else str(reserva[5])
-            st.caption(f"🕐 Inicio: {inicio_str}")
-        with col_time2:
-            fin_str = reserva[6].strftime("%d-%m-%Y %H:%M") if hasattr(reserva[6], "strftime") else str(reserva[6])
-            st.caption(f"🕑 Fin: {fin_str}")
-        
-        return reserva
+        col_index = idx % len(cols)
+        with cols[col_index]:
+            # Subheader for barber
+            st.subheader(f"💈 {barber_name}")
+            
+            # Convert reservations to events for this barber
+            eventos_barbero = construir_eventos_calendario(reservas_barbero)
+            
+            if not eventos_barbero:
+                st.info(f"Sin reservas para {barber_name}")
+                continue
+            
+            # Calendar options (no resources)
+            options = {
+                "initialView": "timeGridWeek",
+                "editable": not read_only,
+                "selectable": not read_only,
+                "allDaySlot": False,
+                "slotMinTime": "09:00:00",
+                "slotMaxTime": "21:00:00",
+                "slotDuration": "00:30:00",
+                "slotLabelInterval": "00:30:00",
+                "height": 600,
+                "contentHeight": "auto",
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,timeGridWeek,timeGridDay",
+                },
+                "slotLabelFormat": {
+                    "meridiem": False,
+                    "hour": "2-digit",
+                    "minute": "2-digit",
+                },
+                "eventDisplay": "block",
+                "eventTimeFormat": {
+                    "meridiem": False,
+                    "hour": "2-digit",
+                    "minute": "2-digit",
+                },
+                "nowIndicator": True,
+                "scrollTime": "09:00:00",
+                "dayMaxEvents": 6,
+                "eventBackgroundColor": "transparent",
+                "eventBorderColor": "transparent",
+                "eventTextColor": "#FFFFFF",
+            }
+            
+            try:
+                calendar_state = calendar(
+                    events=eventos_barbero,
+                    options=options,
+                    key=f"calendario_barbero_{barbero_id}",
+                )
+                
+                if calendar_state and calendar_state.get("eventClick"):
+                    manejar_interaccion_calendario(calendar_state)
+            except Exception as e:
+                logger.exception(f"Error displaying calendar for barber {barbero_id}")
+                st.error(f"Error al mostrar calendario para {barber_name}: {str(e)}")
 
 
 def obtener_reservas(barbero=None):
@@ -1314,14 +1578,31 @@ def obtener_reservas(barbero=None):
 
 def obtener_reserva_por_id(reserva_id):
     try:
-        return fetch_one(
+        result = fetch_one(
             """
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente, pagado, monto
             FROM reservas
             WHERE id = %s
             """,
             (reserva_id,),
         )
+        if not result:
+            return None
+        
+        # Convert tuple to dictionary
+        return {
+            "id": result[0],
+            "nombre": result[1],
+            "barbero": result[2],
+            "servicio": result[3],
+            "precio": result[4],
+            "inicio": result[5],
+            "fin": result[6],
+            "barberia_id": result[7],
+            "cliente": result[8],
+            "pagado": result[9] if len(result) > 9 else False,
+            "monto": result[10] if len(result) > 10 else result[4],
+        }
     except Exception:
         logger.exception("obtener_reserva_por_id")
         return None
@@ -1329,14 +1610,31 @@ def obtener_reserva_por_id(reserva_id):
 
 def obtener_reserva(reserva_id, barberia_id):
     try:
-        return fetch_one(
+        result = fetch_one(
             """
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente, pagado, monto
             FROM reservas
             WHERE id = %s AND barberia_id = %s
             """,
             (reserva_id, barberia_id),
         )
+        if not result:
+            return None
+        
+        # Convert tuple to dictionary
+        return {
+            "id": result[0],
+            "nombre": result[1],
+            "barbero": result[2],
+            "servicio": result[3],
+            "precio": result[4],
+            "inicio": result[5],
+            "fin": result[6],
+            "barberia_id": result[7],
+            "cliente": result[8],
+            "pagado": result[9] if len(result) > 9 else False,
+            "monto": result[10] if len(result) > 10 else result[4],
+        }
     except Exception:
         logger.exception("obtener_reserva")
         return None
@@ -1371,7 +1669,7 @@ def _guardar_reserva_tx(nombre, barbero, servicio, precio, inicio, fin, barberia
             )
             if cur.fetchone():
                 conn.rollback()
-                st.error("Ese horario ya está ocupado para el barbero seleccionado.")
+                st.error("Horario ocupado")
                 return False
 
             cur.execute(
@@ -1530,7 +1828,7 @@ def eliminar_reserva(reserva_id):
         )
     except Exception as e:
         logger.exception("eliminar_reserva")
-        st.error(str(e))
+        st.error(f"Error eliminando reserva:\n{traceback.format_exc()}")
         return False
 
 
@@ -1569,7 +1867,7 @@ def insertar_reserva_con_fecha_hora(
             )
             if cur.fetchone():
                 conn.rollback()
-                st.error("Horario no disponible")
+                st.error("Horario ocupado")
                 return False
 
             cur.execute(
@@ -1585,7 +1883,7 @@ def insertar_reserva_con_fecha_hora(
             )
             if cur.fetchone():
                 conn.rollback()
-                st.error("Horario no disponible")
+                st.error("Horario ocupado")
                 return False
 
             cur.execute(
@@ -1595,6 +1893,7 @@ def insertar_reserva_con_fecha_hora(
                     cliente, fecha, hora, estado, monto, pagado
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+                RETURNING id
                 """,
                 (
                     cliente_usuario,
@@ -1611,9 +1910,10 @@ def insertar_reserva_con_fecha_hora(
                     precio,
                 ),
             )
+            reserva_id = cur.fetchone()[0]
 
         conn.commit()
-        return True
+        return reserva_id
     except Exception as e:
         if conn:
             conn.rollback()
@@ -1625,9 +1925,11 @@ def insertar_reserva_con_fecha_hora(
             conn.close()
 
 
+
+
 @st.cache_data(ttl=30)
 def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_barbero=None):
-    """Fast cached filtered reservations with optimized queries."""
+    """Fast cached filtered reservations - returns normalized list of dicts."""
     nr = normalizar_rol(rol_tag)
     cols = (
         "id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto"
@@ -1641,7 +1943,7 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
             bid = barberia_id_arg or effective_barberia_id()
             if not bid:
                 return []
-            return fetch_all(
+            results = fetch_all(
                 f"""
                 SELECT {cols}
                 FROM reservas
@@ -1651,12 +1953,13 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
                 """,
                 (bid, usuario_login, usuario_login),
             ) or []
+            return [normalizar_reserva(r) for r in results]
 
         if nr == "BARBERO":
             bid = barberia_id_arg or effective_barberia_id()
             if not bid:
                 return []
-            return fetch_all(
+            results = fetch_all(
                 f"""
                 SELECT {cols}
                 FROM reservas
@@ -1665,6 +1968,7 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
                 """,
                 (bid, usuario_login),
             ) or []
+            return [normalizar_reserva(r) for r in results]
 
         if super_all:
             sql = f"SELECT {cols} FROM reservas WHERE 1=1"
@@ -1673,7 +1977,8 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
                 sql += " AND barbero = %s"
                 params.append(filtro_barbero)
             sql += " ORDER BY inicio DESC NULLS LAST"
-            return fetch_all(sql, tuple(params)) or []
+            results = fetch_all(sql, tuple(params)) or []
+            return [normalizar_reserva(r) for r in results]
 
         bid = barberia_id_arg or effective_barberia_id()
         if not bid:
@@ -1685,7 +1990,8 @@ def listar_reservas_filtradas(barberia_id_arg, rol_tag, usuario_login, filtro_ba
             sql += " AND barbero = %s"
             params.append(filtro_barbero)
         sql += " ORDER BY inicio DESC NULLS LAST"
-        return fetch_all(sql, tuple(params)) or []
+        results = fetch_all(sql, tuple(params)) or []
+        return [normalizar_reserva(r) for r in results]
 
     except Exception as e:
         logger.exception("Error listando reservas")
@@ -1700,14 +2006,14 @@ def mostrar_reservas_dataframe(rows):
     ordered = sorted(
         rows,
         key=lambda r: (
-            r[3] if r[3] is not None else datetime.min.date(),
-            r[4] if r[4] is not None else datetime.min.time(),
+            r.get("fecha") if r.get("fecha") is not None else datetime.min.date(),
+            r.get("hora") if r.get("hora") is not None else datetime.min.time(),
         ),
     )
 
     grouped = {}
     for r in ordered:
-        fecha_raw = r[3] if len(r) > 3 else None
+        fecha_raw = r.get("fecha")
         if hasattr(fecha_raw, "strftime"):
             fecha_label = fecha_raw.strftime("%A, %d %b %Y")
         else:
@@ -1715,29 +2021,35 @@ def mostrar_reservas_dataframe(rows):
         grouped.setdefault(fecha_label, []).append(r)
 
     for fecha_label, items in grouped.items():
-        st.markdown(f"### {fecha_label}")
+        st.markdown(f"### 📅 {fecha_label}")
+        
         for r in items:
-            hora_raw = r[4] if len(r) > 4 else None
+            hora_raw = r.get("hora")
             hora_label = hora_raw.strftime("%H:%M") if hasattr(hora_raw, "strftime") else str(hora_raw or "--:--")
-            servicio = r[2] if len(r) > 2 else ""
-            barbero = r[1] if len(r) > 1 else ""
-            cliente = (r[5] if len(r) > 5 else None) or (r[6] if len(r) > 6 else None) or "Cliente desconocido"
-            monto = (r[11] if len(r) > 11 and r[11] is not None else None) or (r[8] if len(r) > 8 else 0)
-            estado = bool(r[10]) if len(r) > 10 else False
-            estado_label = "✅ Pagado" if estado else "⏳ Pendiente"
-            estado_color = "#1f7a1f" if estado else "#b22222"
-            descripcion = f"**{hora_label} · {servicio}**"
+            servicio = r.get("servicio", "")
+            barbero = r.get("barbero", "")
+            cliente = r.get("cliente") or r.get("nombre") or "Cliente desconocido"
+            monto = r.get("monto") or r.get("precio") or 0
+            estado = bool(r.get("pagado", False))
+            estado_label = "Pagado" if estado else "Pendiente"
+            estado_color = "#16a34a" if estado else "#f59e0b"
+            estado_bg = "rgba(22, 163, 74, 0.1)" if estado else "rgba(245, 158, 11, 0.1)"
 
-            with st.container():
-                cols = st.columns([3, 2, 2, 1], gap="small")
-                cols[0].markdown(descripcion)
-                cols[1].markdown(f"👤 {cliente}")
-                cols[2].markdown(f"💇 {barbero} · 💰 ${monto}")
-                cols[3].markdown(
-                    f"<span style='color: {estado_color}; font-weight: 700;'>{estado_label}</span>",
-                    unsafe_allow_html=True,
-                )
-        st.markdown("---")
+            st.markdown(f"""
+<div style="border-radius: 12px; padding: 16px; margin-bottom: 12px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-left: 6px solid {estado_color}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease;">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+        <h4 style="margin: 0; color: #ffffff; font-size: 18px; font-weight: 600;">{cliente}</h4>
+        <span style="background-color: {estado_bg}; color: {estado_color}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid {estado_color};">{estado_label}</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">🕐</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">✂️</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">💇</span><span style="color: #e0e0e0;"><strong>{barbero}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Monto</span><span style="color: #e0e0e0;"><strong>${monto}</strong></span></div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 
 
 def ui_marcar_pagado_reservas(rows, key_prefix):
@@ -1748,15 +2060,22 @@ def ui_marcar_pagado_reservas(rows, key_prefix):
     if nr == "CLIENTE":
         return
 
-    pend = [r for r in rows if not (len(r) > 10 and r[10])]
+    pend = [r for r in rows if not r.get("pagado", False)]
     if not pend:
         return
 
-    ids = [r[0] for r in pend]
+    ids = [r.get("id") for r in pend]
 
     def _lab(i):
-        row = next(x for x in pend if x[0] == i)
-        return f"#{i} · {row[1]} · {row[7]}"
+        row = next(x for x in pend if x.get("id") == i)
+        barbero_str = row.get("barbero", "")
+        fecha_str = row.get("fecha", "")
+        hora_str = row.get("hora", "")
+        if hasattr(fecha_str, "strftime"):
+            fecha_str = fecha_str.strftime("%Y-%m-%d")
+        if hasattr(hora_str, "strftime"):
+            hora_str = hora_str.strftime("%H:%M")
+        return f"#{i} · {barbero_str} · {fecha_str} {hora_str}"
 
     rid = st.selectbox(
         "Marcar como pagado",
@@ -1778,11 +2097,11 @@ def ui_eliminar_reserva_lista(rows, key_prefix):
     if not rows:
         return
 
-    ids = [r[0] for r in rows]
+    ids = [r.get("id") for r in rows]
 
     def _label(i):
-        row = next(x for x in rows if x[0] == i)
-        return f"#{i} · {row[1]} · {row[2]} · {row[7]}"
+        row = next(x for x in rows if x.get("id") == i)
+        return f"#{i} · {row.get('barbero')} · {row.get('servicio')} · {row.get('inicio')}"
 
     rid = st.selectbox(
         "Eliminar reserva",
@@ -1801,7 +2120,7 @@ def ui_eliminar_reserva_lista(rows, key_prefix):
 
 
 def opciones_calendario(initial_view="timeGridWeek"):
-    """Opciones mejoradas del calendario con mejor interactividad."""
+    """Opciones profesionales del calendario (AgendaPro style)."""
     return {
         "initialView": initial_view,
         "editable": True,
@@ -1809,14 +2128,15 @@ def opciones_calendario(initial_view="timeGridWeek"):
         "allDaySlot": False,
         "slotMinTime": "09:00:00",
         "slotMaxTime": "21:00:00",
-        "height": 720,
+        "slotDuration": "00:30:00",
+        "slotLabelInterval": "00:30:00",
+        "height": 700,
         "contentHeight": "auto",
         "headerToolbar": {
             "left": "prev,next today",
             "center": "title",
             "right": "dayGridMonth,timeGridWeek,timeGridDay",
         },
-        "slotLabelInterval": "00:30:00",
         "slotLabelFormat": {
             "meridiem": False,
             "hour": "2-digit",
@@ -1828,7 +2148,59 @@ def opciones_calendario(initial_view="timeGridWeek"):
             "hour": "2-digit",
             "minute": "2-digit",
         },
+        "eventDurationEditable": True,
+        "eventStartEditable": True,
+        "nowIndicator": True,
+        "scrollTime": "09:00:00",
+        "eventBackgroundColor": "transparent",
+        "eventBorderColor": "transparent",
+        "eventTextColor": "#FFFFFF",
+        "dayMaxEvents": 6,
+        "dayMaxEventRows": 3,
     }
+
+
+def mostrar_calendario_reservas(reservas):
+    """Display reservations in professional calendar week view (AgendaPro style)."""
+    if not reservas:
+        st.info("📭 No hay reservas para mostrar en el calendario.")
+        return
+    
+    # Convert reservations to calendar events
+    eventos = construir_eventos_calendario(reservas)
+    
+    if not eventos:
+        st.info("📭 No hay eventos para mostrar.")
+        return
+    
+    # Professional header with legend
+    col_title, col_legend = st.columns([2, 1])
+    with col_title:
+        st.markdown(f"### 📅 Vista de Calendario (Semana)")
+    
+    with col_legend:
+        st.markdown("""
+        <div style="display: flex; gap: 12px; font-size: 11px; padding: 8px;">
+            <div><span style="display: inline-block; width: 10px; height: 10px; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span><strong>Pagado</strong></div>
+            <div><span style="display: inline-block; width: 10px; height: 10px; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span><strong>Pendiente</strong></div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Calendar options
+    options = opciones_calendario(initial_view="timeGridWeek")
+    options["editable"] = False
+    options["selectable"] = False
+    options["height"] = 650
+    
+    try:
+        calendar(
+            events=eventos,
+            options=options,
+            key="calendario_reservas_view",
+        )
+    except Exception as e:
+        logger.exception("Error displaying reservation calendar")
+        st.error(f"Error al mostrar el calendario:\\n{traceback.format_exc()}")
 
 
 def manejar_interaccion_calendario(calendar_state):
@@ -1839,12 +2211,13 @@ def manejar_interaccion_calendario(calendar_state):
     if not st.session_state.get("db_available", True):
         return
 
-    # Manejo de clicks en eventos
+    # Manejo de clicks en eventos - mostrar detalles y opciones
     event_click = calendar_state.get("eventClick")
     if event_click and event_click.get("event"):
         event_id = int(event_click["event"]["id"])
         st.session_state.reserva_seleccionada_id = event_id
         st.session_state.mostrar_detalles_reserva = True
+        st.rerun()  # Trigger re-render to show details panel
 
     # Manejo de drag & drop, resize, y cambios
     for key in ("eventDrop", "eventResize", "eventChange"):
@@ -1878,34 +2251,59 @@ def manejar_interaccion_calendario(calendar_state):
 
 
 def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
-    """Renderiza calendario interactivo con manejo de eventos."""
+    """Renderiza calendario interactivo profesional con manejo de eventos."""
     if "mostrar_detalles_reserva" not in st.session_state:
         st.session_state.mostrar_detalles_reserva = False
+    if "reserva_seleccionada_id" not in st.session_state:
+        st.session_state.reserva_seleccionada_id = None
     
-    col_cal, col_detalles = st.columns([3, 1])
+    # Professional header with legend
+    col_title, col_legend = st.columns([2, 1])
+    with col_title:
+        st.markdown(f"### 📅 Agenda de Reservas")
     
-    with col_cal:
-        options = opciones_calendario()
-        if read_only:
-            options["editable"] = False
-            options["selectable"] = False
+    with col_legend:
+        st.markdown("""
+        <div style="display: flex; gap: 12px; font-size: 12px; padding: 8px;">
+            <div><span style="display: inline-block; width: 12px; height: 12px; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span>Pagado</div>
+            <div><span style="display: inline-block; width: 12px; height: 12px; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span>Pendiente</div>
+        </div>
+        <p style="font-size: 10px; color: #999;">💡 Haz clic en un evento para ver detalles</p>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Calendar area - full width
+    options = opciones_calendario()
+    if read_only:
+        options["editable"] = False
+        options["selectable"] = False
+    
+    calendar_state = calendar(
+        events=eventos,
+        options=options,
+        key=f"agenda_{barbero_actual or 'todos'}",
+    )
+    manejar_interaccion_calendario(calendar_state)
+    
+    # Details panel below calendar - full width when selected
+    st.markdown("---")
+    if st.session_state.get("mostrar_detalles_reserva") and st.session_state.get("reserva_seleccionada_id"):
+        reserva_id = st.session_state.get("reserva_seleccionada_id")
         
-        calendar_state = calendar(
-            events=eventos,
-            options=options,
-            key=f"agenda_{barbero_actual or 'todos'}",
-        )
-        manejar_interaccion_calendario(calendar_state)
-    
-    # Panel de detalles
-    with col_detalles:
-        if st.session_state.get("mostrar_detalles_reserva") and st.session_state.get("reserva_seleccionada_id"):
-            reserva_id = st.session_state.get("reserva_seleccionada_id")
+        # Create a nice details container
+        col_details_left, col_details_right = st.columns([2, 1])
+        
+        with col_details_left:
             mostrar_detalles_reserva(reserva_id)
-            
-            if st.button("✕ Cerrar", key="btn_cerrar_detalles", use_container_width=True):
+        
+        with col_details_right:
+            if st.button("✕ Cerrar Detalles", key="btn_cerrar_detalles", use_container_width=True, type="secondary"):
                 st.session_state.mostrar_detalles_reserva = False
+                st.session_state.reserva_seleccionada_id = None
                 st.rerun()
+    else:
+        st.info("📌 Haz clic en un evento del calendario para ver detalles y opciones")
 
 
 def render_gestion_agenda(barbero_actual=None):
@@ -2028,6 +2426,34 @@ def render_modo_sin_db_banner():
 
 
 # ================= MÉTRICAS HELPERS =================
+
+def calcular_metricas_header(barberia_id):
+    """Calculate quick dashboard header metrics for today."""
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Single query for all today's metrics
+        metrics = fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_hoy,
+                COUNT(CASE WHEN pagado = TRUE THEN 1 END) as pagadas_hoy,
+                COUNT(CASE WHEN pagado = FALSE THEN 1 END) as pendientes_hoy
+            FROM reservas 
+            WHERE barberia_id = %s AND fecha = %s
+            """,
+            (barberia_id, hoy),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2]
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando métricas header")
+        return 0, 0, 0
 
 @st.cache_data(ttl=45)
 def calcular_metricas_cliente(barberia_id, usuario):
@@ -2156,6 +2582,104 @@ def render_dashboard_cards(col_count, cards_data):
             st.metric(card["label"], card["value"], card.get("delta", None))
 
 
+# ================= BOOKING WITHOUT LOGIN =================
+
+def show_reserva_cliente():
+    """Show booking form for unauthenticated clients."""
+    st.markdown("### 📅 Reservar Cita")
+    
+    default_barberia_id = st.session_state.get("default_barberia_id")
+    
+    if not default_barberia_id:
+        st.error("❌ No hay barbería disponible. Por favor, registra una barbería primero.")
+        return
+    
+    db_ok = st.session_state.get("db_available", True)
+    if not db_ok:
+        st.warning("⚠️ No hay base de datos: no puedes crear reservas en modo demo.")
+        return
+    
+    with st.container(border=True):
+        st.markdown("#### Completa el formulario para reservar tu cita")
+        
+        with st.spinner("⏳ Cargando barberos disponibles..."):
+            barber_list = listar_usuarios_barberos(default_barberia_id)
+            barber_opts = [x[0] for x in barber_list] if barber_list else list(barberos.keys())
+        
+        with st.form("form_reserva_sin_login"):
+            col1, col2 = st.columns(2)
+            with col1:
+                nombre = st.text_input("👤 Nombre", placeholder="Tu nombre completo")
+            with col2:
+                telefono = st.text_input("📱 Teléfono", placeholder="Tu número de teléfono")
+            
+            col3, col4 = st.columns(2)
+            with col3:
+                barbero_sel = st.selectbox("💇 Barbero", barber_opts, key="cliente_barbero_sin_login")
+            with col4:
+                servicio_sel = st.selectbox("✂️ Servicio", list(servicios.keys()), key="cliente_servicio_sin_login")
+            
+            col5, col6 = st.columns(2)
+            with col5:
+                fecha_sel = st.date_input("📅 Fecha", key="cliente_fecha_sin_login")
+            with col6:
+                hora_sel = st.time_input("🕐 Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sin_login")
+            
+            enviar = st.form_submit_button("✅ Reservar Cita", use_container_width=True)
+        
+        if enviar:
+            if not nombre or not nombre.strip():
+                st.error("❌ Por favor, ingresa tu nombre.")
+                return
+            
+            if not telefono or not telefono.strip():
+                st.error("❌ Por favor, ingresa tu teléfono.")
+                return
+            
+            with st.spinner("⏳ Procesando reserva..."):
+                duracion = servicios[servicio_sel]["duracion"]
+                precio = servicios[servicio_sel]["precio"]
+                
+                reserva_id = insertar_reserva_con_fecha_hora(
+                    default_barberia_id,
+                    nombre.strip(),
+                    barbero_sel,
+                    servicio_sel,
+                    fecha_sel,
+                    hora_sel,
+                    precio,
+                    duracion,
+                )
+                
+                if reserva_id:
+                    # Send WhatsApp confirmation
+                    try:
+                        inicio_msg = datetime.combine(fecha_sel, hora_sel)
+                        mensaje = construir_mensaje_reserva(
+                            nombre.strip(), inicio_msg, barbero_sel, servicio_sel
+                        )
+                        enviar_whatsapp_twilio(telefono.strip(), mensaje)
+                    except Exception as exc:
+                        logger.exception("Error al enviar WhatsApp: %s", exc)
+                    
+                    st.success("✅ Reserva creada correctamente")
+                    st.markdown("---")
+                    
+                    # Generate payment link
+                    st.markdown("### 💳 Completar Pago")
+                    url_pago = crear_pago_mercadopago(
+                        reserva_id,
+                        precio,
+                        f"Reserva barbería - {servicio_sel}"
+                    )
+                    
+                    if url_pago:
+                        st.info("📌 Por favor, completa el pago para confirmar tu cita.")
+                        st.link_button("💳 Pagar ahora", url_pago, use_container_width=True)
+                    else:
+                        st.warning("⚠️ No se pudo generar el enlace de pago. Tu reserva se ha creado sin pago.")
+
+
 # ------------------ LOGIN ------------------
 
 try:
@@ -2197,6 +2721,7 @@ try:
             opcion = st.radio("Selecciona una opción", [
                 "🔑 Iniciar sesión",
                 "✨ Registrar barbería",
+                "📅 Reservar cita",
             ], key="login_option")
 
             if opcion == "🔑 Iniciar sesión":
@@ -2235,6 +2760,9 @@ try:
                     except Exception as e:
                         logger.exception("Error en login")
                         st.error(f"Error en login: {str(e)}")
+            
+            elif opcion == "📅 Reservar cita":
+                show_reserva_cliente()
 
         # CRITICAL: Stop execution here ONLY when NOT logged in
         st.stop()
@@ -2365,8 +2893,17 @@ try:
                 st.info("📊 Métricas no disponibles sin base de datos.")
             else:
                 with st.spinner("⏳ Cargando métricas..."):
+                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
                     total_reservas, hoy_reservas, _ = calcular_metricas_cliente(barberia_id, usuario)
                     num_barberos_cached = len(listar_usuarios_barberos(barberia_id))
+                
+                # Dashboard header metrics
+                col1, col2, col3 = st.columns(3, gap="large")
+                col1.metric("📅 Reservas Hoy", total_hoy, delta=None)
+                col2.metric("✅ Pagadas", pagadas_hoy, delta=None)
+                col3.metric("⏳ Pendientes", pendientes_hoy, delta=None)
+                st.markdown("---")
+                
                 render_dashboard_cards(4, [
                     {"label": "📅 Total Reservas", "value": total_reservas},
                     {"label": "🎯 Reservas Hoy", "value": hoy_reservas},
@@ -2398,10 +2935,17 @@ try:
                         # Convertir a formato para calendario
                         mis_reservas_dict = []
                         for r in mis_reservas_raw:
-                            inicio = r[7] if len(r) > 7 else None
-                            fin = inicio + timedelta(hours=1) if inicio else None
-                            if inicio and fin:
-                                mis_reservas_dict.append((r[0], r[5] or r[6], r[1], r[2], r[4], inicio, fin))
+                            fecha = r.get("fecha")
+                            hora = r.get("hora")
+                            if fecha and hora:
+                                try:
+                                    start_dt = datetime.combine(fecha, hora)
+                                    end_dt = start_dt + timedelta(minutes=30)
+                                    monto = r.get("monto") or r.get("precio") or 0
+                                    pagado = bool(r.get("pagado", False))
+                                    mis_reservas_dict.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
+                                except (TypeError, ValueError):
+                                    continue
                         
                         eventos_cliente = construir_eventos_calendario(mis_reservas_dict)
                     
@@ -2497,7 +3041,15 @@ try:
                 st.info("📊 Métricas no disponibles sin base de datos.")
             else:
                 with st.spinner("⏳ Cargando métricas..."):
+                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
                     total_reservas, hoy_reservas, total_ingresos = calcular_metricas_barbero(barberia_id, usuario)
+                
+                # Dashboard header metrics
+                col1, col2, col3 = st.columns(3, gap="large")
+                col1.metric("📅 Reservas Hoy", total_hoy, delta=None)
+                col2.metric("✅ Pagadas", pagadas_hoy, delta=None)
+                col3.metric("⏳ Pendientes", pendientes_hoy, delta=None)
+                st.markdown("---")
                 
                 render_dashboard_cards(3, [
                     {"label": "✂️ Total Cortes", "value": total_reservas},
@@ -2543,15 +3095,45 @@ try:
             # TAB: LISTADO
             with tab_lista:
                 st.markdown("### 📋 Mis Reservas")
+                
+                # Toggle between card and calendar view
+                view_type = st.radio(
+                    "Modo de vista",
+                    ["📇 Tarjetas", "📅 Calendario"],
+                    horizontal=True,
+                    key="barbero_view_type"
+                )
+                
                 if not db_ok:
                     st.info("Tabla no disponible sin base de datos.")
                 else:
                     with st.spinner("⏳ Cargando tus reservas..."):
                         rows_bar = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
+                    
                     if rows_bar:
-                        mostrar_reservas_dataframe(rows_bar)
-                        ui_marcar_pagado_reservas(rows_bar, "barbero_panel")
-                        ui_eliminar_reserva_lista(rows_bar, "barbero_panel")
+                        if view_type == "📇 Tarjetas":
+                            mostrar_reservas_dataframe(rows_bar)
+                            ui_marcar_pagado_reservas(rows_bar, "barbero_panel")
+                            ui_eliminar_reserva_lista(rows_bar, "barbero_panel")
+                        else:  # Calendar view
+                            # Convert rows to calendar format
+                            reservas_calendar = []
+                            for r in rows_bar:
+                                fecha = r.get("fecha")
+                                hora = r.get("hora")
+                                if fecha and hora:
+                                    try:
+                                        start_dt = datetime.combine(fecha, hora)
+                                        end_dt = start_dt + timedelta(minutes=30)
+                                        monto = r.get("monto") or r.get("precio") or 0
+                                        pagado = bool(r.get("pagado", False))
+                                        reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
+                                    except (TypeError, ValueError):
+                                        continue
+                            
+                            mostrar_calendario_reservas(reservas_calendar)
+                            st.markdown("---")
+                            st.caption("💡 Vista de calendario en formato semanal - usa las flechas para navegar")
                     else:
                         st.info("📭 No hay reservas")
 
@@ -2576,7 +3158,15 @@ try:
                 st.info("📊 Métricas no disponibles sin base de datos.")
             else:
                 with st.spinner("⏳ Cargando métricas..."):
+                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
                     total_reservas, hoy_reservas, total_ingresos, num_barberos = calcular_metricas_admin(barberia_id)
+                
+                # Dashboard header metrics
+                col1, col2, col3 = st.columns(3, gap="large")
+                col1.metric("📅 Reservas Hoy", total_hoy, delta=None)
+                col2.metric("✅ Pagadas", pagadas_hoy, delta=None)
+                col3.metric("⏳ Pendientes", pendientes_hoy, delta=None)
+                st.markdown("---")
                 
                 render_dashboard_cards(4, [
                     {"label": "📅 Total Reservas", "value": total_reservas},
@@ -2629,7 +3219,7 @@ try:
             with tab_cal:
                 if db_ok:
                     with st.spinner("⏳ Cargando calendario..."):
-                        render_agenda_interactiva(eventos, read_only=not db_ok)
+                        render_calendario_multi_barbero(eventos, read_only=not db_ok)
                 else:
                     st.warning("Calendario no disponible sin base de datos (modo demo).")
             
@@ -2640,6 +3230,17 @@ try:
             # TAB: RESERVAS
             with tab_lista:
                 st.markdown("### 📋 Reservas")
+                
+                # Toggle between card and calendar view
+                col_view1, col_view2 = st.columns(2)
+                with col_view1:
+                    view_type = st.radio(
+                        "Modo de vista",
+                        ["📇 Tarjetas", "📅 Calendario"],
+                        horizontal=True,
+                        key="admin_view_type"
+                    )
+                
                 if not db_ok:
                     st.info("Tabla no disponible sin base de datos.")
                 else:
@@ -2652,10 +3253,31 @@ try:
                         rows_adm = listar_reservas_filtradas(
                             barberia_id, "ADMIN", usuario, filtro_barbero=filtro_adm
                         )
+                    
                     if rows_adm:
-                        mostrar_reservas_dataframe(rows_adm)
-                        ui_marcar_pagado_reservas(rows_adm, "admin_panel")
-                        ui_eliminar_reserva_lista(rows_adm, "admin_panel")
+                        if view_type == "📇 Tarjetas":
+                            mostrar_reservas_dataframe(rows_adm)
+                            ui_marcar_pagado_reservas(rows_adm, "admin_panel")
+                            ui_eliminar_reserva_lista(rows_adm, "admin_panel")
+                        else:  # Calendar view
+                            # Convert rows to calendar format
+                            reservas_calendar = []
+                            for r in rows_adm:
+                                fecha = r.get("fecha")
+                                hora = r.get("hora")
+                                if fecha and hora:
+                                    try:
+                                        start_dt = datetime.combine(fecha, hora)
+                                        end_dt = start_dt + timedelta(minutes=30)
+                                        monto = r.get("monto") or r.get("precio") or 0
+                                        pagado = bool(r.get("pagado", False))
+                                        reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
+                                    except (TypeError, ValueError):
+                                        continue
+                            
+                            mostrar_calendario_reservas(reservas_calendar)
+                            st.markdown("---")
+                            st.caption("💡 Vista de calendario en formato semanal - usa las flechas para navegar")
                     else:
                         st.info("📭 No hay reservas")
             
@@ -2726,7 +3348,15 @@ try:
                 st.info("📊 Métricas no disponibles sin base de datos.")
             else:
                 with st.spinner("⏳ Cargando métricas globales..."):
+                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(bid_ctx) if bid_ctx else (0, 0, 0)
                     num_barberias, num_usuarios, num_reservas, total_ingresos, hoy_count = calcular_metricas_super_admin(bid_ctx)
+                
+                # Dashboard header metrics
+                col1, col2, col3 = st.columns(3, gap="large")
+                col1.metric("📅 Reservas Hoy", total_hoy, delta=None)
+                col2.metric("✅ Pagadas", pagadas_hoy, delta=None)
+                col3.metric("⏳ Pendientes", pendientes_hoy, delta=None)
+                st.markdown("---")
                 
                 render_dashboard_cards(5, [
                     {"label": "🏢 Barberías", "value": num_barberias},
@@ -2759,7 +3389,7 @@ try:
             with tab_cal:
                 if db_ok:
                     with st.spinner("⏳ Cargando calendario..."):
-                        render_agenda_interactiva(eventos, read_only=not db_ok)
+                        render_calendario_multi_barbero(eventos, read_only=not db_ok)
                 else:
                     st.warning("Calendario no disponible sin base de datos (modo demo).")
             
@@ -2770,6 +3400,15 @@ try:
             # TAB: RESERVAS
             with tab_lista:
                 st.markdown("### 📋 Reservas")
+                
+                # Toggle between card and calendar view
+                view_type = st.radio(
+                    "Modo de vista",
+                    ["📇 Tarjetas", "📅 Calendario"],
+                    horizontal=True,
+                    key="super_view_type"
+                )
+                
                 if not db_ok:
                     st.info("Tabla no disponible sin base de datos.")
                 else:
@@ -2783,9 +3422,29 @@ try:
                             bid_ctx, "SUPER_ADMIN", usuario, filtro_barbero=filtro_su
                         )
                     if rows_su:
-                        mostrar_reservas_dataframe(rows_su)
-                        ui_marcar_pagado_reservas(rows_su, "super_panel")
-                        ui_eliminar_reserva_lista(rows_su, "super_panel")
+                        if view_type == "📇 Tarjetas":
+                            mostrar_reservas_dataframe(rows_su)
+                            ui_marcar_pagado_reservas(rows_su, "super_panel")
+                            ui_eliminar_reserva_lista(rows_su, "super_panel")
+                        else:  # Calendar view
+                            # Convert rows to calendar format
+                            reservas_calendar = []
+                            for r in rows_su:
+                                fecha = r.get("fecha")
+                                hora = r.get("hora")
+                                if fecha and hora:
+                                    try:
+                                        start_dt = datetime.combine(fecha, hora)
+                                        end_dt = start_dt + timedelta(minutes=30)
+                                        monto = r.get("monto") or r.get("precio") or 0
+                                        pagado = bool(r.get("pagado", False))
+                                        reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
+                                    except (TypeError, ValueError):
+                                        continue
+                            
+                            mostrar_calendario_reservas(reservas_calendar)
+                            st.markdown("---")
+                            st.caption("💡 Vista de calendario en formato semanal - usa las flechas para navegar")
                     else:
                         st.info("📭 No hay reservas")
 
