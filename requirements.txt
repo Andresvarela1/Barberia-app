@@ -8,3 +8,5 @@ mercadopago
 fastapi
 uvicorn
 requests
+geopy
+pandas
