@@ -1,0 +1,132 @@
+/* ==================== SIDEBAR STYLES ==================== */
+/* Extracted from: design_system.py - apply_global_theme() */
+/* Purpose: Sidebar layout, navigation, and styling */
+
+/* ===== MAIN SIDEBAR CONTAINER ===== */
+[data-testid="stSidebar"] {
+    background-color: #1e293b;
+    border-right: 1px solid #334155;
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: #f1f5f9;
+}
+
+/* ===== SIDEBAR TEXT STYLING ===== */
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #f1f5f9;
+    font-weight: 600;
+    margin-top: 16px;
+    margin-bottom: 12px;
+}
+
+[data-testid="stSidebar"] p {
+    color: #cbd5e1;
+    font-size: 14px;
+    margin: 8px 0;
+}
+
+/* ===== SIDEBAR BUTTONS ===== */
+[data-testid="stSidebar"] .stButton > button {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 14px;
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    transition: all 0.2s ease;
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    color: white;
+    border-color: #7c3aed;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    transform: translateX(4px);
+}
+
+[data-testid="stSidebar"] .stButton > button:active {
+    transform: translateX(2px);
+}
+
+/* ===== SIDEBAR INPUTS ===== */
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] textarea,
+[data-testid="stSidebar"] [role="textbox"] {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+    padding: 10px 12px !important;
+}
+
+[data-testid="stSidebar"] input:focus,
+[data-testid="stSidebar"] textarea:focus {
+    border-color: #7c3aed !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2) !important;
+}
+
+/* ===== SIDEBAR DIVIDERS ===== */
+[data-testid="stSidebar"] hr {
+    border: none;
+    border-top: 1px solid #334155;
+    margin: 16px 0;
+}
+
+/* ===== SIDEBAR EXPANDER ===== */
+[data-testid="stSidebar"] .streamlit-expanderHeader {
+    background-color: #334155 !important;
+    border: 1px solid #475569 !important;
+    padding: 12px 16px !important;
+    border-radius: 6px !important;
+    margin: 8px 0;
+    transition: all 0.2s ease;
+}
+
+[data-testid="stSidebar"] .streamlit-expanderHeader:hover {
+    background-color: #475569 !important;
+    border-color: #7c3aed !important;
+}
+
+/* ===== SIDEBAR SELECTBOX ===== */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div {
+    background-color: #0f172a !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div:focus-within {
+    border-color: #7c3aed !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2) !important;
+}
+
+/* ===== SIDEBAR METRIC CARDS ===== */
+[data-testid="stSidebar"] [data-testid="metric-container"] {
+    background: #334155 !important;
+    border: 1px solid #475569 !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+}
+
+[data-testid="stSidebar"] [data-testid="metric-container"]:hover {
+    border-color: #7c3aed !important;
+    background: #3f3f4f !important;
+}
+
+/* ===== SIDEBAR SCROLLBAR ===== */
+[data-testid="stSidebar"] ::-webkit-scrollbar {
+    width: 6px;
+}
+
+[data-testid="stSidebar"] ::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 3px;
+}
+
+[data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+}

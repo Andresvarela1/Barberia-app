@@ -1,0 +1,330 @@
+/* ==================== BASE STYLES - GLOBAL THEME ==================== */
+/* Extracted from: design_system.py - apply_global_theme() */
+/* Purpose: Global typography, spacing, and container styles */
+
+/* ===== ROOT VARIABLES ===== */
+:root {
+    --primary: #7c3aed;
+    --secondary: #06b6d4;
+    --success: #22c55e;
+    --warning: #f97316;
+    --danger: #ef4444;
+    --background: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+}
+
+/* ===== BODY & MAIN STYLES ===== */
+body {
+    background-color: var(--background);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.stApp {
+    background-color: var(--background);
+    color: var(--text);
+}
+
+/* ===== TEXT STYLING ===== */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+h1 {
+    font-size: 32px;
+    margin-bottom: 24px;
+    margin-top: 16px;
+}
+
+h2 {
+    font-size: 24px;
+    margin-bottom: 16px;
+    margin-top: 16px;
+}
+
+h3 {
+    font-size: 20px;
+    margin-bottom: 12px;
+    margin-top: 12px;
+}
+
+h4 {
+    font-size: 16px;
+    margin-bottom: 12px;
+}
+
+p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 8px 0;
+}
+
+.caption {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    margin: 4px 0;
+}
+
+/* ===== MAIN CONTENT AREA ===== */
+.main {
+    background-color: var(--background);
+    padding: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ===== HORIZONTAL DIVIDERS ===== */
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+}
+
+/* ===== BUTTON BASE STYLES ===== */
+button {
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    padding: 0.75rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.stButton > button {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border: 2px solid #7c3aed;
+    font-weight: 700;
+    position: relative;
+    overflow: hidden;
+    height: auto;
+    padding: 12px 16px;
+}
+
+.stButton > button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+    transition: left 0.2s ease;
+    z-index: -1;
+}
+
+.stButton > button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.2s ease, height 0.2s ease;
+    pointer-events: none;
+}
+
+.stButton > button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stButton > button:active {
+    transform: translateY(-1px) scale(0.98);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.stButton > button:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Secondary Button */
+.stButton > button[kind="secondary"] {
+    background: var(--card);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+}
+
+.stButton > button[kind="secondary"]:active {
+    transform: translateY(0) scale(0.97);
+}
+
+/* ===== INPUT BASE STYLES ===== */
+input, textarea, [role="textbox"] {
+    background-color: var(--card) !important;
+    color: var(--text) !important;
+    border: 2px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 12px !important;
+    transition: all 0.15s ease !important;
+    font-size: 14px !important;
+    font-family: inherit !important;
+}
+
+input:hover, textarea:hover {
+    border-color: rgba(124, 58, 237, 0.5) !important;
+    background-color: rgba(124, 58, 237, 0.05) !important;
+}
+
+input:focus, textarea:focus, [role="textbox"]:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2), inset 0 0 0 1px rgba(124, 58, 237, 0.1) !important;
+    background-color: var(--card) !important;
+    outline: none !important;
+}
+
+/* ===== SELECT/DROPDOWN BASE STYLES ===== */
+[data-testid="stSelectbox"] > div > div {
+    background-color: var(--card) !important;
+    border: 2px solid var(--border) !important;
+    border-radius: 8px !important;
+    transition: all 0.15s ease !important;
+}
+
+[data-testid="stSelectbox"] > div > div:hover {
+    border-color: rgba(124, 58, 237, 0.5) !important;
+    background-color: rgba(124, 58, 237, 0.05) !important;
+}
+
+[data-testid="stSelectbox"] > div > div:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2) !important;
+}
+
+.stSelectbox [role="combobox"] {
+    color: var(--text) !important;
+    font-weight: 500 !important;
+}
+
+/* ===== CHECKBOX & RADIO BASE STYLES ===== */
+[role="checkbox"], [role="radio"] {
+    accent-color: var(--primary) !important;
+    cursor: pointer !important;
+}
+
+[role="checkbox"]:hover, [role="radio"]:hover {
+    filter: brightness(1.2) !important;
+}
+
+/* ===== EXPANDABLE SECTIONS ===== */
+.streamlit-expanderHeader {
+    background-color: var(--card) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    border: 1px solid var(--border) !important;
+    transition: all 0.2s ease !important;
+}
+
+.streamlit-expanderHeader:hover {
+    background-color: #334155 !important;
+    border-color: rgba(124, 58, 237, 0.5) !important;
+}
+
+/* ===== CODE BLOCKS ===== */
+pre, code {
+    background-color: var(--background) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    font-family: 'Monaco', 'Courier New', monospace !important;
+    color: var(--text) !important;
+}
+
+/* ===== SCROLLBAR STYLING ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
+/* ===== CONTAINER STYLING ===== */
+div[data-testid="stVerticalBlock"] > [style*="flex-direction"] > [data-testid="stVerticalBlock"] {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(30, 41, 59, 0.4) 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+div[data-testid="stVerticalBlock"] > [style*="flex-direction"] > [data-testid="stVerticalBlock"]:hover {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 20px rgba(124, 58, 237, 0.1);
+    border-color: rgba(124, 58, 237, 0.5);
+}
+
+/* ===== METRIC CARDS - REFINED ===== */
+[data-testid="metric-container"] {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="metric-container"]:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-2px) !important;
+}
+
+[data-testid="metric-container"]::before {
+    display: none !important;
+}
+
+/* ===== COLUMN PADDING ===== */
+div[data-testid="column"] {
+    padding: 0 12px !important;
+}
+
+div[data-testid="column"]:first-child {
+    padding-left: 0 !important;
+}
+
+div[data-testid="column"]:last-child {
+    padding-right: 0 !important;
+}
+
+/* ===== VERTICAL BLOCK SPACING ===== */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+    margin-bottom: 12px !important;
+}

@@ -1,0 +1,22 @@
+﻿        )
+        
+        if result and result[0]:
+            logger.info(f"ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ BarberÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­a creada: {data['nombre']} (ID: {result[0]}, Slug: {slug})")
+            return result[0]
+        return None
+    except Exception as e:
+        logger.exception(f"Error creating barberia: {str(e)}")
+        return None
+
+
+def create_admin_user_in_db(barberia_id, slug, telefono):
+    """Create admin user. Returns (username, password) or (None, None)."""
+    admin_user = f"admin_{slug}"
+    admin_password = "admin123"
+    admin_hash = hash_password(admin_password)
+    
+    try:
+        execute_write(
+            """
+            INSERT INTO usuarios (usuario, password, rol, barberia_id, telefono)
+            VALUES (%s, %s, %s, %s, %s)

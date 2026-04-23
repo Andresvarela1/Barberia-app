@@ -1,0 +1,121 @@
+﻿            metrics = safe_fetch_one(
+                """
+                SELECT 
+                    (SELECT COUNT(*) FROM barberias) as num_barberias,
+                    (SELECT COUNT(*) FROM usuarios) as num_usuarios,
+                    (SELECT COUNT(*) FROM reservas) as num_reservas,
+                    COALESCE((SELECT SUM(monto) FROM reservas WHERE pagado = TRUE), 0) as total_ingresos,
+                    (SELECT COUNT(*) FROM reservas WHERE DATE(inicio) = %s) as hoy_count
+                """,
+                (hoy,),
+            )
+        else:
+            # CONTEXT metrics - filter by barberia_id (SUPER_ADMIN selected a specific barberia)
+            # SECURITY: Use get_current_barberia_id() instead of parameter
+            barberia_id = get_current_barberia_id()
+            if not barberia_id:
+                return 0, 0, 0, 0, 0
+            
+            metrics = safe_fetch_one(
+                """
+                SELECT 
+                    (SELECT COUNT(*) FROM barberias WHERE id = %s) as num_barberias,
+                    (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s) as num_usuarios,
+                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s) as num_reservas,
+                    COALESCE((SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE), 0) as total_ingresos,
+                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s AND DATE(inicio) = %s) as hoy_count
+                """,
+                (barberia_id, barberia_id, barberia_id, barberia_id, barberia_id, hoy),
+            )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
+        return 0, 0, 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas super admin")
+        return 0, 0, 0, 0, 0
+
+
+def render_dashboard_cards(col_count, cards_data):
+    """Renderiza cards de mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas con layout flexible."""
+    cols = st.columns(col_count)
+    for idx, (col, card) in enumerate(zip(cols, cards_data)):
+        with col:
+            st.metric(card["label"], card["value"], card.get("delta", None))
+
+
+# ================= MULTI-BARBERIA PUBLIC ACCESS =================
+
+def obtener_barberia_por_slug(slug):
+    """Get barberia by slug for public booking."""
+    if not slug:
+        return None
+    try:
+        result = fetch_one(
+            """SELECT id, nombre, slug, telefono, email, ciudad, direccion, 
+                      latitud, longitud, color_primario, logo_url, 
+                      hora_apertura, hora_cierre, estado 
+               FROM barberias WHERE slug = %s""",
+            (slug,),
+        )
+        if result:
+            return {
+                "id": result[0],
+                "nombre": result[1],
+                "slug": result[2],
+                "telefono": result[3],
+                "email": result[4],
+                "ciudad": result[5],
+                "direccion": result[6],
+                "latitud": result[7],
+                "longitud": result[8],
+                "color_primario": result[9],
+                "logo_url": result[10],
+                "hora_apertura": result[11],
+                "hora_cierre": result[12],
+                "estado": result[13],
+            }
+        return None
+    except Exception as e:
+        logger.exception(f"Error getting barberia by slug: {str(e)}")
+        return None
+
+
+def obtener_servicios(barberia_id=None):
+    """Load services from database for a barberia.
+    
+    SECURITY: Always uses current barberia context - prevents service leakage between barberias.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id:
+        return []
+    try:
+        results = safe_fetch_all(
+            """SELECT id, nombre, duracion_minutos, precio, descripcion, icono 
+               FROM servicios 
+               WHERE barberia_id = %s 
+               ORDER BY id ASC""",
+            (barberia_id,),
+        )
+        servicios_list = []
+        for row in results:
+            servicios_list.append({
+                "id": row[0],
+                "nombre": row[1],
+                "duracion": row[2],
+                "precio": row[3],
+                "descripcion": row[4],
+                "icono": row[5] or "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â",
+            })
+        # If no services in DB, return empty list (UI will show message)
+        return servicios_list
+    except Exception as e:
+        logger.exception(f"Error loading services for barberia {barberia_id}: {e}")
+        return []
+
+
+# ================= BARBER SHOP REGISTRATION FLOW (PRODUCTION) =================
+
+# --------- GEOCODING FUNCTIONS ---------
+

@@ -1,0 +1,300 @@
+﻿            email = render_form_group("Email", "Ej: tu@email.com", 
+                "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ Email (opcional)",
+                placeholder="Ej: tu@email.com",
+                key="booking_email_premium",
+                help="Para recibir confirmaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de tu reserva"
+            )
+            
+            st.markdown("---")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submit_btn = st.form_submit_button("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Ver resumen", use_container_width=True, type="primary")
+
+                submit_btn = st.form_submit_button("?????????? Ver resumen", use_container_width=True, type="primary")
+                if submit_btn:
+                errors = []
+                if not nombre or len(nombre) < 3:
+                    errors.append("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Nombre debe tener al menos 3 caracteres")
+                if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
+                    errors.append("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ TelÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©fono debe tener al menos 9 dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­gitos")
+                if email and "@" not in email:
+                    errors.append("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Email no vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡lido")
+                
+                if errors:
+                    st.error("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Revisa los siguientes errores:\n" + "\n".join(errors))
+                else:
+                    st.session_state.booking_data["nombre"] = nombre
+                    st.session_state.booking_data["telefono"] = telefono
+                    st.session_state.booking_data["email"] = email
+                    st.session_state.booking_step = 5
+                    st.rerun()
+    
+        elif st.session_state.booking_step == 5:
+        render_step_indicator(5, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "????Listo!"])
+        render_booking_header("Revisa tu reserva", "Verifica que todo est???? correcto", step=5, total_steps=6)
+
+        with render_booking_container():
+            with render_booking_section("Detalles de tu cita"):
+                st.write(f"**Servicio:** {st.session_state.booking_data.get('servicio')}")
+                st.write(f"**Barbero:** {st.session_state.booking_data.get('barbero_nombre')}")
+                st.write(f"**Fecha:** {st.session_state.booking_data.get('fecha')} a las {st.session_state.booking_data.get('hora')}")
+                st.write(f"**Precio:** ${st.session_state.booking_data.get('precio', 0):,}")
+
+data = st.session_state.booking_data
+        
+        # Premium summary card
+        
+        
+        # Personal info section
+        st.markdown("## ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Tus datos")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤ Nombre", value=data.get('nombre', 'N/A'), disabled=True)
+        with col2:
+            st.text_input("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ TelÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©fono", value=data.get('telefono', 'N/A'), disabled=True)
+        with col3:
+            st.text_input("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ Email", value=data.get('email', 'N/A') or 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â', disabled=True)
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Cancelar", key="cancel_booking_step5", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
+        
+        with col2:
+            if st.button("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Agendar mi cita ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â", key="confirm_booking_step5", use_container_width=True, type="primary", help="Confirma tu reserva"):
+                # Create reservation
+                with st.spinner("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ Creando tu reserva..."):
+                    reserva_id = insertar_reserva_con_fecha_hora(
+                        barberia_id,
+                        normalizar_texto(data.get('nombre', '')),
+                        data.get('barbero_id'),
+                        data.get('barbero_nombre'),
+                        data.get('servicio'),
+                        data.get('fecha'),
+                        data.get('hora'),
+                        data.get('precio'),
+                        data.get('duracion'),
+                    )
+                    
+                    if reserva_id:
+                        # Generate payment link
+                        with st.spinner("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â² Generando enlace de pago..."):
+                            pago_url = crear_pago_mercadopago(
+                                reserva_id,
+                                data.get('precio', 0),
+                                f"Reserva barberÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­a: {data.get('servicio')}",
+                                data.get('email'),
+                                show_errors=True
+                            )
+                            
+                            if pago_url:
+                                st.session_state.booking_step = 6
+                                st.session_state.booking_data["pago_url"] = pago_url
+                                st.session_state.booking_data["reserva_id"] = reserva_id
+                                st.rerun()
+                            else:
+                                st.warning("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Reserva confirmada pero no se pudo generar el enlace de pago. Contacta al local.")
+                    else:
+                        st.error("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Error al crear la reserva. Intenta nuevamente.")
+    
+        elif st.session_state.booking_step == 6:
+        render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "????Listo!"])
+        render_booking_header("????Reserva confirmada!", "Tu cita est???? lista", step=6, total_steps=6)
+
+        with render_booking_container():
+            st.balloons()
+            render_cta_section(
+                "????Reserva confirmada!",
+                "Tu cita ha sido programada con ????xito. Te hemos enviado un WhatsApp con la confirmaci????n.",
+                "???????"
+            )
+            if data.get('pago_url'):
+            st.markdown("""<div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 24px; border-radius: 16px; border: 3px solid #dc2626; margin-bottom: 28px; text-align: center; box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);"><p style="margin: 0 0 12px 0; color: #7f1d1d; font-weight: 700; font-size: 18px;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ Finaliza tu pago ahora</p><p style="margin: 0 0 16px 0; color: #991b1b; font-weight: 600; font-size: 15px;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Tu hora estÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ bloqueada temporalmente para ti</p><p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">Completa el pago para asegurar tu cita ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Sin pago se libera la hora</p></div>""", unsafe_allow_html=True)
+            
+            # PRIMARY PAYMENT BUTTON
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.link_button(
+                    "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ Pagar ahora",
+                    url=data.get('pago_url', '#'),
+                    use_container_width=True,
+                    help="Finaliza el pago en MercadoPago"
+                )
+            
+            st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 13px; color: #22c55e; font-weight: 600;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Pago seguro con MercadoPago</div>""", unsafe_allow_html=True)
+            
+            st.markdown("""<div style="text-align: center; margin-top: 8px; padding: 6px; font-size: 12px; color: #666; font-weight: 500;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ No guardamos datos de tu tarjeta</div>""", unsafe_allow_html=True)
+            
+            st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; background: rgba(59, 130, 246, 0.08); border-radius: 8px;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ Te tomarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ menos de 30 segundos completar tu reserva</div>""", unsafe_allow_html=True)
+        
+        st.markdown("""<div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 16px; border-radius: 12px; border-left: 4px solid #3b82f6; margin-bottom: 24px; text-align: center;"><p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 14px;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â² Te enviamos la confirmaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n a WhatsApp<br><span style="font-size: 13px; font-weight: 400;">Revisa tu telÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©fono para mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡s detalles</span></p></div>""", unsafe_allow_html=True)
+        
+        # BOOKING SUMMARY - EXPANDABLE/SECONDARY
+        with st.expander("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Ver detalles de tu cita", expanded=False):
+            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">SERVICIO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">BARBERO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">FECHA Y HORA</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('fecha', 'N/A')} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">MONTO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡MERO DE RESERVA</p><p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
+        
+        st.markdown("""<div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(74, 222, 128, 0.05) 100%); padding: 14px; border-radius: 10px; border-left: 3px solid #22c55e; margin-bottom: 20px; text-align: center;"><p style="margin: 0; color: #16a34a; font-weight: 600; font-size: 13px;">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡s de 100 clientes ya se depilaron aquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­</p></div>""", unsafe_allow_html=True)
+        
+        # INFO SECTION - COMPACT
+        st.markdown("""
+        <div style="
+            background: #fef3c7;
+            padding: 14px;
+            border-radius: 8px;
+            border-left: 3px solid #f59e0b;
+            margin-bottom: 24px;
+        ">
+            <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;">
+                <strong>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ Tu hora estÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ reservada</strong><br>
+                <strong>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ ConfirmaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n en tu WhatsApp</strong><br>
+                <strong>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ Cancela hasta 24h antes</strong>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # ACTION BUTTONS - CLEAR HIERARCHY
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.button("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Volver al inicio", key="home_booking_step6", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
+        
+        with col2:
+            if st.button("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Otra cita", key="new_booking_step6", use_container_width=True):
+                st.session_state.booking_step = 1
+                st.session_state.booking_data = {}
+                st.session_state.selected_fecha = datetime.now().date()
+                st.rerun()
+
+
+# ================= MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â°TRICAS HELPERS =================
+
+
+
+def calcular_metricas_header(barberia_id=None):
+    """Calculate quick dashboard header metrics for today.
+    
+    SECURITY: Always uses current barberia context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Single query for all today's metrics - SAFE wrapper ensures barberia_id filter
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_hoy,
+                COUNT(CASE WHEN pagado = TRUE THEN 1 END) as pagadas_hoy,
+                COUNT(CASE WHEN pagado = FALSE THEN 1 END) as pendientes_hoy
+            FROM reservas 
+            WHERE barberia_id = %s AND fecha = %s
+            """,
+            (barberia_id, hoy),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2]
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas header")
+        return 0, 0, 0
+
+@st.cache_data(ttl=45)
+def calcular_metricas_cliente(barberia_id=None, usuario=None):
+    """Fast cached client metrics with optimized queries.
+    
+    SECURITY: Always uses current context and validates user access.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not usuario or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        hoy = datetime.now().date()
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas
+            FROM reservas 
+            WHERE barberia_id = %s 
+              AND (cliente = %s OR nombre = %s)
+            """,
+            (hoy, barberia_id, usuario, usuario),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], 0
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas cliente")
+        return 0, 0, 0
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_barbero(barberia_id=None, barbero_id=None):
+    """Fast cached barber metrics with optimized queries.
+    
+    SECURITY: Always uses current context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not barbero_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        hoy = datetime.now().date()
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
+                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos
+            FROM reservas 
+            WHERE barberia_id = %s AND barbero_id = %s
+            """,
+            (hoy, barberia_id, barbero_id),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2]
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas barbero")
+        return 0, 0, 0
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_admin(barberia_id=None):
+    """Fast cached admin metrics with optimized queries.
+    
+    SECURITY: Always uses current context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        metrics = safe_fetch_one(

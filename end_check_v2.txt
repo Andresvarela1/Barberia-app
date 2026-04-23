@@ -1,0 +1,19 @@
+﻿            """,
+            (admin_user, admin_hash, "ADMIN", barberia_id, telefono)
+        )
+        logger.info(f"ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Admin user creado: {admin_user}")
+        return admin_user, admin_password
+    except Exception as e:
+        logger.exception(f"Error creating admin user: {str(e)}")
+        return None, None
+
+
+def create_services_in_db(barberia_id, services):
+    """Create services. Returns count of created services."""
+    count = 0
+    try:
+        for service in services:
+            execute_write(
+                """
+                INSERT INTO servicios 
+                (barberia_id, nombre, duracion_minutos, precio, icono)

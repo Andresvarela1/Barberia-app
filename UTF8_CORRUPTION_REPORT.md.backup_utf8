@@ -1,0 +1,78 @@
+# UTF-8 CORRUPTION REPORT
+
+**Fecha:** 2026-04-23  
+**Estado:** CRÍTICO - 200+ instancias de mojibake encontradas
+
+## CORRUPCIÓN IDENTIFICADA
+
+### Patrones Detectados
+- `Ã­` → debería ser `í`
+- `Ã³` → debería ser `ó`
+- `Ã¡` → debería ser `á`
+- `Ã©` → debería ser `é`
+- `ðŸ` → debería ser emoji (ej: 🚨)
+- `âœ‚ï¸` → debería ser ✂️
+- `â€` → parte de secuencia corrupta
+- `Ã±` → debería ser `ñ`
+- `Â` → carácter padding corrupto
+
+### Archivos Afectados
+
+#### app.py (CRÍTICO - 150+ instancias)
+- Línea 64: `BarberÃ­a` → `Barbería`
+- Línea 65: `âœ‚ï¸` → `✂️`
+- Línea 113-115: Múltiples acentos corruptos en mensajes de error
+- Línea 140: `ðŸ"Œ` → `📌` + `ConexiÃ³n` → `Conexión`
+- Línea 154: `âœ…` → `✅`
+- Línea 183-185: Errores de BD con acentos corruptos
+- Línea 291, 329, 358: Emojis de seguridad `ðŸš¨` → `🚨`
+- Línea 388, 415, 442: Múltiples `âœ…`, `Ã±`, `Ã¡`
+- Línea 512, 606: Emojis de tijeras corruptos
+- Línea 711, 743, 746, 794: Mensajes de error con acentos
+- Línea 818-905: Sección de verificación de contraseña con +30 instancias
+
+#### backup_before_encoding_fix/BACKUP_MANIFEST.md
+- Referencias a corrupción triple-encoded
+
+## CAUSA RAÍZ
+
+Texto codificado como **latin1** pero interpretado como **UTF-8** (doble encoding).
+
+**Solución:** `text.encode('latin1').decode('utf-8')`
+
+## CONVERSIÓN MAPEADA
+
+| Corrupto | Correcto | Tipo |
+|----------|----------|------|
+| `BarberÃ­a` | `Barbería` | Palabra |
+| `sesiÃ³n` | `sesión` | Palabra |
+| `configuraciÃ³n` | `configuración` | Palabra |
+| `ContraseÃ±a` | `Contraseña` | Palabra |
+| `VerificaciÃ³n` | `Verificación` | Palabra |
+| `CompararÃ¡` | `Comparará` | Palabra |
+| `estÃ¡` | `está` | Palabra |
+| `aÃ±adida` | `añadida` | Palabra |
+| `crÃ­tico` | `crítico` | Palabra |
+| `despuÃ©s` | `después` | Palabra |
+| `reintentando` | `reintentando` | Palabra |
+| `âœ…` | `✅` | Emoji |
+| `âœ‚ï¸` | `✂️` | Emoji |
+| `ðŸš¨` | `🚨` | Emoji |
+| `âŒ` | `❌` | Emoji |
+| `ðŸ"Œ` | `📌` | Emoji |
+| `âš ï¸` | `⚠️` | Emoji |
+
+## IMPACTO
+
+- ❌ Textos en español ilegibles
+- ❌ Emojis no renderizados correctamente
+- ❌ Mensajes de log corrupto
+- ✅ Lógica funcional NO afectada
+- ✅ SQL queries NO afectadas
+
+## PRÓXIMOS PASOS
+
+1. Crear script de reparación automática
+2. Validar recuperación sin romper lógica
+3. Verificar compilación Python
+4. Validar ejecución de Streamlit

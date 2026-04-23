@@ -1,0 +1,200 @@
+﻿                COUNT(*) as total_hoy,
+                COUNT(CASE WHEN pagado = TRUE THEN 1 END) as pagadas_hoy,
+                COUNT(CASE WHEN pagado = FALSE THEN 1 END) as pendientes_hoy
+            FROM reservas 
+            WHERE barberia_id = %s AND fecha = %s
+            """,
+            (barberia_id, hoy),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2]
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas header")
+        return 0, 0, 0
+
+@st.cache_data(ttl=45)
+def calcular_metricas_cliente(barberia_id=None, usuario=None):
+    """Fast cached client metrics with optimized queries.
+    
+    SECURITY: Always uses current context and validates user access.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not usuario or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        hoy = datetime.now().date()
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas
+            FROM reservas 
+            WHERE barberia_id = %s 
+              AND (cliente = %s OR nombre = %s)
+            """,
+            (hoy, barberia_id, usuario, usuario),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], 0
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas cliente")
+        return 0, 0, 0
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_barbero(barberia_id=None, barbero_id=None):
+    """Fast cached barber metrics with optimized queries.
+    
+    SECURITY: Always uses current context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not barbero_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0
+    
+    try:
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        hoy = datetime.now().date()
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
+                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos
+            FROM reservas 
+            WHERE barberia_id = %s AND barbero_id = %s
+            """,
+            (hoy, barberia_id, barbero_id),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2]
+        return 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas barbero")
+        return 0, 0, 0
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_admin(barberia_id=None):
+    """Fast cached admin metrics with optimized queries.
+    
+    SECURITY: Always uses current context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
+                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos,
+                (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO') as num_barberos
+            FROM reservas 
+            WHERE barberia_id = %s
+            """,
+            (hoy, barberia_id, barberia_id),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3]
+        return 0, 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas admin")
+        return 0, 0, 0, 0
+
+
+@st.cache_data(ttl=60)
+def calcular_metricas_super_admin(barberia_id=None):
+    """Fast cached super admin metrics - respects context (single barberia or global).
+    
+    SECURITY: Uses current barberia context if set, otherwise respects super_admin_all_barberias flag.
+    """
+    if not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Check if SUPER_ADMIN is viewing all barberias or specific context
+        viewing_all = st.session_state.get("super_admin_all_barberias", False)
+        
+        if viewing_all:
+            # GLOBAL metrics - no barberia_id filter (SUPER_ADMIN chose to view all)
+            # This is authorized for SUPER_ADMIN role, uses safe_fetch_one which exempts global queries
+            metrics = safe_fetch_one(
+                """
+                SELECT 
+                    (SELECT COUNT(*) FROM barberias) as num_barberias,
+                    (SELECT COUNT(*) FROM usuarios) as num_usuarios,
+                    (SELECT COUNT(*) FROM reservas) as num_reservas,
+                    COALESCE((SELECT SUM(monto) FROM reservas WHERE pagado = TRUE), 0) as total_ingresos,
+                    (SELECT COUNT(*) FROM reservas WHERE DATE(inicio) = %s) as hoy_count
+                """,
+                (hoy,),
+            )
+        else:
+            # CONTEXT metrics - filter by barberia_id (SUPER_ADMIN selected a specific barberia)
+            # SECURITY: Use get_current_barberia_id() instead of parameter
+            barberia_id = get_current_barberia_id()
+            if not barberia_id:
+                return 0, 0, 0, 0, 0
+            
+            metrics = safe_fetch_one(
+                """
+                SELECT 
+                    (SELECT COUNT(*) FROM barberias WHERE id = %s) as num_barberias,
+                    (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s) as num_usuarios,
+                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s) as num_reservas,
+                    COALESCE((SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE), 0) as total_ingresos,
+                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s AND DATE(inicio) = %s) as hoy_count
+                """,
+                (barberia_id, barberia_id, barberia_id, barberia_id, barberia_id, hoy),
+            )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
+        return 0, 0, 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas super admin")
+        return 0, 0, 0, 0, 0
+
+
+def render_dashboard_cards(col_count, cards_data):
+    """Renderiza cards de mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas con layout flexible."""
+    cols = st.columns(col_count)
+    for idx, (col, card) in enumerate(zip(cols, cards_data)):
+        with col:
+            st.metric(card["label"], card["value"], card.get("delta", None))
+
+
+# ================= MULTI-BARBERIA PUBLIC ACCESS =================
+
+def obtener_barberia_por_slug(slug):
+    """Get barberia by slug for public booking."""
+    if not slug:
+        return None
+    try:
+        result = fetch_one(
+            """SELECT id, nombre, slug, telefono, email, ciudad, direccion, 
+                      latitud, longitud, color_primario, logo_url, 
+                      hora_apertura, hora_cierre, estado 
+               FROM barberias WHERE slug = %s""",
+            (slug,),
+        )
+        if result:
+            return {

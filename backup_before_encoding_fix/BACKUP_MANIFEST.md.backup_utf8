@@ -1,0 +1,83 @@
+# Backup Manifest - Encoding Fix Rollback Point
+
+## Purpose
+Created as a safe rollback point before attempting UTF-8 encoding fixes on the Streamlit barber booking application.
+
+## Backup Date & Time
+Created: Before encoding remediation phase
+
+## Files Backed Up
+
+| File | Original Size | Status | Notes |
+|------|---------------|--------|-------|
+| app.py | ~6000 lines | ✓ Backed up | PRIMARY FILE - Contains 200+ UTF-8 corruption instances |
+| design_system.py | ~2750 lines | ✓ Backed up | Design system with potential encoding in default values |
+| whatsapp.py | TBD | ✓ Backed up | WhatsApp/Twilio integration - Spanish text at risk |
+| webhook.py | TBD | ✓ Backed up | Webhook handler - response text may have encoding issues |
+| LOGIN_SECTION_FIX.py | TBD | ✓ Backed up | Login utilities - likely contains Spanish text |
+
+## Corruption Evidence
+
+### Confirmed Corruption Types:
+1. **Spanish accented characters**: á→Ãƒ¡, é→Ãƒ©, ñ→Ã±
+2. **Emoji corruption**: Multi-byte emoji sequences → 60+ character mojibake
+3. **Double-encoding**: UTF-8→Latin-1 misinterpretation→UTF-8 re-encoding
+
+### Known Corruption Locations (app.py):
+- Line 61: `page_title="BarberÃƒÆ'Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢..."` (should be "Barbería Leveling")
+- Line 62: `page_icon="ÃƒÆ'Ã†â€™Ãƒâ€šÃ‚Â¢..."` (should be ✂ emoji)
+- Lines 100-102: Database error messages with corrupted "está", "configuración", "código"
+- Lines 127, 141: Logger messages with corrupted "Conexión", "Creando"
+- And 190+ additional locations
+
+## Root Cause Analysis
+
+**Primary Cause**: PowerShell string manipulation without explicit `-Encoding UTF8` flag
+- Evidence: 40+ terminal session history without proper encoding specification
+- Get-Content/Set-Content operations defaulting to system encoding
+
+**Secondary Cause**: Mixed encoding handling in file processing
+- UTF-8 bytes (e.g., C3 A1 for "á") misinterpreted as Latin-1
+- Then re-encoded to UTF-8, creating double-encoding
+
+## Recovery Instructions
+
+If encoding fixes fail or corrupt data:
+
+1. **Restore from this backup**:
+   ```powershell
+   Copy-Item "backup_before_encoding_fix\app.py" "app.py" -Force
+   Copy-Item "backup_before_encoding_fix\design_system.py" "design_system.py" -Force
+   # ... restore other files as needed
+   ```
+
+2. **Verify restoration**:
+   ```powershell
+   Get-FileEncoding app.py  # Should show UTF-8 after successful fix
+   Select-String -Path app.py -Pattern "BarberÃ" # Should find corrupted text if not yet fixed
+   ```
+
+3. **Recommended fix approach**:
+   - Read file as Latin-1 (the incorrect encoding)
+   - Encode back to UTF-8 (correct representation)
+   - Verify each field before writing
+
+## Backup Location
+Path: `c:\Users\Joanb\OneDrive\Escritorio\barberia_app\backup_before_encoding_fix\`
+
+All files are read-only after fix completion (recommended):
+```powershell
+Get-Item .\backup_before_encoding_fix\*.py | Set-ItemProperty -Name IsReadOnly -Value $true
+```
+
+## Next Steps
+
+1. **DO NOT DELETE** this backup until encoding fixes are verified and tested
+2. Keep backup for 7+ days after successful fix deployment
+3. Document any encoding issues encountered during remediation
+4. Update this manifest with final status after fix completion
+
+---
+**Status**: PENDING - Backup created, awaiting encoding fix execution
+**Created By**: Encoding Audit & Recovery Process
+**Version**: 1.0

@@ -1,0 +1,201 @@
+﻿                    st.write(f"Precio: ")
+                    st.write(f"Duracion: {config['duraction']} min")
+                    if st.button(f"Seleccionar {service}", key=f"svc_{idx}", use_container_width=True):
+                        st.session_state.booking_data["servicio"] = service
+                        st.session_state.booking_data["precio"] = config["precio"]
+                        st.session_state.booking_data["duracion"] = config["duraction"]
+                        st.session_state.booking_step = 2
+                        st.rerun()
+
+    # ===== STEP 2: SELECT BARBER =====
+    elif st.session_state.booking_step == 2:
+        render_step_indicator(2, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "Listo"])
+        render_booking_header("Selecciona tu barbero", "Con quien quieres tu corte?", step=2, total_steps=6)
+        
+        if st.button("<- Volver", key="back_to_1"):
+            st.session_state.booking_step = 1
+            st.rerun()
+
+        with render_booking_section():
+            barberos = obtener_barberos_activos(st.session_state.get('barberia_id'))
+            if not barberos:
+                st.warning("No hay barberos disponibles en este momento.")
+            else:
+                cols = st.columns(min(len(barberos), 3))
+                for idx, b in enumerate(barberos):
+                    with cols[idx % len(cols)]:
+                        st.markdown(f"### {b['nombre']}")
+                        if st.button(f"Elegir {b['nombre']}", key=f"barb_{b['id']}", use_container_width=True):
+                            st.session_state.booking_data["barbero_id"] = b["id"]
+                            st.session_state.booking_data["barbero_nombre"] = b["nombre"]
+                            st.session_state.booking_step = 3
+                            st.rerun()
+
+    # ===== STEP 3: SELECT DATE & TIME =====
+    elif st.session_state.booking_step == 3:
+        render_step_indicator(3, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "Listo"])
+        render_booking_header("Selecciona fecha y hora", "Cuando te gustaria venir?", step=3, total_steps=6)
+
+        if st.button("<- Volver", key="back_to_2"):
+            st.session_state.booking_step = 2
+            st.rerun()
+
+        with render_booking_section():
+            fecha = st.date_input("Fecha", min_value=datetime.now().date(), key="booking_date")
+            st.session_state.booking_data["fecha"] = fecha.strftime("%Y-%m-%d")
+            
+            st.write("---")
+            st.write("Horas disponibles:")
+            # Simplified time slot selection
+            horas = ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00"]
+            cols = st.columns(4)
+            for idx, h in enumerate(horas):
+                with cols[idx % 4]:
+                    if st.button(h, key=f"time_{h}", use_container_width=True):
+                        st.session_state.booking_data["hora"] = h
+                        st.session_state.booking_step = 4
+                        st.rerun()
+
+    # ===== STEP 4: PERSONAL DATA =====
+    elif st.session_state.booking_step == 4:
+        render_step_indicator(4, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "Listo"])
+        render_booking_header("Tus datos", "Para confirmar tu cita", step=4, total_steps=6)
+
+        if st.button("<- Volver", key="back_to_3"):
+            st.session_state.booking_step = 3
+            st.rerun()
+
+        with st.form("personal_data_form"):
+            nombre = st.text_input("Nombre completo")
+            telefono = st.text_input("WhatsApp (ej: +569...)")
+            email = st.text_input("Email (opcional)")
+            
+            submit = st.form_submit_button("Ver resumen", use_container_width=True)
+            if submit:
+                if len(nombre) < 3 or len(telefono) < 8:
+                    st.error("Por favor completa los campos correctamente")
+                else:
+                    st.session_state.booking_data["nombre"] = nombre
+                    st.session_state.booking_data["telefono"] = telefono
+                    st.session_state.booking_data["email"] = email
+                    st.session_state.booking_step = 5
+                    st.rerun()
+
+    # ===== STEP 5: REVIEW =====
+    elif st.session_state.booking_step == 5:
+        render_step_indicator(5, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "Listo"])
+        render_booking_header("Confirma tu reserva", "Revisa que todo este correcto", step=5, total_steps=6)
+
+        data = st.session_state.booking_data
+        with render_booking_section("Resumen"):
+            st.write(f"**Servicio:** {data.get('servicio')}")
+            st.write(f"**Barbero:** {data.get('barbero_nombre')}")
+            st.write(f"**Fecha:** {data.get('fecha')} a las {data.get('hora')}")
+            st.write(f"**Total:** ")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Modificar", use_container_width=True):
+                    st.session_state.booking_step = 1
+                    st.rerun()
+            with col2:
+                if st.button("Confirmar y Pagar", type="primary", use_container_width=True):
+                    # Simplified reservation creation
+                    reserva_id = insertar_reserva_con_fecha_hora(
+                        st.session_state.get('barberia_id'),
+                        data.get('nombre'),
+                        data.get('barbero_id'),
+                        data.get('barbero_nombre'),
+                        data.get('servicio'),
+                        data.get('fecha'),
+                        data.get('hora'),
+                        data.get('precio'),
+                        data.get('duracion')
+                    )
+                    if reserva_id:
+                        pago_url = crear_pago_mercadopago(
+                            reserva_id,
+                            data.get('precio', 0),
+                            f"Reserva: {data.get('servicio')}",
+                            data.get('email')
+                        )
+                        st.session_state.booking_data["reserva_id"] = reserva_id
+                        st.session_state.booking_data["pago_url"] = pago_url
+                        st.session_state.booking_step = 6
+                        st.rerun()
+                    else:
+                        st.error("Error al guardar la reserva")
+
+    # ===== STEP 6: SUCCESS =====
+    elif st.session_state.booking_step == 6:
+        render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "Listo"])
+        render_booking_header("Reserva Confirmada!", "Te esperamos!", step=6, total_steps=6)
+        
+        st.balloons()
+        data = st.session_state.booking_data
+        st.success(f"Tu reserva #{data.get('reserva_id')} ha sido creada con exito.")
+        
+        if data.get('pago_url'):
+            st.link_button("Pagar con MercadoPago", data['pago_url'], type="primary", use_container_width=True)
+        
+        if st.button("Nueva reserva", use_container_width=True):
+            st.session_state.booking_step = 1
+            st.session_state.booking_data = {}
+            st.rerun()
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_admin(barberia_id=None):
+    """Fast cached admin metrics with optimized queries.
+    
+    SECURITY: Always uses current context.
+    """
+    # SECURITY: Always use current context
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
+        metrics = safe_fetch_one(
+            """
+            SELECT 
+                COUNT(*) as total_reservas,
+                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
+                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos,
+                (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO') as num_barberos
+            FROM reservas 
+            WHERE barberia_id = %s
+            """,
+            (hoy, barberia_id, barberia_id),
+        )
+        
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3]
+        return 0, 0, 0, 0
+    except Exception as e:
+        logger.exception("Error calculando mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricas admin")
+        return 0, 0, 0, 0
+
+
+@st.cache_data(ttl=60)
+def calcular_metricas_super_admin(barberia_id=None):
+    """Fast cached super admin metrics - respects context (single barberia or global).
+    
+    SECURITY: Uses current barberia context if set, otherwise respects super_admin_all_barberias flag.
+    """
+    if not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0, 0
+    
+    try:
+        hoy = datetime.now().date()
+        
+        # Check if SUPER_ADMIN is viewing all barberias or specific context
+        viewing_all = st.session_state.get("super_admin_all_barberias", False)
+        
+        if viewing_all:
+            # GLOBAL metrics - no barberia_id filter (SUPER_ADMIN chose to view all)
+            # This is authorized for SUPER_ADMIN role, uses safe_fetch_one which exempts global queries
+            metrics = safe_fetch_one(
