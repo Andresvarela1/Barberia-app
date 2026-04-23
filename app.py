@@ -9747,7 +9747,7 @@ def flujo_reserva_publica():
         with st.expander("�°Å¸¹ Ver detalles de tu cita", expanded=False):
 
 
-            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">SERVICIO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">BARBERO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">FECHA Y HORA</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">{data.get('fecha', 'N/A')} ⚠️ {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">MONTO</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: bold; color: #16a34a;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 700; letter-spacing: 0.5px;">N�Å¡MERO DE RESERVA</p><p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #16a34a;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Servicio</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Barbero</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Fecha y hora</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('fecha', 'N/A')} ⚠️ {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Monto</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Reserva</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: 700; color: #16a34a; line-height: 1.3;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
 
 
         
@@ -15477,7 +15477,7 @@ def render_home_screen():
         with col1:
 
 
-            if st.button("�°Å¸\n\nIniciar Sesión\n\nAccede a tu cuenta", key="home_login", use_container_width=True):
+            if st.button("Iniciar sesión\n\nAccede a tu cuenta", key="home_login", use_container_width=True):
 
 
                 st.session_state.view = "login"
@@ -15492,7 +15492,7 @@ def render_home_screen():
         with col2:
 
 
-            if st.button("Å¨\n\nRegistrar Barbería\n\nCrea tu barbería", key="home_registro", use_container_width=True):
+            if st.button("Registrar barbería\n\nCrea tu espacio", key="home_registro", use_container_width=True):
 
 
                 st.session_state.view = "registro"
@@ -15507,7 +15507,7 @@ def render_home_screen():
         with col3:
 
 
-            if st.button("�°Å¸¦\n\nReservar Cita\n\nAgenda tu corte", key="home_reserva", use_container_width=True):
+            if st.button("Reservar cita\n\nAgenda tu corte", key="home_reserva", use_container_width=True):
 
 
                 st.session_state.view = "reserva"
@@ -16530,7 +16530,7 @@ try:
         with col_center[1]:
 
 
-            if st.button("  Volver al inicio", key="back_to_home"):
+            if st.button("Volver al inicio", key="back_to_home"):
 
 
                 st.session_state.view = "home"
@@ -16545,13 +16545,13 @@ try:
             with st.form("login_form"):
 
 
-                usuario = st.text_input("�°Å¸¤ Usuario", placeholder="Tu usuario")
+                usuario = st.text_input("Usuario", placeholder="Tu usuario")
 
 
-                password = st.text_input("�°Å¸ Contraseña", type="password", placeholder="Tu contraseña")
+                password = st.text_input("Contraseña", type="password", placeholder="Tu contraseña")
 
 
-                entrar = st.form_submit_button(" Entrar", use_container_width=True, disabled=not db_ok)
+                entrar = st.form_submit_button("Entrar", use_container_width=True, disabled=not db_ok)
 
 
 

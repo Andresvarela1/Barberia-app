@@ -48,11 +48,11 @@ class Typography:
     """Typography system for consistent text styling"""
     
     # Font sizes
-    H1 = "2.5rem"  # 40px - Page titles
-    H2 = "2rem"    # 32px - Section titles
-    H3 = "1.5rem"  # 24px - Subsection titles
-    H4 = "1.25rem" # 20px - Card titles
-    BODY = "1rem"  # 16px - Main text
+    H1 = "2.25rem"  # 36px - Page titles
+    H2 = "1.5rem"   # 24px - Section titles
+    H3 = "1.25rem"  # 20px - Subsection titles
+    H4 = "1.125rem" # 18px - Card titles
+    BODY = "0.95rem"  # 15px - Main text
     SMALL = "0.875rem"  # 14px - Small text
     TINY = "0.75rem"  # 12px - Captions
     
@@ -71,19 +71,19 @@ class Spacing:
     XS = "0.25rem"  # 4px
     SM = "0.5rem"   # 8px
     MD = "1rem"     # 16px
-    LG = "1.5rem"   # 24px
-    XL = "2rem"     # 32px
-    XXL = "3rem"    # 48px
+    LG = "1.25rem"  # 20px
+    XL = "1.75rem"  # 28px
+    XXL = "2.25rem" # 36px
 
 
 # ==================== BORDER RADIUS ====================
 class BorderRadius:
     """Consistent border radius values"""
     NONE = "0px"
-    SM = "6px"
-    MD = "12px"
-    LG = "16px"
-    XL = "24px"
+    SM = "8px"
+    MD = "10px"
+    LG = "12px"
+    XL = "16px"
     FULL = "9999px"
 
 
@@ -168,6 +168,8 @@ def apply_global_theme():
             background-color: {Colors.BACKGROUND};
             color: {Colors.TEXT};
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            font-size: {Typography.BODY};
+            line-height: 1.55;
         }}
 
         .stApp {{
@@ -189,38 +191,43 @@ def apply_global_theme():
         .main {{
             background-color: {Colors.BACKGROUND};
             padding: {Spacing.LG};
+            max-width: 1360px;
+            margin: 0 auto;
         }}
 
         /* ==================== TEXT STYLING ==================== */
         h1, h2, h3, h4, h5, h6 {{
             color: {Colors.TEXT};
             font-weight: {Typography.SEMIBOLD};
+            line-height: 1.2;
+            letter-spacing: -0.01em;
         }}
 
         h1 {{
             font-size: {Typography.H1};
-            margin-bottom: {Spacing.XL};
+            margin: {Spacing.MD} 0 {Spacing.LG} 0;
         }}
 
         h2 {{
             font-size: {Typography.H2};
-            margin-bottom: {Spacing.LG};
+            margin: {Spacing.MD} 0 {Spacing.MD} 0;
         }}
 
         h3 {{
             font-size: {Typography.H3};
-            margin-bottom: {Spacing.MD};
+            margin: {Spacing.MD} 0 {Spacing.SM} 0;
         }}
 
         h4 {{
             font-size: {Typography.H4};
-            margin-bottom: {Spacing.MD};
+            margin: {Spacing.SM} 0;
         }}
 
         p {{
             color: {Colors.TEXT_SECONDARY};
             font-size: {Typography.BODY};
             line-height: 1.6;
+            margin: {Spacing.SM} 0;
         }}
 
         .caption {{
@@ -228,14 +235,49 @@ def apply_global_theme():
             font-size: {Typography.TINY};
         }}
 
+        [data-testid="stWidgetLabel"],
+        label,
+        .stTextInput label,
+        .stSelectbox label,
+        .stDateInput label,
+        .stTimeInput label,
+        .stNumberInput label,
+        .stTextArea label {{
+            color: {Colors.TEXT};
+            font-size: {Typography.SMALL};
+            font-weight: {Typography.MEDIUM};
+            line-height: 1.4;
+            letter-spacing: 0;
+        }}
+
         /* ==================== CONTAINER STYLING ==================== */
         [data-testid="stVerticalBlock"] > [style*="flex-direction"] > [data-testid="stVerticalBlock"] {{
             background: {Gradients.CARD_SUBTLE};
             border: 1px solid {Colors.BORDER};
-            border-radius: {BorderRadius.LG};
+            border-radius: {BorderRadius.MD};
             padding: {Spacing.LG};
             box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
             transition: all {Transitions.NORMAL};
+        }}
+
+        div[data-testid="stVerticalBlock"] {{
+            gap: {Spacing.MD};
+        }}
+
+        div[data-testid="stHorizontalBlock"] {{
+            gap: {Spacing.MD};
+        }}
+
+        div[data-testid="column"] {{
+            padding: 0 calc({Spacing.SM} + 2px);
+        }}
+
+        div[data-testid="column"]:first-child {{
+            padding-left: 0;
+        }}
+
+        div[data-testid="column"]:last-child {{
+            padding-right: 0;
         }}
 
         [data-testid="stVerticalBlock"] > [style*="flex-direction"] > [data-testid="stVerticalBlock"]:hover {{
@@ -251,7 +293,10 @@ def apply_global_theme():
             font-weight: {Typography.SEMIBOLD};
             transition: all {Transitions.NORMAL};
             font-size: {Typography.BODY};
-            padding: 0.75rem 1.5rem;
+            line-height: 1.35;
+            letter-spacing: 0;
+            text-transform: none;
+            padding: 0.8rem 1.1rem;
             position: relative;
             overflow: hidden;
             cursor: pointer;
@@ -261,11 +306,12 @@ def apply_global_theme():
         .stButton > button {{
             background: {Gradients.PRIMARY_BUTTON};
             color: {Colors.WHITE};
-            box-shadow: {Shadows.MD}, {Shadows.GLOW_SOFT};
-            border: 2px solid {Colors.PRIMARY};
+            box-shadow: {Shadows.SM};
+            border: 1px solid {Colors.PRIMARY};
             font-weight: {Typography.BOLD};
             position: relative;
             overflow: hidden;
+            border-radius: {BorderRadius.MD};
         }}
 
         .stButton > button::before {{
@@ -296,12 +342,12 @@ def apply_global_theme():
 
         .stButton > button:hover {{
             transform: translateY(-3px);
-            box-shadow: {Shadows.LG}, {Shadows.GLOW_STRONG};
+            box-shadow: {Shadows.MD};
         }}
 
         .stButton > button:active {{
             transform: translateY(-1px) scale(0.98);
-            box-shadow: {Shadows.MD}, {Shadows.GLOW_SOFT};
+            box-shadow: {Shadows.SM};
         }}
 
         .stButton > button:active::after {{
@@ -313,7 +359,7 @@ def apply_global_theme():
         .stButton > button[kind="secondary"] {{
             background: {Colors.CARD};
             color: {Colors.PRIMARY};
-            border: 2px solid {Colors.PRIMARY};
+            border: 1px solid {Colors.PRIMARY};
             box-shadow: {Shadows.SM};
             font-weight: {Typography.SEMIBOLD};
         }}
@@ -346,7 +392,7 @@ def apply_global_theme():
         input, textarea, [role="textbox"] {{
             background-color: {Colors.CARD} !important;
             color: {Colors.TEXT} !important;
-            border: 2px solid {Colors.BORDER} !important;
+            border: 1px solid {Colors.BORDER} !important;
             border-radius: {BorderRadius.MD} !important;
             padding: 0.75rem {Spacing.MD} !important;
             transition: all {Transitions.FAST} !important;
@@ -369,7 +415,7 @@ def apply_global_theme():
         /* ==================== SELECT/DROPDOWN STYLING ==================== */
         [data-testid="stSelectbox"] > div > div {{
             background-color: {Colors.CARD} !important;
-            border: 2px solid {Colors.BORDER} !important;
+            border: 1px solid {Colors.BORDER} !important;
             border-radius: {BorderRadius.MD} !important;
             transition: all {Transitions.FAST} !important;
         }}
@@ -416,10 +462,10 @@ def apply_global_theme():
         /* ==================== METRIC STYLING ==================== */
         [data-testid="metric-container"] {{
             background: {Gradients.CARD_SUBTLE};
-            border: 2px solid {Colors.BORDER};
-            border-radius: {BorderRadius.LG};
-            padding: {Spacing.LG};
-            box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
+            border: 1px solid {Colors.BORDER};
+            border-radius: {BorderRadius.MD};
+            padding: {Spacing.MD};
+            box-shadow: {Shadows.SM};
             transition: all {Transitions.NORMAL};
             position: relative;
             overflow: hidden;
@@ -452,6 +498,9 @@ def apply_global_theme():
         [data-testid="metric-container"] [data-testid="stMetricLabel"] {{
             color: {Colors.TEXT_SECONDARY};
             font-weight: {Typography.MEDIUM};
+            font-size: {Typography.SMALL};
+            letter-spacing: 0;
+            text-transform: none;
         }}
 
         /* ==================== TABS STYLING ==================== */
@@ -478,9 +527,11 @@ def apply_global_theme():
 
         /* ==================== ALERT/MESSAGE STYLING ==================== */
         .stAlert {{
-            border-radius: {BorderRadius.LG};
+            border-radius: {BorderRadius.MD};
             padding: {Spacing.MD};
             border-left: 4px solid;
+            border: 1px solid transparent;
+            box-shadow: {Shadows.SM};
         }}
 
         .stSuccess {{
@@ -540,7 +591,7 @@ def apply_global_theme():
         [data-testid="stExpander"] {{
             background-color: {Colors.CARD};
             border: 1px solid {Colors.BORDER};
-            border-radius: {BorderRadius.LG};
+            border-radius: {BorderRadius.MD};
             box-shadow: {Shadows.SM};
         }}
 
@@ -567,9 +618,9 @@ def apply_global_theme():
         .card-container {{
             background: {Gradients.CARD_SUBTLE};
             border: 1px solid {Colors.BORDER};
-            border-radius: {BorderRadius.LG};
-            padding: {Spacing.LG};
-            box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
+            border-radius: {BorderRadius.MD};
+            padding: {Spacing.MD};
+            box-shadow: {Shadows.SM};
             margin-bottom: {Spacing.MD};
             transition: all {Transitions.NORMAL};
             cursor: pointer;
@@ -577,10 +628,10 @@ def apply_global_theme():
         }}
 
         .card-container:hover {{
-            box-shadow: {Shadows.LG}, {Shadows.INSET_SUBTLE}, {Shadows.GLOW_SOFT};
+            box-shadow: {Shadows.MD};
             border-color: {Colors.PRIMARY};
             background: {Gradients.CARD_HOVER};
-            transform: translateY(-4px);
+            transform: translateY(-2px);
         }}
 
         .card-container:active {{
@@ -590,12 +641,12 @@ def apply_global_theme():
 
         .premium-card {{
             background: {Gradients.PREMIUM};
-            border: 2px solid transparent;
+            border: 1px solid transparent;
             background-clip: padding-box;
             border-image: linear-gradient(135deg, {Colors.PRIMARY} 0%, {Colors.SECONDARY} 100%) 1;
-            border-radius: {BorderRadius.XL};
-            padding: {Spacing.LG};
-            box-shadow: {Shadows.ELEVATED}, {Shadows.INSET_SUBTLE};
+            border-radius: {BorderRadius.LG};
+            padding: {Spacing.MD};
+            box-shadow: {Shadows.MD};
             position: relative;
             overflow: hidden;
             cursor: pointer;
@@ -616,8 +667,8 @@ def apply_global_theme():
         }}
 
         .premium-card:hover {{
-            box-shadow: {Shadows.FLOATING}, {Shadows.GLOW_STRONG};
-            transform: translateY(-6px);
+            box-shadow: {Shadows.LG};
+            transform: translateY(-2px);
         }}
 
         .premium-card:hover::before {{
@@ -680,8 +731,8 @@ def apply_global_theme():
             font-size: {Typography.SMALL};
             font-weight: {Typography.SEMIBOLD};
             box-shadow: {Shadows.SM};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: none;
+            letter-spacing: 0;
         }}
 
         .badge-success {{
@@ -870,7 +921,7 @@ def render_section_title(title, subtitle=None):
     st.markdown(
         f"""
         <div class="section-title">{title}</div>
-        {'<p style="color: ' + Colors.TEXT_SECONDARY + '; margin-top: -' + Spacing.MD + ';">' + subtitle + '</p>' if subtitle else ''}
+        {'<p style="color: ' + Colors.TEXT_SECONDARY + '; margin: ' + Spacing.XS + ' 0 0 0;">' + subtitle + '</p>' if subtitle else ''}
         """,
         unsafe_allow_html=True
     )
@@ -958,8 +1009,9 @@ def render_stat_box(label, value, icon="📊", color=Colors.PRIMARY):
                     color: {Colors.TEXT_SECONDARY};
                     font-size: {Typography.SMALL};
                     margin-bottom: {Spacing.SM};
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    text-transform: none;
+                    letter-spacing: 0;
+                    line-height: 1.4;
                 ">{label}</div>
                 <div style="
                     color: {color};
@@ -1448,8 +1500,8 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             gap: {Spacing.SM};
             margin-top: {Spacing.SM};
             font-weight: {Typography.MEDIUM};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: none;
+            letter-spacing: 0;
         }}
         
         .barber-availability::before {{
@@ -1864,8 +1916,8 @@ def render_form_group(label, input_func=None, help_text=None, error_text=None):
             font-weight: {Typography.SEMIBOLD};
             color: {Colors.TEXT};
             margin-bottom: {Spacing.SM};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: none;
+            letter-spacing: 0;
         ">{label}</label>
     """
     
@@ -1965,7 +2017,7 @@ def render_step_indicator(current_step, total_steps, step_titles=None):
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
             gap: 8px;
         }
         
@@ -2226,8 +2278,9 @@ def render_metric_card(label, value, delta=None, icon="📊", color=Colors.PRIMA
             font-size: {config['label_size']};
             color: {Colors.TEXT_SECONDARY};
             font-weight: {Typography.MEDIUM};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: none;
+            letter-spacing: 0;
+            line-height: 1.4;
         ">{label}</p>
         <p style="
             margin: 0;
@@ -2257,7 +2310,7 @@ def apply_layout_css():
     /* ===== GLOBAL SPACING FIXES ===== */
     /* Reduce excessive vertical spacing between elements */
     div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {{
-        margin-bottom: {Spacing.MD} !important;
+        margin-bottom: {Spacing.SM} !important;
     }}
     
     /* Better spacing for containers */
@@ -2270,7 +2323,7 @@ def apply_layout_css():
     /* ===== CONTENT CENTERING ===== */
     /* Center content columns properly */
     div[data-testid="column"] {{
-        padding: 0 {Spacing.MD} !important;
+        padding: 0 {Spacing.SM} !important;
     }}
     
     div[data-testid="column"]:first-child {{
@@ -2298,7 +2351,7 @@ def apply_layout_css():
         background: {Colors.CARD} !important;
         border: 1px solid {Colors.BORDER} !important;
         border-radius: {BorderRadius.LG} !important;
-        padding: {Spacing.LG} !important;
+        padding: {Spacing.MD} !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
         transition: all 0.2s ease !important;
     }}
@@ -2316,11 +2369,11 @@ def apply_layout_css():
     /* ===== TYPOGRAPHY REFINEMENT ===== */
     /* Tighter headings to reduce empty space */
     h1 {{
-        margin: {Spacing.LG} 0 {Spacing.SM} 0 !important;
+        margin: {Spacing.MD} 0 {Spacing.SM} 0 !important;
     }}
     
     h2 {{
-        margin: {Spacing.LG} 0 {Spacing.SM} 0 !important;
+        margin: {Spacing.MD} 0 {Spacing.SM} 0 !important;
         font-size: {Typography.H2} !important;
     }}
     
@@ -2337,7 +2390,7 @@ def apply_layout_css():
     hr {{
         border: none !important;
         border-top: 1px solid {Colors.BORDER} !important;
-        margin: {Spacing.LG} 0 !important;
+        margin: {Spacing.MD} 0 !important;
     }}
     
     /* ===== INPUT REFINEMENT ===== */
@@ -2358,7 +2411,7 @@ def apply_layout_css():
     /* ===== BUTTONS - CONSISTENT SIZING ===== */
     .stButton > button {{
         height: auto !important;
-        padding: {Spacing.MD} {Spacing.LG} !important;
+        padding: {Spacing.SM} {Spacing.LG} !important;
         font-weight: {Typography.SEMIBOLD} !important;
         border-radius: {BorderRadius.MD} !important;
         border: none !important;
@@ -2396,7 +2449,7 @@ def apply_layout_css():
     
     ::-webkit-scrollbar-thumb {{
         background: {Colors.BORDER};
-        border-radius: 4px;
+        border-radius: {BorderRadius.SM};
     }}
     
     ::-webkit-scrollbar-thumb:hover {{
@@ -2433,8 +2486,8 @@ def apply_calendar_refinement():
         font-weight: {Typography.BOLD};
         border-bottom: 2px solid {Colors.BORDER};
         font-size: {Typography.SMALL};
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        text-transform: none;
+        letter-spacing: 0;
     }}
     
     td {{
@@ -2528,7 +2581,7 @@ def render_sidebar_section(title, items, active_item=None):
     """
     st.markdown(f"""
     <div class="sidebar-section">
-        <h4 style="margin: 0 0 {Spacing.LG} 0; color: {Colors.TEXT}; font-size: {Typography.SMALL}; text-transform: uppercase; letter-spacing: 1px;">
+        <h4 style="margin: 0 0 {Spacing.MD} 0; color: {Colors.TEXT}; font-size: {Typography.SMALL}; font-weight: {Typography.SEMIBOLD}; text-transform: none; letter-spacing: 0;">
             {title}
         </h4>
     </div>
@@ -2631,8 +2684,8 @@ def render_appointment_block(time, service, barber, duration, status="scheduled"
                 <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.BODY}; font-weight: bold;">✂️ {service}</p>
                 <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.SMALL}; opacity: 0.85;">👤 {barber} • {duration} min</p>
             </div>
-            <div style="font-size: {Typography.TINY}; opacity: 0.8; text-transform: uppercase; font-weight: bold;">
-                {status.upper()}
+            <div style="font-size: {Typography.TINY}; opacity: 0.8; text-transform: none; font-weight: {Typography.SEMIBOLD};">
+                {status.title()}
             </div>
         </div>
     </div>
