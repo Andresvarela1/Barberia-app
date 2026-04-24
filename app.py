@@ -114,7 +114,7 @@ st.set_page_config(
 
     page_title="Barbería Leveling",
 
-    page_icon="ï¸",
+    page_icon="✂️",
 
     layout="wide",
 
@@ -1295,13 +1295,13 @@ def enforce_access(target_barberia_id):
 
     if not current_id:
 
-        st.error("Å No barbería seleccionada")
+        st.error("No barbería seleccionada")
 
         st.stop()
 
     if target_barberia_id != current_id:
 
-        st.error("Å No tienes permiso para acceder a esta barbería")
+        st.error("No tienes permiso para acceder a esta barbería")
 
         logger.warning(f"🚨 ACCESS DENIED: Current={current_id}, Target={target_barberia_id}, Role={st.session_state.get('rol')}")
 
@@ -1374,7 +1374,7 @@ def enforce_barberia_access(target_barberia_id):
 
         logger.warning(f"🚨 UNAUTHORIZED ACCESS ATTEMPT: Role={user_role}, UserBarberia={user_barberia}, TargetBarberia={target_barberia_id}")
 
-        st.error(f"Å No tienes permiso para acceder a esta barbería")
+        st.error(f"No tienes permiso para acceder a esta barbería")
 
         st.stop()
 
@@ -2143,7 +2143,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
     if not mercadopago:
 
-        error_msg = "Å MercadoPago SDK no está instalado. Ejecuta: pip install mercadopago"
+        error_msg = "MercadoPago SDK no está instalado. Ejecuta: pip install mercadopago"
 
         logger.error(error_msg)
 
@@ -2160,7 +2160,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
     if not access_token or access_token.strip() == "":
 
-        error_msg = "Å MERCADOPAGO_ACCESS_TOKEN no configurado. Agrega a .env: MERCADOPAGO_ACCESS_TOKEN=tu_token"
+        error_msg = "MERCADOPAGO_ACCESS_TOKEN no configurado. Agrega a .env: MERCADOPAGO_ACCESS_TOKEN=tu_token"
 
         logger.error(error_msg)
 
@@ -2197,7 +2197,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         except (ValueError, TypeError) as e:
 
-            error_msg = f"Å Monto inválido: {monto}. Error: {str(e)}"
+            error_msg = f"Monto inválido: {monto}. Error: {str(e)}"
 
             logger.error(error_msg)
 
@@ -2278,7 +2278,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         if not isinstance(preference_response, dict):
 
-            error_msg = f"Å Respuesta inválida de MercadoPago: tipo {type(preference_response)}"
+            error_msg = f"Respuesta inválida de MercadoPago: tipo {type(preference_response)}"
 
             logger.error(error_msg)
 
@@ -2295,7 +2295,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         if response_status != 201:
 
-            error_msg = f"Å MercadoPago error (status {response_status}): {preference_response}"
+            error_msg = f"MercadoPago error (status {response_status}): {preference_response}"
 
             logger.error(error_msg)
 
@@ -2310,7 +2310,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         if "response" not in preference_response:
 
-            error_msg = f"Å No 'response' en respuesta de MercadoPago: {preference_response}"
+            error_msg = f"No 'response' en respuesta de MercadoPago: {preference_response}"
 
             logger.error(error_msg)
 
@@ -2325,7 +2325,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         if "init_point" not in response_data:
 
-            error_msg = f"Å No 'init_point' en response de MercadoPago: {response_data}"
+            error_msg = f"No 'init_point' en response de MercadoPago: {response_data}"
 
             logger.error(error_msg)
 
@@ -2340,7 +2340,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
         if not init_point:
 
-            error_msg = "Å init_point es vacío en respuesta de MercadoPago"
+            error_msg = "init_point es vacío en respuesta de MercadoPago"
 
             logger.error(error_msg)
 
@@ -2358,7 +2358,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
     except Exception as e:
 
-        error_msg = f"Å Error creando pago MercadoPago para reserva {reserva_id}: {str(e)}"
+        error_msg = f"Error creando pago MercadoPago para reserva {reserva_id}: {str(e)}"
 
         logger.exception(error_msg)
 
@@ -2415,7 +2415,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
         return
 
 
-    st.markdown("### �°Å¸³ Pagar Reservas Pendientes")
+    st.markdown("### Pagar reservas pendientes")
 
 
     # DEBUG: Show token status (temporary, for troubleshooting)
@@ -2424,7 +2424,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
     token_status = " Cargado" if access_token else "Å No configurado"
 
-    with st.expander(f"�°Å¸§ Debug - Token: {token_status}"):
+    with st.expander(f"Debug - Token: {token_status}"):
 
         if access_token:
 
@@ -2432,7 +2432,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
         else:
 
-            st.error("Å MERCADOPAGO_ACCESS_TOKEN no está en .env")
+            st.error("MERCADOPAGO_ACCESS_TOKEN no está en .env")
 
 
     for r in unpaid:
@@ -2458,7 +2458,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
         with col1:
 
-            st.caption(f"�°Å¸¦ {fecha_label} {hora_label} �· ï¸ {servicio}")
+            st.caption(f"{fecha_label} {hora_label} · {servicio}")
 
 
         with col2:
@@ -2470,7 +2470,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
             if st.button(
 
-                "�°Å¸³ Generar Link",
+                "Generar Link",
 
                 key=f"pagar_mp_{reserva_id}",
 
@@ -2507,7 +2507,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
                     else:
 
-                        st.error(f"Å No se pudo generar el link para reserva #{reserva_id}")
+                        st.error(f"No se pudo generar el link para reserva #{reserva_id}")
 
 
         # Show payment link if generated (ALWAYS visible after generation)
@@ -2527,7 +2527,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
                     st.link_button(
 
-                        f"�°Å¸ Ir a pagar ${monto} (MercadoPago)",
+                        f"Ir a pagar ${monto} (MercadoPago)",
 
                         pago_url,
 
@@ -2556,7 +2556,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
             else:
 
-                st.error(f"Å El URL de pago no es válido")
+                st.error(f"El URL de pago no es válido")
 
 
         st.divider()
@@ -2634,7 +2634,7 @@ def procesar_beneficio_fidelizacion(usuario, barberia_id):
 
                 telefono_cliente,
 
-                "�°Å¸¥ �¡Tienes un descuento en tu próximo corte!",
+                "¡Tienes un descuento en tu próximo corte!",
 
             )
 
@@ -2962,7 +2962,7 @@ def mostrar_detalles_reserva(reserva_id):
 
     if not reserva:
 
-        st.error("Å Reserva no encontrada")
+        st.error("Reserva no encontrada")
 
         return None
 
@@ -2990,12 +2990,12 @@ def mostrar_detalles_reserva(reserva_id):
 
     # Build the inner card with all reservation details - FLEX LAYOUT
 
-    inner_card_html = f"""<div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">�°Å¸¤ CLIENTE</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">ï¸ SERVICIO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div></div></div><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">ð HORA</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div><div style="font-size: 12px; color: #666;">{fecha_str}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">�°Å¸° MONTO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div></div></div><div style="border-top: 1px solid #333; padding-top: 12px;"><div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">{estado}</div></div>"""
+    inner_card_html = f"""<div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">CLIENTE</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">SERVICIO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div></div></div><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">HORA</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div><div style="font-size: 12px; color: #666;">{fecha_str}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">MONTO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div></div></div><div style="border-top: 1px solid #333; padding-top: 12px;"><div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">{estado}</div></div>"""
 
 
     # Wrap in premium container - MAIN WRAPPER
 
-    card_html = f"""<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"><h3 style="margin: 0 0 20px 0; color: white; font-size: 20px;">�°Å¸Ë Tu reserva</h3>{inner_card_html}</div>"""
+    card_html = f"""<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"><h3 style="margin: 0 0 20px 0; color: white; font-size: 20px;">Tu reserva</h3>{inner_card_html}</div>"""
 
 
     # Render the reservation card
@@ -3058,7 +3058,7 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     if not reservas:
 
-        st.warning("Å¡ ï¸ No hay reservas para mostrar en el calendario.")
+        st.warning("No hay reservas para mostrar en el calendario.")
 
         return
 
@@ -3078,7 +3078,7 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     if not barberos_dict:
 
-        st.warning("Å¡ ï¸ No hay reservas para mostrar. Verifique los datos.")
+        st.warning("No hay reservas para mostrar. Verifique los datos.")
 
         return
 
@@ -3089,7 +3089,7 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     with col_title:
 
-        st.markdown(f"### �°Å¸¦ Vista Multi-Barbero")
+        st.markdown(f"### Vista Multi-Barbero")
 
 
     with col_legend:
@@ -3137,7 +3137,7 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
                 # Subheader for barber
 
-                st.subheader(f"�°Å¸Ë {barber_name}")
+                st.subheader(f"{barber_name}")
 
 
                 # Convert reservations to events for this barber
@@ -4064,7 +4064,7 @@ def mostrar_reservas_dataframe(rows):
 
     if not rows:
 
-        st.info("�°Å¸­ No hay reservas para mostrar.")
+        st.info("No hay reservas para mostrar.")
 
         return
 
@@ -4100,7 +4100,7 @@ def mostrar_reservas_dataframe(rows):
 
     for fecha_label, items in grouped.items():
 
-        st.markdown(f"### �°Å¸¦ {fecha_label}")
+        st.markdown(f"### {fecha_label}")
 
 
         for r in items:
@@ -4139,11 +4139,11 @@ def mostrar_reservas_dataframe(rows):
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
 
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">ð</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">⏰</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
 
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">ï¸</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">✂️</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
 
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">�°Å¸¡</span><span style="color: #e0e0e0;"><strong>{barbero}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">·</span><span style="color: #e0e0e0;"><strong>{barbero}</strong></span></div>
 
         <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Monto</span><span style="color: #e0e0e0;"><strong>${monto}</strong></span></div>
 
@@ -4349,7 +4349,7 @@ def mostrar_calendario_reservas(reservas):
 
     if not reservas:
 
-        st.info("�°Å¸­ No hay reservas para mostrar en el calendario.")
+        st.info("No hay reservas para mostrar en el calendario.")
 
         return
 
@@ -4361,7 +4361,7 @@ def mostrar_calendario_reservas(reservas):
 
     if not eventos:
 
-        st.info("�°Å¸­ No hay eventos para mostrar.")
+        st.info("No hay eventos para mostrar.")
 
         return
 
@@ -4372,7 +4372,7 @@ def mostrar_calendario_reservas(reservas):
 
     with col_title:
 
-        st.markdown(f"### �°Å¸¦ Vista de Calendario (Semana)")
+        st.markdown(f"### Vista de Calendario (Semana)")
 
 
     with col_legend:
@@ -4477,7 +4477,7 @@ def manejar_interaccion_calendario(calendar_state):
 
             if reserva:
 
-                with st.spinner("³ Actualizando reserva..."):
+                with st.spinner("Actualizando reserva..."):
 
                     actualizar_reserva(
 
@@ -4497,7 +4497,7 @@ def manejar_interaccion_calendario(calendar_state):
 
                     )
 
-                st.success(" Reserva actualizada")
+                st.success("Reserva actualizada")
 
                 st.rerun()
 
@@ -4520,7 +4520,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
     with col_title:
 
-        st.markdown(f"### �°Å¸¦ Agenda de Reservas")
+        st.markdown(f"### Agenda de Reservas")
 
 
     with col_legend:
@@ -4535,7 +4535,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
         </div>
 
-        <p style="font-size: 10px; color: #999;">�°Å¸¡ Haz clic en un evento para ver detalles</p>
+        <p style="font-size: 10px; color: #999;">Haz clic en un evento para ver detalles</p>
 
         """, unsafe_allow_html=True)
 
@@ -4588,11 +4588,11 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
         with col_btn_left:
 
-            if st.button(" Marcar Pagado", key="btn_pagado_action", use_container_width=True):
+            if st.button("Marcar Pagado", key="btn_pagado_action", use_container_width=True):
 
                 if marcar_reserva_pagada(reserva_id):
 
-                    st.success(" Pago registrado")
+                    st.success("Pago registrado")
 
                     st.session_state.mostrar_detalles_reserva = False
 
@@ -4601,7 +4601,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
         with col_btn_right:
 
-            if st.button("Å¢ Cerrar Detalles", key="btn_cerrar_detalles", use_container_width=True, type="secondary"):
+            if st.button("Cerrar Detalles", key="btn_cerrar_detalles", use_container_width=True, type="secondary"):
 
                 st.session_state.mostrar_detalles_reserva = False
 
@@ -5028,7 +5028,7 @@ def flujo_reserva_publica():
 
     if not barberia_id:
 
-        st.error("Å Barbería no disponible. Contacta al administrador.")
+        st.error("Barbería no disponible. Contacta al administrador.")
 
         return
 
@@ -5104,7 +5104,7 @@ def flujo_reserva_publica():
 
         render_step_indicator(2, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
 
-        render_booking_header("Selecciona tu barbero", "🤔 Con quién quieres tu corte?", step=2, total_steps=6)
+        render_booking_header("Selecciona tu barbero", "¿Con quién quieres tu corte?", step=2, total_steps=6)
 
         with render_booking_container():
 
@@ -5129,7 +5129,7 @@ def flujo_reserva_publica():
             precio_fmt = f"${servicio_precio:,}".replace(",", ".")
 
 
-            st.info(f"ï¸ **Servicio:** {servicio_nombre} | ⏳ **Duración:** {servicio_duracion} min | **Precio:** {precio_fmt}")
+            st.info(f"Servicio: {servicio_nombre} | Duración: {servicio_duracion} min | Precio: {precio_fmt}")
 
 
         # Debug info
@@ -5139,7 +5139,7 @@ def flujo_reserva_publica():
 
         if not barberos:
 
-            st.info("¹ï¸ Mostrando todos los barberos disponibles...")
+            st.info("Mostrando todos los barberos disponibles...")
 
             # Fallback: try to get all active barbers directly
 
@@ -5172,7 +5172,7 @@ def flujo_reserva_publica():
 
         if not barberos:
 
-            st.error("Å No hay barberos disponibles. Contacta al local.")
+            st.error("No hay barberos disponibles. Contacta al local.")
 
             st.stop()
 
@@ -5181,7 +5181,7 @@ def flujo_reserva_publica():
 
         # Render premium barber selection cards
 
-        st.markdown("### �°Å¸¡ Selecciona tu barbero")
+        st.markdown("### Selecciona tu barbero")
 
 
         # Initialize selection tracking for transition effect
@@ -5203,7 +5203,7 @@ def flujo_reserva_publica():
 
                 <div style="text-align: center; padding: 20px;">
 
-                    <div style="font-size: 2rem; margin-bottom: 10px;">³</div>
+                    <div style="font-size: 2rem; margin-bottom: 10px;">⏳</div>
 
                     <p style="color: #7c3aed; font-weight: 600; margin: 0;">Seleccionando barbero...</p>
 
@@ -5243,7 +5243,7 @@ def flujo_reserva_publica():
 
             selected_id=st.session_state.booking_data.get("barbero_id"),
 
-            icon="�°Å¸Ë",
+            icon="✂️",
 
             on_select_callback=on_barber_selected
 
@@ -5280,7 +5280,7 @@ def flujo_reserva_publica():
 
             fecha = st.date_input(
 
-            "�°Å¸¦ Selecciona una fecha",
+            "Selecciona una fecha",
 
             value=st.session_state.selected_fecha,
 
@@ -5314,7 +5314,7 @@ def flujo_reserva_publica():
 
         if not horarios:
 
-            st.warning("Å¡ ï¸ No hay horarios disponibles para esta fecha. Selecciona otra fecha.")
+            st.warning("No hay horarios disponibles para esta fecha. Selecciona otra fecha.")
 
             st.stop()
 
@@ -5327,10 +5327,10 @@ def flujo_reserva_publica():
 
         if num_slots <= 4:
 
-            st.warning("�°Å¸¥ Quedan pocos horarios disponibles hoy")
+            st.warning("Quedan pocos horarios disponibles hoy")
 
 
-        st.markdown(f"ð **Horarios disponibles** ({num_slots})")
+        st.markdown(f"⏰ Horarios disponibles ({num_slots})")
 
 
                 # Render time chips with responsive grid
@@ -5426,7 +5426,7 @@ def flujo_reserva_publica():
 
                 nombre = render_form_group("Nombre", "Ej: Juan Pérez", 
 
-                "�°Å¸ Nombre completo",
+                "Nombre completo",
 
                 placeholder="Ej: Juan Pérez",
 
@@ -5439,7 +5439,7 @@ def flujo_reserva_publica():
 
             telefono = render_form_group("Teléfono", "Ej: +56 9 1234 5678", 
 
-                "�°Å¸Å¾ Teléfono",
+                "Teléfono",
 
                 placeholder="Ej: +56 9 1234 5678",
 
@@ -5452,7 +5452,7 @@ def flujo_reserva_publica():
 
             email = render_form_group("Email", "Ej: tu@email.com", 
 
-                "�°Å¸§ Email (opcional)",
+                "Email (opcional)",
 
                 placeholder="Ej: tu@email.com",
 
@@ -5478,20 +5478,20 @@ def flujo_reserva_publica():
 
                     if not nombre or len(nombre) < 3:
 
-                        errors.append("⚠️ Nombre debe tener al menos 3 caracteres")
+                        errors.append("Nombre debe tener al menos 3 caracteres")
 
                     if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
 
-                        errors.append("⚠️ Teléfono debe tener al menos 9 dígitos")
+                        errors.append("Teléfono debe tener al menos 9 dígitos")
 
                     if email and "@" not in email:
 
-                        errors.append("⚠️ Email no válido")
+                        errors.append("Email no válido")
 
 
                     if errors:
 
-                        st.error("Å Revisa los siguientes errores:\n" + "\n".join(errors))
+                        st.error("Revisa los siguientes errores:\n" + "\n".join(errors))
 
                     else:
 
@@ -5531,22 +5531,22 @@ def flujo_reserva_publica():
 
             # Personal info section
 
-            st.markdown("## �°Å¸¹ Tus datos")
+            st.markdown("## Tus datos")
 
 
             col1, col2, col3 = st.columns(3)
 
             with col1:
 
-                st.text_input("�°Å¸¤ Nombre", value=data.get('nombre', 'N/A'), disabled=True)
+                st.text_input("Nombre", value=data.get('nombre', 'N/A'), disabled=True)
 
             with col2:
 
-                st.text_input("�°Å¸Å¾ Teléfono", value=data.get('telefono', 'N/A'), disabled=True)
+                st.text_input("Teléfono", value=data.get('telefono', 'N/A'), disabled=True)
 
             with col3:
 
-                st.text_input("�°Å¸§ Email", value=data.get('email', 'N/A') or '¬', disabled=True)
+                st.text_input("Email", value=data.get('email', 'N/A') or "-", disabled=True)
 
 
             # Action buttons
@@ -5556,7 +5556,7 @@ def flujo_reserva_publica():
 
             with col1:
 
-                if st.button("Å Cancelar", key="cancel_booking_step5", use_container_width=True):
+                if st.button("Cancelar", key="cancel_booking_step5", use_container_width=True):
 
                     st.session_state.booking_step = 1
 
@@ -5567,75 +5567,75 @@ def flujo_reserva_publica():
                     st.rerun()
 
 
-        with col2:
+            with col2:
 
-            if st.button(" Agendar mi cita ï¸", key="confirm_booking_step5", use_container_width=True, type="primary", help="Confirma tu reserva"):
+                if st.button("Agendar mi cita", key="confirm_booking_step5", use_container_width=True, type="primary", help="Confirma tu reserva"):
 
-                # Create reservation
+                    # Create reservation
 
-                with st.spinner("³ Creando tu reserva..."):
+                    with st.spinner("Creando tu reserva..."):
 
-                    reserva_id = insertar_reserva_con_fecha_hora(
+                        reserva_id = insertar_reserva_con_fecha_hora(
 
-                        barberia_id,
+                            barberia_id,
 
-                        normalizar_texto(data.get('nombre', '')),
+                            normalizar_texto(data.get('nombre', '')),
 
-                        data.get('barbero_id'),
+                            data.get('barbero_id'),
 
-                        data.get('barbero_nombre'),
+                            data.get('barbero_nombre'),
 
-                        data.get('servicio'),
+                            data.get('servicio'),
 
-                        data.get('fecha'),
+                            data.get('fecha'),
 
-                        data.get('hora'),
+                            data.get('hora'),
 
-                        data.get('precio'),
+                            data.get('precio'),
 
-                        data.get('duracion'),
+                            data.get('duracion'),
 
-                    )
-
-
-                    if reserva_id:
-
-                        # Generate payment link
-
-                        with st.spinner("�°Å¸² Generando enlace de pago..."):
-
-                            pago_url = crear_pago_mercadopago(
-
-                                reserva_id,
-
-                                data.get('precio', 0),
-
-                                f"Reserva barbería: {data.get('servicio')}",
-
-                                data.get('email'),
-
-                                show_errors=True
-
-                            )
+                        )
 
 
-                            if pago_url:
+                        if reserva_id:
 
-                                st.session_state.booking_step = 6
+                            # Generate payment link
 
-                                st.session_state.booking_data["pago_url"] = pago_url
+                            with st.spinner("Generando enlace de pago..."):
 
-                                st.session_state.booking_data["reserva_id"] = reserva_id
+                                pago_url = crear_pago_mercadopago(
 
-                                st.rerun()
+                                    reserva_id,
 
-                            else:
+                                    data.get('precio', 0),
 
-                                st.warning("Å¡ ï¸ Reserva confirmada pero no se pudo generar el enlace de pago. Contacta al local.")
+                                    f"Reserva barbería: {data.get('servicio')}",
 
-                    else:
+                                    data.get('email'),
 
-                        st.error("Å Error al crear la reserva. Intenta nuevamente.")
+                                    show_errors=True
+
+                                )
+
+
+                                if pago_url:
+
+                                    st.session_state.booking_step = 6
+
+                                    st.session_state.booking_data["pago_url"] = pago_url
+
+                                    st.session_state.booking_data["reserva_id"] = reserva_id
+
+                                    st.rerun()
+
+                                else:
+
+                                    st.warning("Reserva confirmada, pero no se pudo generar el enlace de pago. Contacta al local.")
+
+                        else:
+
+                            st.error("Error al crear la reserva. Intenta nuevamente.")
 
 
     elif st.session_state.booking_step == 6:
@@ -5660,7 +5660,7 @@ def flujo_reserva_publica():
 
             if data.get('pago_url'):
 
-                st.markdown("""<div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 24px; border-radius: 16px; border: 3px solid #dc2626; margin-bottom: 28px; text-align: center; box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);"><p style="margin: 0 0 12px 0; color: #7f1d1d; font-weight: 700; font-size: 18px;">�°Å¸³ Finaliza tu pago ahora</p><p style="margin: 0 0 16px 0; color: #991b1b; font-weight: 600; font-size: 15px;">⏳ Tu hora está bloqueada temporalmente para ti</p><p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">Completa el pago para asegurar tu cita ⚠️ Sin pago se libera la hora</p></div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 24px; border-radius: 16px; border: 3px solid #dc2626; margin-bottom: 28px; text-align: center; box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);"><p style="margin: 0 0 12px 0; color: #7f1d1d; font-weight: 700; font-size: 18px;">Finaliza tu pago ahora</p><p style="margin: 0 0 16px 0; color: #991b1b; font-weight: 600; font-size: 15px;">Tu hora está bloqueada temporalmente para ti</p><p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">Completa el pago para asegurar tu cita. Sin pago, se libera la hora.</p></div>""", unsafe_allow_html=True)
 
 
                 # PRIMARY PAYMENT BUTTON
@@ -5671,7 +5671,7 @@ def flujo_reserva_publica():
 
                     st.link_button(
 
-                    "�°Å¸³ Pagar ahora",
+                    "Pagar ahora",
 
                     url=data.get('pago_url', '#'),
 
@@ -5682,23 +5682,23 @@ def flujo_reserva_publica():
                 )
 
 
-                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 13px; color: #22c55e; font-weight: 600;">�°Å¸ Pago seguro con MercadoPago</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 13px; color: #22c55e; font-weight: 600;">Pago seguro con MercadoPago</div>""", unsafe_allow_html=True)
 
 
-                st.markdown("""<div style="text-align: center; margin-top: 8px; padding: 6px; font-size: 12px; color: #666; font-weight: 500;">�°Å¸ No guardamos datos de tu tarjeta</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="text-align: center; margin-top: 8px; padding: 6px; font-size: 12px; color: #666; font-weight: 500;">No guardamos datos de tu tarjeta</div>""", unsafe_allow_html=True)
 
 
-                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; background: rgba(59, 130, 246, 0.08); border-radius: 8px;">³ Te tomará menos de 30 segundos completar tu reserva</div>""", unsafe_allow_html=True)
+                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; background: rgba(59, 130, 246, 0.08); border-radius: 8px;">⏳ Te tomará menos de 30 segundos completar tu reserva</div>""", unsafe_allow_html=True)
 
 
-        st.markdown("""<div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 16px; border-radius: 12px; border-left: 4px solid #3b82f6; margin-bottom: 24px; text-align: center;"><p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 14px;">�°Å¸² Te enviamos la confirmación a WhatsApp<br><span style="font-size: 13px; font-weight: 400;">Revisa tu teléfono para más detalles</span></p></div>""", unsafe_allow_html=True)
+        st.markdown("""<div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 16px; border-radius: 12px; border-left: 4px solid #3b82f6; margin-bottom: 24px; text-align: center;"><p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 14px;">Te enviamos la confirmación a WhatsApp<br><span style="font-size: 13px; font-weight: 400;">Revisa tu teléfono para más detalles</span></p></div>""", unsafe_allow_html=True)
 
 
         # BOOKING SUMMARY - EXPANDABLE/SECONDARY
 
-        with st.expander("�°Å¸¹ Ver detalles de tu cita", expanded=False):
+        with st.expander("Ver detalles de tu cita", expanded=False):
 
-            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Servicio</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Barbero</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Fecha y hora</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('fecha', 'N/A')} ⚠️ {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Monto</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Reserva</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: 700; color: #16a34a; line-height: 1.3;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Servicio</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Barbero</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Fecha y hora</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('fecha', 'N/A')} · {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Monto</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Reserva</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: 700; color: #16a34a; line-height: 1.3;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
 
 
         st.markdown("""<div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(74, 222, 128, 0.05) 100%); padding: 14px; border-radius: 10px; border-left: 3px solid #22c55e; margin-bottom: 20px; text-align: center;"><p style="margin: 0; color: #16a34a; font-weight: 600; font-size: 13px;">­ Más de 100 clientes ya se depilaron aquí</p></div>""", unsafe_allow_html=True)
@@ -5724,11 +5724,11 @@ def flujo_reserva_publica():
 
             <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;">
 
-                <strong>Å Tu hora está reservada</strong><br>
+                <strong>Tu hora está reservada</strong><br>
 
-                <strong>Å Confirmación en tu WhatsApp</strong><br>
+                <strong>Confirmación en tu WhatsApp</strong><br>
 
-                <strong>Å Cancela hasta 24h antes</strong>
+                <strong>Cancela hasta 24h antes</strong>
 
             </p>
 
@@ -5744,7 +5744,7 @@ def flujo_reserva_publica():
 
         with col1:
 
-            if st.button("�°Å¸  Volver al inicio", key="home_booking_step6", use_container_width=True):
+            if st.button("Volver al inicio", key="home_booking_step6", use_container_width=True):
 
                 st.session_state.booking_step = 1
 
@@ -5757,7 +5757,7 @@ def flujo_reserva_publica():
 
         with col2:
 
-            if st.button("Å¾¢ Otra cita", key="new_booking_step6", use_container_width=True):
+            if st.button("Otra cita", key="new_booking_step6", use_container_width=True):
 
                 st.session_state.booking_step = 1
 
@@ -6687,7 +6687,7 @@ def render_header_and_progress(step):
 
     ">
 
-        <h1 style="margin: 0; font-size: 2.5em;">�°Å¸ª Crea Tu Barbería</h1>
+        <h1 style="margin: 0; font-size: 2.5em;">Crea Tu Barbería</h1>
 
         <p style="margin: 10px 0 0 0; font-size: 1.1em; opacity: 0.9;">En 5 simples pasos estarás listo</p>
 
@@ -6702,7 +6702,7 @@ def render_step_1_basic_info(data):
 
     """Render Step 1: Basic Information."""
 
-    st.markdown("## �°Å¸¹ Paso 1: Información Básica")
+    st.markdown("## Paso 1: Información Básica")
 
     st.markdown("Cuéntanos los datos de tu barbería")
 
@@ -6713,7 +6713,7 @@ def render_step_1_basic_info(data):
 
         data["nombre"] = st.text_input(
 
-            "�°Å¸ª Nombre de la barbería",
+            "Nombre de la barbería",
 
             value=data["nombre"],
 
@@ -6725,7 +6725,7 @@ def render_step_1_basic_info(data):
 
         data["ciudad"] = st.text_input(
 
-            "�°Å¸ Ciudad",
+            "Ciudad",
 
             value=data["ciudad"],
 
@@ -6740,7 +6740,7 @@ def render_step_1_basic_info(data):
 
         data["telefono"] = st.text_input(
 
-            "�°Å¸± Teléfono",
+            "Teléfono",
 
             value=data["telefono"],
 
@@ -6752,7 +6752,7 @@ def render_step_1_basic_info(data):
 
         data["email"] = st.text_input(
 
-            "�°Å¸§ Email",
+            "Email",
 
             value=data["email"],
 
@@ -6765,7 +6765,7 @@ def render_step_1_basic_info(data):
 
     data["direccion"] = st.text_input(
 
-        "�°Å¸ Dirección del local",
+        "Dirección del local",
 
         value=data["direccion"],
 
@@ -6780,7 +6780,7 @@ def render_step_1_basic_info(data):
 
     if data.get("direccion", "").strip():
 
-        with st.spinner("�°Å¸ Localizando dirección en el mapa..."):
+        with st.spinner("Localizando dirección en el mapa..."):
 
             lat, lng = geocode_address(data["direccion"], data.get("ciudad", ""))
 
@@ -6790,7 +6790,7 @@ def render_step_1_basic_info(data):
 
                 data["longitud"] = lng
 
-                st.success(f" Ubicación encontrada: ({lat:.4f}, {lng:.4f})")
+                st.success(f"Ubicación encontrada: ({lat:.4f}, {lng:.4f})")
 
                 # Display map with the location
 
@@ -6808,11 +6808,11 @@ def render_step_1_basic_info(data):
 
                 if Nominatim is not None:
 
-                    st.warning("Å¡ ï¸ No se pudo encontrar la ubicación. Verifica la dirección e intenta de nuevo.")
+                    st.warning("No se pudo encontrar la ubicación. Verifica la dirección e intenta de nuevo.")
 
                 else:
 
-                    st.info("¹ï¸ Localización automática no disponible. Instala geopy para habilitar mapas.")
+                    st.info("Localización automática no disponible. Instala geopy para habilitar mapas.")
 
 
     # Validation and navigation
@@ -6821,7 +6821,7 @@ def render_step_1_basic_info(data):
 
     with col2:
 
-        if st.button(" Continuar", use_container_width=True, type="primary", key="step1_next"):
+        if st.button("Continuar", use_container_width=True, type="primary", key="step1_next"):
 
             errors = validate_basic_info(data)
 
@@ -6829,11 +6829,11 @@ def render_step_1_basic_info(data):
 
                 for error in errors:
 
-                    st.error(f"Å¡ ï¸ {error}")
+                    st.error(f"{error}")
 
             elif check_barberia_name_exists(data["nombre"]):
 
-                st.error("Å¡ ï¸ Este nombre de barbería ya existe")
+                st.error("Este nombre de barbería ya existe")
 
             else:
 
@@ -6845,7 +6845,7 @@ def render_step_2_branding(data):
 
     """Render Step 2: Branding."""
 
-    st.markdown("## �°Å¸Å½¨ Paso 2: Branding")
+    st.markdown("## Paso 2: Branding")
 
     st.markdown("Personaliza la apariencia de tu barbería")
 
@@ -6854,7 +6854,7 @@ def render_step_2_branding(data):
 
     with col1:
 
-        st.subheader("�°Å¸Å½¨ Color Primario")
+        st.subheader("Color Primario")
 
         data["color_primario"] = st.color_picker(
 
@@ -6869,7 +6869,7 @@ def render_step_2_branding(data):
 
     with col2:
 
-        st.subheader("�°Å¸¼ï¸ Logo (Opcional)")
+        st.subheader("Logo (Opcional)")
 
         data["logo_url"] = st.text_input(
 
@@ -6886,7 +6886,7 @@ def render_step_2_branding(data):
 
     st.markdown("---")
 
-    st.markdown("### �°Å¸ï¸ Vista Previa")
+    st.markdown("### Vista Previa")
 
     preview_col1, preview_col2 = st.columns([1, 2])
 
@@ -6906,7 +6906,7 @@ def render_step_2_branding(data):
 
         ">
 
-            <p style="font-size: 2em; margin: 0;">ï¸</p>
+            <p style="font-size: 2em; margin: 0;">✂️</p>
 
             <p style="font-size: 0.9em; margin: 10px 0 0 0;">{data['nombre']}</p>
 
@@ -6914,7 +6914,7 @@ def render_step_2_branding(data):
 
     with preview_col2:
 
-        st.info(f"�°Å¸ {data['ciudad']} ⚠️ �°Å¸± {data['telefono']}")
+        st.info(f"{data['ciudad']} · {data['telefono']}")
 
 
     # Navigation
@@ -6923,7 +6923,7 @@ def render_step_2_branding(data):
 
     with col1:
 
-        if st.button("  Atrás", use_container_width=True, key="step2_back"):
+        if st.button("Atrás", use_container_width=True, key="step2_back"):
 
             st.session_state.registration_step = 1
 
@@ -6931,7 +6931,7 @@ def render_step_2_branding(data):
 
     with col3:
 
-        if st.button("Continuar ", use_container_width=True, type="primary", key="step2_next"):
+        if st.button("Continuar", use_container_width=True, type="primary", key="step2_next"):
 
             st.session_state.registration_step = 3
 
@@ -6941,7 +6941,7 @@ def render_step_3_services(data):
 
     """Render Step 3: Services."""
 
-    st.markdown("## ï¸ Paso 3: Servicios")
+    st.markdown("## Paso 3: Servicios")
 
     st.markdown("Define los servicios que ofreces")
 
@@ -7008,7 +7008,7 @@ def render_step_3_services(data):
 
         with col_del:
 
-            if st.button("�°Å¸ï¸", key=f"del_service_{idx}", use_container_width=True):
+            if st.button("Eliminar", key=f"del_service_{idx}", use_container_width=True):
 
                 data["servicios"].pop(idx)
 
@@ -7021,7 +7021,7 @@ def render_step_3_services(data):
 
     with col1:
 
-        if st.button("Å¾¢ Agregar Servicio", use_container_width=True, key="add_service"):
+        if st.button("Agregar Servicio", use_container_width=True, key="add_service"):
 
             data["servicios"].append({"nombre": "", "precio": 0, "duracion": 30})
 
@@ -7032,7 +7032,7 @@ def render_step_3_services(data):
 
     with col1:
 
-        if st.button("  Atrás", use_container_width=True, key="step3_back"):
+        if st.button("Atrás", use_container_width=True, key="step3_back"):
 
             st.session_state.registration_step = 2
 
@@ -7040,7 +7040,7 @@ def render_step_3_services(data):
 
     with col3:
 
-        if st.button("Continuar ", use_container_width=True, type="primary", key="step3_next"):
+        if st.button("Continuar", use_container_width=True, type="primary", key="step3_next"):
 
             errors, valid_services = validate_services(data["servicios"])
 
@@ -7048,7 +7048,7 @@ def render_step_3_services(data):
 
                 for error in errors:
 
-                    st.error(f"Å¡ ï¸ {error}")
+                    st.error(f"{error}")
 
             else:
 
@@ -7062,7 +7062,7 @@ def render_step_4_barbers(data):
 
     """Render Step 4: Barbers."""
 
-    st.markdown("## �°Å¸Ë Paso 4: Barberos")
+    st.markdown("## Paso 4: Barberos")
 
     st.markdown("Agrega los barberos de tu equipo")
 
@@ -7127,7 +7127,7 @@ def render_step_4_barbers(data):
 
         with col_del:
 
-            if st.button("�°Å¸ï¸", key=f"del_barber_{idx}", use_container_width=True):
+            if st.button("Eliminar", key=f"del_barber_{idx}", use_container_width=True):
 
                 data["barberos"].pop(idx)
 
@@ -7140,21 +7140,21 @@ def render_step_4_barbers(data):
 
     with col1:
 
-        if st.button("Å¾¢ Agregar Barbero", use_container_width=True, key="add_barber"):
+        if st.button("Agregar Barbero", use_container_width=True, key="add_barber"):
 
             data["barberos"].append({"nombre": "", "apellido": "", "usuario": ""})
 
             st.rerun()
 
 
-    st.info("�°Å¸¡ Los barberos cambiarán su contraseña al primer acceso")
+    st.info("Los barberos cambiarán su contraseña al primer acceso")
 
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
 
-        if st.button("  Atrás", use_container_width=True, key="step4_back"):
+        if st.button("Atrás", use_container_width=True, key="step4_back"):
 
             st.session_state.registration_step = 3
 
@@ -7162,7 +7162,7 @@ def render_step_4_barbers(data):
 
     with col3:
 
-        if st.button("Continuar ", use_container_width=True, type="primary", key="step4_next"):
+        if st.button("Continuar", use_container_width=True, type="primary", key="step4_next"):
 
             errors, valid_barbers = validate_barbers(data["barberos"])
 
@@ -7184,7 +7184,7 @@ def render_step_5_schedule(data):
 
     """Render Step 5: Schedule."""
 
-    st.markdown("## ð Paso 5: Horario de Funcionamiento")
+    st.markdown("## Paso 5: Horario de funcionamiento")
 
     st.markdown("Define tu horario de atención")
 
@@ -7223,7 +7223,7 @@ def render_step_5_schedule(data):
 
     st.markdown("---")
 
-    st.markdown("### �°Å¸¹ Resumen")
+    st.markdown("### Resumen")
 
 
     col1, col2 = st.columns(2)
@@ -7232,7 +7232,7 @@ def render_step_5_schedule(data):
 
         st.markdown(f"""
 
-        **�°Å¸ Ubicación**
+        **Ubicación**
 
         - {data['nombre']}
 
@@ -7244,7 +7244,7 @@ def render_step_5_schedule(data):
 
         st.markdown(f"""
 
-        **° Operaciones**
+        **Operaciones**
 
         - {data['hora_apertura']} a {data['hora_cierre']}
 
@@ -7259,7 +7259,7 @@ def render_step_5_schedule(data):
 
     with col1:
 
-        if st.button("  Atrás", use_container_width=True, key="step5_back"):
+        if st.button("Atrás", use_container_width=True, key="step5_back"):
 
             st.session_state.registration_step = 4
 
@@ -7268,7 +7268,7 @@ def render_step_5_schedule(data):
 
     with col3:
 
-        if st.button("�°Å¸Å¡¬ Crear Barbería", use_container_width=True, type="primary", key="create_barberia"):
+        if st.button("Crear Barbería", use_container_width=True, type="primary", key="create_barberia"):
 
             create_barberia_and_transition(data)
 
@@ -7301,9 +7301,9 @@ def render_success_screen():
 
     ">
 
-        <p style="font-size: 5em; margin: 0;">�°Å¸Å½°</p>
+        <p style="font-size: 5em; margin: 0;">🎉</p>
 
-        <h1 style="margin: 20px 0 0 0; font-size: 2.8em; font-weight: 700;">�¡Tu Barbería está Lista!</h1>
+        <h1 style="margin: 20px 0 0 0; font-size: 2.8em; font-weight: 700;">¡Tu Barbería está Lista!</h1>
 
         <p style="margin: 15px 0 0 0; font-size: 1.2em; opacity: 0.95;">En menos de 2 minutos ya puedes recibir reservas</p>
 
@@ -7312,7 +7312,7 @@ def render_success_screen():
 
     # Main booking link section
 
-    st.markdown("### �°Å¸ Link de Reservas")
+    st.markdown("### Link de Reservas")
 
     booking_url = f"http://tudominio.com?barberia={barberia.get('slug')}"
 
@@ -7328,14 +7328,14 @@ def render_success_screen():
         st.info("Copia este link")
 
 
-    st.success(f" Comparte este link con tus clientes para que agendan")
+    st.success(f"Comparte este link con tus clientes para que agendan")
 
 
     # Credentials section
 
     st.markdown("---")
 
-    st.markdown("### �°Å¸ Acceso a Tu Panel")
+    st.markdown("### Acceso a Tu Panel")
 
 
     cred_col1, cred_col2 = st.columns(2)
@@ -7344,7 +7344,7 @@ def render_success_screen():
 
         st.markdown(f"""
 
-        **�°Å¸¤ Admin**
+        **Admin**
 
 
         Usuario: `{barberia.get('admin_user')}`
@@ -7353,7 +7353,7 @@ def render_success_screen():
         Contraseña: `{barberia.get('admin_password')}`
 
 
-        Å¡ ï¸ Cambia esta contraseña al primer acceso
+        Cambia esta contraseña al primer acceso
 
         """)
 
@@ -7362,7 +7362,7 @@ def render_success_screen():
 
     with cred_col2:
 
-        st.markdown("**�°Å¸Ë Barberos**")
+        st.markdown("**Barberos**")
 
         for usuario, password in barberia.get('barber_passwords', {}).items():
 
@@ -7375,7 +7375,7 @@ def render_success_screen():
 
     st.markdown("---")
 
-    st.markdown("### �°Å¸¹ Próximos Pasos")
+    st.markdown("### Próximos pasos")
 
 
     step_col1, step_col2, step_col3 = st.columns(3)
@@ -7384,7 +7384,7 @@ def render_success_screen():
 
         st.markdown("""
 
-        **1ï¸Æ£ Inicia Sesión**
+        **1. Inicia sesión**
 
 
         Usa tus credenciales de admin para acceder
@@ -7395,7 +7395,7 @@ def render_success_screen():
 
         st.markdown("""
 
-        **2ï¸Æ£ Comparte el Link**
+        **2. Comparte el link**
 
 
         Envía a clientes por WhatsApp, email o redes
@@ -7406,7 +7406,7 @@ def render_success_screen():
 
         st.markdown("""
 
-        **3ï¸Æ£ Recibe Reservas**
+        **3. Recibe reservas**
 
 
         Los clientes agendan sin crear cuenta
@@ -7423,7 +7423,7 @@ def render_success_screen():
 
     with col1:
 
-        if st.button("�°Å¸¹ Nueva Barbería", use_container_width=True):
+        if st.button("Nueva barbería", use_container_width=True):
 
             st.session_state.registration_step = 1
 
@@ -7446,7 +7446,7 @@ def render_success_screen():
 
     with col4:
 
-        if st.button("�°Å¸Å¡¬ Ir a Login", use_container_width=True, type="primary"):
+        if st.button("Ir a Login", use_container_width=True, type="primary"):
 
             st.session_state.view = "login"
 
@@ -7471,7 +7471,7 @@ def create_barberia_and_transition(data):
 
             if not barberia_id:
 
-                st.error("Å Error creando la barbería")
+                st.error("Error creando la barbería")
 
                 return
 
@@ -7482,7 +7482,7 @@ def create_barberia_and_transition(data):
 
             if not admin_user:
 
-                st.error("Å Error creando usuario administrador")
+                st.error("Error creando usuario administrador")
 
                 return
 
@@ -7493,7 +7493,7 @@ def create_barberia_and_transition(data):
 
             if service_count == 0:
 
-                st.error("Å Error creando servicios")
+                st.error("Error creando servicios")
 
                 return
 
@@ -7504,7 +7504,7 @@ def create_barberia_and_transition(data):
 
             if not barber_passwords:
 
-                st.error("Å Error creando barberos")
+                st.error("Error creando barberos")
 
                 return
 
@@ -7529,7 +7529,7 @@ def create_barberia_and_transition(data):
 
             }
 
-            st.success(" �¡Barbería creada exitosamente!")
+            st.success("¡Barbería creada exitosamente!")
 
             st.rerun()
 
@@ -7538,7 +7538,7 @@ def create_barberia_and_transition(data):
 
             logger.exception(f"Error en create_barberia_and_transition: {str(e)}")
 
-            st.error(f"Å Error: {str(e)}")
+            st.error(f"Error: {str(e)}")
 
 def render_registro_barberia():
 
@@ -7823,7 +7823,7 @@ def render_hero_marketplace():
 
     <div class="hero-container">
 
-        <h1 class="hero-title">�°Å¸¦ Agenda servicios de barbería en segundos</h1>
+        <h1 class="hero-title">Agenda servicios de barbería en segundos</h1>
 
         <p class="hero-subtitle">Encuentra las mejores barberías de tu zona y reserva tu corte con un solo click</p>
 
@@ -8278,13 +8278,13 @@ def render_modal_booking(barberia):
 
     with col_title:
 
-        st.markdown(f'<h2 class="modal-title">�°Å¸¦ Reservar en {barberia.get("nombre", "Barbería")}</h2>', 
+        st.markdown(f'<h2 class="modal-title">Reservar en {barberia.get("nombre", "Barbería")}</h2>', 
 
                    unsafe_allow_html=True)
 
     with col_close:
 
-        if st.button("Å¢", key="modal_close_btn", help="Cerrar"):
+        if st.button("Cerrar", key="modal_close_btn", help="Cerrar"):
 
             st.session_state.modal_booking_open = False
 
@@ -8314,7 +8314,7 @@ def render_modal_booking(barberia):
 
     if st.session_state.modal_booking_step == 1:
 
-        st.markdown('<h3 class="modal-section-title">ï¸ Elige tu servicio</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="modal-section-title">Elige tu servicio</h3>', unsafe_allow_html=True)
 
 
         for servicio_name, datos in servicios.items():
@@ -8330,7 +8330,7 @@ def render_modal_booking(barberia):
 
                 <div style="font-weight: 600; margin-bottom: 4px;">{servicio_name}</div>
 
-                <div style="font-size: 13px; color: #666;">⏳ {datos['duracion']} min ⚠️ ${datos['precio']:,}</div>
+                <div style="font-size: 13px; color: #666;">{datos['duracion']} min · ${datos['precio']:,}</div>
 
             </div>
 
@@ -8356,7 +8356,7 @@ def render_modal_booking(barberia):
 
     elif st.session_state.modal_booking_step == 2:
 
-        st.markdown('<h3 class="modal-section-title">�°Å¸¦ Fecha y hora</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="modal-section-title">Fecha y hora</h3>', unsafe_allow_html=True)
 
 
         # Show selected service
@@ -8374,7 +8374,7 @@ def render_modal_booking(barberia):
 
         fecha = st.date_input(
 
-            "�°Å¸¦ Fecha",
+            "Fecha",
 
             value=st.session_state.modal_selected_fecha,
 
@@ -8419,7 +8419,7 @@ def render_modal_booking(barberia):
 
         with col_back:
 
-            if st.button("  Atrás", key="modal_back_step2", use_container_width=True):
+            if st.button("Atrás", key="modal_back_step2", use_container_width=True):
 
                 st.session_state.modal_booking_step = 1
 
@@ -8427,7 +8427,7 @@ def render_modal_booking(barberia):
 
         with col_next:
 
-            if st.button("Siguiente  ", key="modal_next_step2", use_container_width=True):
+            if st.button("Siguiente", key="modal_next_step2", use_container_width=True):
 
                 st.session_state.modal_booking_step = 3
 
@@ -8438,7 +8438,7 @@ def render_modal_booking(barberia):
 
     elif st.session_state.modal_booking_step == 3:
 
-        st.markdown('<h3 class="modal-section-title">�°Å¸¤ Tu información</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="modal-section-title">Tu información</h3>', unsafe_allow_html=True)
 
 
         # Show booking summary
@@ -8447,9 +8447,9 @@ def render_modal_booking(barberia):
 
         <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px;">
 
-        ï¸ <strong>{st.session_state.modal_booking_data.get('servicio', 'N/A')}</strong><br>
+        Servicio: <strong>{st.session_state.modal_booking_data.get('servicio', 'N/A')}</strong><br>
 
-        �°Å¸¦ <strong>{st.session_state.modal_booking_data.get('fecha', 'N/A')}</strong> @ <strong>{st.session_state.modal_booking_data.get('hora', 'N/A')}</strong>
+        Fecha y hora: <strong>{st.session_state.modal_booking_data.get('fecha', 'N/A')}</strong> @ <strong>{st.session_state.modal_booking_data.get('hora', 'N/A')}</strong>
 
         </div>
 
@@ -8485,7 +8485,7 @@ def render_modal_booking(barberia):
 
         with col_back:
 
-            if st.button("  Atrás", key="modal_back_step3", use_container_width=True):
+            if st.button("Atrás", key="modal_back_step3", use_container_width=True):
 
                 st.session_state.modal_booking_step = 2
 
@@ -8493,7 +8493,7 @@ def render_modal_booking(barberia):
 
         with col_confirm:
 
-            if st.button("Å Confirmar reserva", key="modal_confirm_booking", use_container_width=True, disabled=not is_valid):
+            if st.button("Confirmar reserva", key="modal_confirm_booking", use_container_width=True, disabled=not is_valid):
 
                 # Save booking to database
 
@@ -8538,7 +8538,7 @@ def render_modal_booking(barberia):
 
                     if reserva_id:
 
-                        st.success(f" �¡Reserva confirmada! ID: {reserva_id}")
+                        st.success(f"¡Reserva confirmada! ID: {reserva_id}")
 
                         st.session_state.modal_booking_open = False
 
@@ -8552,13 +8552,13 @@ def render_modal_booking(barberia):
 
                     else:
 
-                        st.error("Å Error al guardar la reserva. Intenta de nuevo.")
+                        st.error("Error al guardar la reserva. Intenta de nuevo.")
 
                 except Exception as e:
 
                     logger.exception("Error saving booking from modal")
 
-                    st.error(f"Å Error: {str(e)}")
+                    st.error(f"Error: {str(e)}")
 
 
     st.markdown('</div></div>', unsafe_allow_html=True)
@@ -8812,19 +8812,19 @@ def render_barberia_card(barberia, index):
 
         <div class="card-meta-{index}">
 
-            �°Å¸± {barberia.get('telefono', 'N/A')}
+            Teléfono: {barberia.get('telefono', 'N/A')}
 
         </div>
 
         <div class="card-address-{index}">
 
-            �°Å¸ {barberia.get('direccion', 'Dirección no disponible')}
+            Dirección: {barberia.get('direccion', 'Dirección no disponible')}
 
         </div>
 
         <div class="card-meta-{index}">
 
-            �°Å¸¢ï¸ {barberia.get('ciudad', 'N/A')}
+            Ciudad: {barberia.get('ciudad', 'N/A')}
 
         </div>
 
@@ -8844,7 +8844,7 @@ def render_barberia_card(barberia, index):
 
     if st.button(
 
-        "�°Å¸¦ Agendar cita",
+        "Agendar cita",
 
         key=f"btn_agendar_{index}_{barberia['id']}",
 
@@ -8875,17 +8875,17 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_filters[0]:
 
-        servicio_filter = st.text_input("�°Å¸ Filtrar por servicio", value=servicio_busqueda, label_visibility="collapsed", placeholder="Ej: Corte")
+        servicio_filter = st.text_input("Filtrar por servicio", value=servicio_busqueda, label_visibility="collapsed", placeholder="Ej: Corte")
 
 
     with col_filters[1]:
 
-        ubicacion_filter = st.text_input("�°Å¸ Filtrar por ciudad", value=ubicacion_busqueda, label_visibility="collapsed", placeholder="Tu ciudad")
+        ubicacion_filter = st.text_input("Filtrar por ciudad", value=ubicacion_busqueda, label_visibility="collapsed", placeholder="Tu ciudad")
 
 
     with col_filters[2]:
 
-        aplicar_filtros = st.button("�°Å¸ Actualizar", use_container_width=True, key="btn_filtros_update")
+        aplicar_filtros = st.button("Actualizar", use_container_width=True, key="btn_filtros_update")
 
 
     # Fetch results
@@ -8901,7 +8901,7 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     if not barberias:
 
-        st.warning("Å No se encontraron barberías que coincidan con tu búsqueda. Intenta con otros filtros.")
+        st.warning("No se encontraron barberías que coincidan con tu búsqueda. Intenta con otros filtros.")
 
         return
 
@@ -8915,7 +8915,7 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_left:
 
-        st.markdown(f"### �°Å¸¹ Resultados ({len(barberias)} barberías)")
+        st.markdown(f"### Resultados ({len(barberias)} barberías)")
 
         st.markdown("")
 
@@ -8929,7 +8929,7 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_right:
 
-        st.markdown("### �°Å¸ºï¸ Mapa")
+        st.markdown("### Mapa")
 
         st.markdown("")
 
@@ -8973,11 +8973,11 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
             else:
 
-                st.info("�°Å¸ Las barberías aún no tienen ubicaciones geocodificadas.")
+                st.info("Las barberías aún no tienen ubicaciones geocodificadas.")
 
         else:
 
-            st.info("�°Å¸ Las barberías aún no tienen ubicaciones geocodificadas.")
+            st.info("Las barberías aún no tienen ubicaciones geocodificadas.")
 
 
     # ===== MODAL BOOKING OVERLAY =====
@@ -9498,7 +9498,7 @@ def render_landing_publico(barberia):
 
     else:
 
-        st.info("�°Å¸¹ Los servicios se mostrarán aquí una vez configurados")
+        st.info("Los servicios se mostrarán aquí una vez configurados")
 
 
     # Spacer
@@ -9536,7 +9536,7 @@ def render_landing_publico(barberia):
 
             font-weight: 700;
 
-        ">Selecciona tu servicio y agenda �°Å¸Å½¯</h2>
+        ">Selecciona tu servicio y agenda tu cita</h2>
 
 
         <p style="
@@ -9567,7 +9567,7 @@ def render_landing_publico(barberia):
 
         cta_clicked = st.button(
 
-            "�°Å¸¦ Agendar mi cita",
+            "Agendar mi cita",
 
             key="barberia_cta_button",
 
@@ -9607,7 +9607,7 @@ def render_landing_publico(barberia):
 
     ">
 
-        <p style="margin: 0;">ï¸ Barbería profesional ⚠️ �°Å¸Ë Barberos expertos ⚠️ �°Å¸Å½¯ Tu estilo</p>
+        <p style="margin: 0;">✂️ Barbería profesional · Barberos expertos · Tu estilo</p>
 
     </div>
 
@@ -9626,7 +9626,7 @@ def render_booking_publico(barberia_slug):
 
     if not barberia:
 
-        st.error("Å Barbería no encontrada")
+        st.error("Barbería no encontrada")
 
         st.stop()
 
@@ -9642,7 +9642,7 @@ def render_booking_publico(barberia_slug):
 
         page_title=f"Reserva en {barberia['nombre']}",
 
-        page_icon="�°Å¸Ë",
+        page_icon="✂️",
 
         layout="wide",
 
@@ -9819,7 +9819,7 @@ try:
 
                 try:
 
-                    with st.spinner("�°Å¸ Verificando credenciales..."):
+                    with st.spinner("Verificando credenciales..."):
 
                         user = login(usuario, password)
 
@@ -9841,7 +9841,7 @@ try:
 
                                 st.session_state.barberia_id = None
 
-                                with st.spinner("³ Cargando barberías..."):
+                                with st.spinner("Cargando barberías..."):
 
                                     fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
 
@@ -9871,7 +9871,7 @@ try:
 
                                 st.session_state.view = "dashboard"
 
-                            st.success(" �¡Bienvenido!")
+                            st.success("¡Bienvenido!")
 
                             st.rerun()
 
@@ -9903,7 +9903,7 @@ try:
 
         with col_center[1]:
 
-            if st.button("  Volver al inicio", key="back_to_home_res"):
+            if st.button("Volver al inicio", key="back_to_home_res"):
 
                 st.session_state.view = "home"
 
@@ -9996,7 +9996,7 @@ try:
 
     with st.sidebar:
 
-        st.markdown("## �°Å¸Ë Barbería Leveling")
+        st.markdown("## ✂️ Barbería Leveling")
 
         st.markdown(f"**{usuario or 'Invitado'}**")
 
@@ -10008,7 +10008,7 @@ try:
 
             if "barberia_name" not in st.session_state or st.session_state.get("cached_barberia_id") != barberia_id:
 
-                with st.spinner("³ Cargando barbería..."):
+                with st.spinner("Cargando barbería..."):
 
                     b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
 
@@ -10024,13 +10024,13 @@ try:
 
         if nr == "SUPER_ADMIN":
 
-            st.markdown("### �°Å¸¢ Contexto")
+            st.markdown("### Contexto")
 
             try:
 
                 if "barberias_list" not in st.session_state:
 
-                    with st.spinner("³ Cargando barberías..."):
+                    with st.spinner("Cargando barberías..."):
 
                         b_list = fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
 
@@ -10119,7 +10119,7 @@ try:
 
         # ===== DEBUG: VERIFY BARBERIA_ID ISOLATION =====
 
-        st.markdown("### �°Å¸ºï¸ Navegación")
+        st.markdown("### Navegación")
 
         nav_opts = ["Dashboard", "Agenda", "Barberos", "Configuración"]
 
@@ -10131,7 +10131,7 @@ try:
 
         st.markdown("---")
 
-        if st.button("�°Å¸Å¡ª Cerrar sesión", use_container_width=True, type="secondary"):
+        if st.button("Cerrar sesión", use_container_width=True, type="secondary"):
 
             st.session_state.user = None
 
@@ -10177,7 +10177,7 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("�°Å¸Å  Mi Panel", subtitle="Visualiza tus reservas y métricas")
+            render_section_title("Mi panel", subtitle="Visualiza tus reservas y métricas")
 
 
             if not db_ok:
@@ -10186,7 +10186,7 @@ try:
 
             else:
 
-                with st.spinner("³ Cargando métricas..."):
+                with st.spinner("Cargando métricas..."):
 
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
 
@@ -10201,67 +10201,67 @@ try:
 
                 with col1:
 
-                    render_stat_box("Reservas Hoy", total_hoy, "�°Å¸¦", Colors.PRIMARY)
+                    render_stat_box("Reservas Hoy", total_hoy, "📅", Colors.PRIMARY)
 
                 with col2:
 
-                    render_stat_box("Pagadas", pagadas_hoy, "", Colors.SUCCESS)
+                    render_stat_box("Pagadas", pagadas_hoy, "✅", Colors.SUCCESS)
 
                 with col3:
 
-                    render_stat_box("Pendientes", pendientes_hoy, "³", Colors.WARNING)
+                    render_stat_box("Pendientes", pendientes_hoy, "⏳", Colors.WARNING)
 
 
                 render_divider()
 
 
-                render_subsection_title("�°Å¸Ë Resumen de Actividad")
+                render_subsection_title("Resumen de actividad")
 
                 col_a, col_b, col_c, col_d = st.columns(4, gap="large")
 
                 with col_a:
 
-                    render_stat_box("Total", total_reservas, "�°Å¸¹", Colors.SECONDARY)
+                    render_stat_box("Total", total_reservas, "📊", Colors.SECONDARY)
 
                 with col_b:
 
-                    render_stat_box("Hoy", hoy_reservas, "�°Å¸Å½¯", Colors.PRIMARY)
+                    render_stat_box("Hoy", hoy_reservas, "📆", Colors.PRIMARY)
 
                 with col_c:
 
-                    render_stat_box("Ingresos", "$0", "�°Å¸°", Colors.SUCCESS)
+                    render_stat_box("Ingresos", "$0", "💰", Colors.SUCCESS)
 
                 with col_d:
 
-                    render_stat_box("Barberos", num_barberos_cached, "ï¸", Colors.WARNING)
+                    render_stat_box("Barberos", num_barberos_cached, "✂️", Colors.WARNING)
 
 
                 render_divider()
 
 
-                render_subsection_title("�°Å¸¡ Información �Å¡til")
+                render_subsection_title("Información útil")
 
                 col_tip1, col_tip2 = st.columns(2, gap="large")
 
                 with col_tip1:
 
-                    render_alert("Obtén descuento cada 5 cortes", alert_type="success", title="Å¨ Beneficio de Fidelización")
+                    render_alert("Obtén descuento cada 5 cortes", alert_type="success", title="Beneficio de fidelización")
 
                 with col_tip2:
 
-                    render_alert("Cancela con 1 hora de anticipación para evitar penalización", alert_type="info", title="° Política de Cancelación")
+                    render_alert("Cancela con 1 hora de anticipación para evitar penalización", alert_type="info", title="Política de cancelación")
 
         elif seccion == "Agenda":
 
-            render_section_title("�°Å¸¦ Mi Agenda", subtitle="Gestiona tus citas")
+            render_section_title("Mi agenda", subtitle="Gestiona tus citas")
 
             tab_calendario, tab_crear, tab_lista = st.tabs([
 
-                "�°Å¸¦ Calendario",
+                "Calendario",
 
-                "Å¨ Nueva Reserva",
+                "Nueva reserva",
 
-                "�°Å¸¹ Listado"
+                "Listado"
 
             ])
 
@@ -10271,7 +10271,7 @@ try:
 
                 if db_ok:
 
-                    with st.spinner("³ Cargando tu calendario..."):
+                    with st.spinner("Cargando tu calendario..."):
 
                         mis_reservas_raw = listar_reservas_filtradas(barberia_id, "CLIENTE", usuario)
 
@@ -10313,7 +10313,7 @@ try:
 
                     else:
 
-                        st.info("�°Å¸­ No tienes reservas a�ºn. �¡Crea una!")
+                        st.info("No tienes reservas aún. ¡Crea una!")
 
                 else:
 
@@ -10325,7 +10325,7 @@ try:
 
                 with st.container(border=True):
 
-                    st.markdown("### Å¨ Nueva Reserva")
+                    st.markdown("### Nueva reserva")
 
                     if not db_ok:
 
@@ -10333,7 +10333,7 @@ try:
 
                     else:
 
-                        with st.spinner("³ Cargando barberos disponibles..."):
+                        with st.spinner("Cargando barberos disponibles..."):
 
                             barber_opts = [x[0] for x in listar_usuarios_barberos(barberia_id)] or list(barberos.keys())
 
@@ -10351,7 +10351,7 @@ try:
 
                         # Premium barber selection cards
 
-                        st.markdown("#### �°Å¸¡ Elige tu barbero")
+                        st.markdown("#### Elige tu barbero")
 
                         barberos_list = [(name, name) for name in barber_opts]
 
@@ -10372,9 +10372,9 @@ try:
 
                                     barber_id=barber_id,
 
-                                    availability="Å Disponible",
+                                    availability="Disponible",
 
-                                    icon="�°Å¸Ë",
+                                    icon="✂️",
 
                                     is_selected=is_selected
 
@@ -10397,7 +10397,7 @@ try:
 
                                 <div style="display: inline-block; color: #7c3aed; font-weight: 600;">
 
-                                    <div style="font-size: 1.5rem; margin-bottom: 5px;">Å¨</div>
+                                    <div style="font-size: 1.5rem; margin-bottom: 5px;">⏳</div>
 
                                     Preparando formulario...
 
@@ -10429,39 +10429,39 @@ try:
 
                             with st.form("form_reserva_cliente"):
 
-                                st.markdown("#### �°Å¸¹ Detalles de la reserva")
+                                st.markdown("#### Detalles de la reserva")
 
 
                                 # Barber (pre-selected and read-only display)
 
-                                st.caption(f"�°Å¸¡ **Barbero:** {st.session_state.cliente_barbero_sel_premium}")
+                                st.caption(f"**Barbero:** {st.session_state.cliente_barbero_sel_premium}")
 
 
                                 col2 = st.columns(1)[0]
 
                                 with col2:
 
-                                    servicio_sel = st.selectbox("ï¸ Servicio", list(servicios.keys()), key="cliente_servicio_sel")
+                                    servicio_sel = st.selectbox("Servicio", list(servicios.keys()), key="cliente_servicio_sel")
 
 
                                 col3, col4 = st.columns(2)
 
                                 with col3:
 
-                                    fecha_sel = st.date_input("�°Å¸¦ Fecha", key="cliente_fecha_sel")
+                                    fecha_sel = st.date_input("Fecha", key="cliente_fecha_sel")
 
                                 with col4:
 
-                                    hora_sel = st.time_input("ð Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sel")
+                                    hora_sel = st.time_input("Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sel")
 
 
-                                st.caption(f"�°Å¸¤ Cliente: **{usuario}**")
+                                st.caption(f"Cliente: **{usuario}**")
 
-                                enviar = st.form_submit_button(" Reservar", use_container_width=True)
+                                enviar = st.form_submit_button("Reservar", use_container_width=True)
 
                             if enviar:
 
-                                with st.spinner("³ Procesando reserva..."):
+                                with st.spinner("Procesando reserva..."):
 
                                     duracion = servicios[servicio_sel]["duracion"]
 
@@ -10511,7 +10511,7 @@ try:
 
                                                 logger.exception("Error al ejecutar el envio de WhatsApp: %s", exc)
 
-                                    st.success(" Reserva creada exitosamente")
+                                    st.success("Reserva creada exitosamente")
 
                                     st.rerun()
 
@@ -10519,7 +10519,7 @@ try:
 
             with tab_lista:
 
-                st.markdown("### �°Å¸¹ Tus Reservas")
+                st.markdown("### Tus reservas")
 
                 if not db_ok:
 
@@ -10545,7 +10545,7 @@ try:
 
                     else:
 
-                        st.info("�°Å¸­ A�ºn no tienes reservas. �¡Crea una!")
+                        st.info("Aún no tienes reservas. ¡Crea una!")
 
     # ================= BARBERO =================
 
@@ -10559,7 +10559,7 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("�°Å¸Å  Mi Panel �· Barbero", subtitle="Panel de control de cortes y ingresos")
+            render_section_title("Mi panel · Barbero", subtitle="Panel de control de cortes y ingresos")
 
 
             if not db_ok:
@@ -10568,7 +10568,7 @@ try:
 
             else:
 
-                with st.spinner("³ Cargando métricas..."):
+                with st.spinner("Cargando métricas..."):
 
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
 
@@ -10581,21 +10581,21 @@ try:
 
                 with col1:
 
-                    render_stat_box("Reservas Hoy", total_hoy, "�°Å¸¦", Colors.PRIMARY)
+                    render_stat_box("Reservas Hoy", total_hoy, "📅", Colors.PRIMARY)
 
                 with col2:
 
-                    render_stat_box("Pagadas", pagadas_hoy, "", Colors.SUCCESS)
+                    render_stat_box("Pagadas", pagadas_hoy, "✅", Colors.SUCCESS)
 
                 with col3:
 
-                    render_stat_box("Pendientes", pendientes_hoy, "³", Colors.WARNING)
+                    render_stat_box("Pendientes", pendientes_hoy, "⏳", Colors.WARNING)
 
 
                 render_divider()
 
 
-                render_subsection_title("�°Å¸Ë Rendimiento")
+                render_subsection_title("Rendimiento")
 
                 col_x, col_y, col_z = st.columns(3, gap="large")
 
@@ -10615,7 +10615,7 @@ try:
                 render_divider()
 
 
-                with st.spinner("³ Cargando próximas citas..."):
+                with st.spinner("Cargando próximas citas..."):
 
                     reservas_barbero = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
 
@@ -10626,7 +10626,7 @@ try:
 
                 if hoy_reservas_list:
 
-                    render_subsection_title("ð Próximas Citas (Hoy)")
+                    render_subsection_title("Próximas citas (hoy)")
 
                     for r in hoy_reservas_list[:5]:
 
@@ -10652,15 +10652,14 @@ try:
 
                         ">
 
-                            <strong style="color: {Colors.PRIMARY};">ð {hora_str}</strong> - <span style="color: {Colors.TEXT};">{cliente_str}</span> ({servicio_str})
-
+                            <strong style="color: {Colors.PRIMARY};">Hora: {hora_str}</strong> - <span style="color: {Colors.TEXT};">{cliente_str}</span> ({servicio_str})
                         </div>
 
                         """, unsafe_allow_html=True)
 
         elif seccion == "Agenda":
 
-            render_section_title("�°Å¸¦ Mi Agenda", subtitle="Gestiona tu calendario")
+            render_section_title("Mi agenda", subtitle="Gestiona tu calendario")
 
 
             tab_cal, tab_crear, tab_lista = st.tabs([
@@ -10702,7 +10701,7 @@ try:
 
             with tab_lista:
 
-                st.markdown("### �°Å¸¹ Mis Reservas")
+                st.markdown("### Mis reservas")
 
 
                 # Toggle between card and calendar view
@@ -10776,21 +10775,21 @@ try:
 
                             st.markdown("---")
 
-                            st.caption("�°Å¸¡ Vista de calendario en formato semanal - usa las flechas para navegar")
+                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
 
                     else:
 
-                        st.info("�°Å¸­ No hay reservas")
+                        st.info("No hay reservas")
 
         elif seccion == "Barberos":
 
-            render_section_title("�°Å¸¥ Equipo", subtitle="Gestión de barberos")
+            render_section_title("Equipo", subtitle="Gestión de barberos")
 
             render_alert("Solo el administrador de la barbería puede gestionar el equipo de barberos", alert_type="info")
 
         elif seccion == "Configuración":
 
-            render_section_title("Å¡¢ï¸ Configuración", subtitle="Preferencias y ajustes de la barbería")
+            render_section_title("Configuración", subtitle="Preferencias y ajustes de la barbería")
 
             render_alert("Preferencias y ajustes próximamente", alert_type="info")
 
@@ -10806,7 +10805,7 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("�°Å¸Å  Panel Administrativo", subtitle="Gestiona tu barbería")
+            render_section_title("Panel administrativo", subtitle="Gestiona tu barbería")
 
 
             if not db_ok:
@@ -10842,7 +10841,7 @@ try:
                 render_divider()
 
 
-                render_subsection_title("�°Å¸Ë Resumen General")
+                render_subsection_title("Resumen general")
 
                 col_a, col_b, col_c, col_d = st.columns(4, gap="large")
 
@@ -10904,7 +10903,7 @@ try:
 
         elif seccion == "Agenda":
 
-            st.markdown("## �°Å¸¦ Agenda")
+            st.markdown("## Agenda")
 
 
             # Fetch eventos for calendar
@@ -10963,7 +10962,7 @@ try:
 
             with tab_lista:
 
-                st.markdown("### �°Å¸¹ Reservas")
+                st.markdown("### Reservas")
 
 
                 # Toggle between card and calendar view
@@ -11055,18 +11054,18 @@ try:
 
                             st.markdown("---")
 
-                            st.caption("�°Å¸¡ Vista de calendario en formato semanal - usa las flechas para navegar")
+                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
 
                     else:
 
-                        st.info("�°Å¸­ No hay reservas")
+                        st.info("No hay reservas")
 
 
             # TAB: INGRESOS
 
             with tab_ingresos:
 
-                st.markdown("### �°Å¸° Ingresos")
+                st.markdown("### Ingresos")
 
                 if db_ok:
 
@@ -11082,12 +11081,12 @@ try:
 
                         total = total_row[0] if total_row and total_row[0] else 0
 
-                    st.metric("�°Å¸µ Ingresos Totales (Pagado)", f"${total}")
+                    st.metric("Ingresos totales (pagado)", f"${total}")
 
 
                     st.markdown("---")
 
-                    st.markdown("#### �°Å¸Å  Desglose por Barbero")
+                    st.markdown("#### Desglose por barbero")
 
                     with st.spinner("³ Cargando desglose..."):
 
@@ -11105,16 +11104,16 @@ try:
 
                             ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
 
-                            st.caption(f"�°Å¸¡ {barbero_name}: ${ingreso}")
+                            st.caption(f"{barbero_name}: ${ingreso}")
 
         elif seccion == "Barberos":
 
-            render_section_title("�°Å¸¥ Gestión de Barberos", subtitle="Crea y administra tu equipo")
+            render_section_title("Gestión de barberos", subtitle="Crea y administra tu equipo")
 
 
             with st.container(border=True):
 
-                st.markdown("### Å¾¢ Nuevo Barbero")
+                st.markdown("### Nuevo barbero")
 
                 with st.form("crear_barbero_admin"):
 
@@ -11142,7 +11141,7 @@ try:
             render_divider()
 
 
-            render_subsection_title("�°Å¸¹ Barberos Registrados")
+            render_subsection_title("Barberos registrados")
 
             with st.spinner("³ Cargando barberos..."):
 
@@ -11162,11 +11161,11 @@ try:
 
             else:
 
-                render_alert("No hay barberos registrados a�ºn", alert_type="info")
+                render_alert("No hay barberos registrados aún", alert_type="info")
 
         elif seccion == "Configuración":
 
-            render_section_title("Å¡¢ï¸ Configuración", subtitle="Datos de la barbería y preferencias")
+            render_section_title("Configuración", subtitle="Datos de la barbería y preferencias")
 
             render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
 
@@ -11176,7 +11175,7 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("�°Å¸Å  Panel Global", subtitle="Supervisa todas tus barberías")
+            render_section_title("Panel global", subtitle="Supervisa todas tus barberías")
 
 
             if not db_ok:
@@ -11212,7 +11211,7 @@ try:
                 render_divider()
 
 
-                render_subsection_title("�°Å¸Å  Resumen Global")
+                render_subsection_title("Resumen global")
 
                 col_a, col_b, col_c, col_d, col_e = st.columns(5, gap="large")
 
@@ -11238,7 +11237,7 @@ try:
 
         elif seccion == "Agenda":
 
-            render_section_title("�°Å¸¦ Agenda Global", subtitle="Vista de todas las citas")
+            render_section_title("Agenda global", subtitle="Vista de todas las citas")
 
 
             # Fetch eventos for calendar
@@ -11296,7 +11295,7 @@ try:
 
             with tab_lista:
 
-                st.markdown("### �°Å¸¹ Reservas")
+                st.markdown("### Reservas")
 
 
                 # Toggle between card and calendar view
@@ -11383,17 +11382,17 @@ try:
 
                             st.markdown("---")
 
-                            st.caption("�°Å¸¡ Vista de calendario en formato semanal - usa las flechas para navegar")
+                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
 
                     else:
 
-                        st.info("�°Å¸­ No hay reservas")
+                        st.info("No hay reservas")
 
             # TAB: INGRESOS
 
             with tab_ingresos:
 
-                st.markdown("### �°Å¸° Ingresos (Barbería Activa)")
+                st.markdown("### Ingresos (barbería activa)")
 
                 if db_ok and bid_ctx:
 
@@ -11409,12 +11408,12 @@ try:
 
                         total = total_row[0] if total_row and total_row[0] else 0
 
-                    st.metric("�°Å¸µ Ingresos Totales (Pagado)", f"${total}")
+                    st.metric("Ingresos totales (pagado)", f"${total}")
 
 
                     st.markdown("---")
 
-                    st.markdown("#### �°Å¸Å  Desglose por Barbero")
+                    st.markdown("#### Desglose por barbero")
 
                     with st.spinner("³ Cargando desglose..."):
 
@@ -11432,7 +11431,7 @@ try:
 
                             ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
 
-                            st.caption(f"�°Å¸¡ {barbero_name}: ${ingreso}")
+                            st.caption(f"{barbero_name}: ${ingreso}")
 
                 else:
 
@@ -11440,7 +11439,7 @@ try:
 
         elif seccion == "Barberos":
 
-            st.markdown("## �°Å¸¥ Barberos (Contexto)")
+            st.markdown("## Barberos (contexto)")
 
             if bid_ctx:
 
@@ -11462,17 +11461,17 @@ try:
 
                 else:
 
-                    st.info("�°Å¸­ No hay barberos registrados")
+                    st.info("No hay barberos registrados")
 
             else:
 
-                st.info("�°Å¸¢ Selecciona una barbería en la barra lateral.")
+                st.info("Selecciona una barbería en la barra lateral.")
 
         elif seccion == "Configuración":
 
-            st.markdown("## Å¡¢ï¸ Configuración Global")
+            st.markdown("## Configuración global")
 
-            st.info("Å¨ Parámetros de plataforma próximamente.")
+            st.info("Parámetros de plataforma próximamente.")
 
     else:
 
@@ -11483,4 +11482,3 @@ except Exception as e:
     logger.exception("Unhandled exception in Streamlit app")
 
     st.error(f"Error en la aplicación:\n{traceback.format_exc()}")
-
