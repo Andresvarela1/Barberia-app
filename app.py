@@ -7817,19 +7817,13 @@ def render_hero_marketplace():
     """, unsafe_allow_html=True)
 
 
-    # Hero Section HTML
+    # Hero Section
 
-    st.markdown("""
+    st.title("Agenda servicios de barbería en segundos")
 
-    <div class="hero-container">
-
-        <h1 class="hero-title">Agenda servicios de barbería en segundos</h1>
-
-        <p class="hero-subtitle">Encuentra las mejores barberías de tu zona y reserva tu corte con un solo click</p>
-
-    </div>
-
-    """, unsafe_allow_html=True)
+    st.markdown(
+        "Encuentra las mejores barberías de tu zona y reserva tu corte con un solo click"
+    )
 
 
     # Search Bar with 3 columns
@@ -7880,7 +7874,7 @@ def render_hero_marketplace():
 
         search_clicked = st.button(
 
-            "�°Å¸ Buscar",
+            "Buscar",
 
             use_container_width=True,
 
