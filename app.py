@@ -228,7 +228,7 @@ def create_fresh_connection():
 
         masked = _masked_postgres_url(parsed)
 
-        logger.info("ð Creando conexión PostgreSQL: %s", masked)
+        logger.info("📍 Creando conexión PostgreSQL: %s", masked)
 
         try:
 
@@ -484,7 +484,7 @@ def safe_fetch_one(query, params=()):
 
     if "barberia_id" not in query_lower:
 
-        error_msg = f"ð¨ SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
+        error_msg = f"🚨 SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
 
         logger.error(error_msg)
 
@@ -549,7 +549,7 @@ def safe_fetch_all(query, params=()):
 
     if "barberia_id" not in query_lower:
 
-        error_msg = f"ð¨ SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
+        error_msg = f"🚨 SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
 
         logger.error(error_msg)
 
@@ -598,7 +598,7 @@ def safe_execute(query, params=(), fetch_one_result=False):
 
         if "barberia_id" not in query_lower:
 
-            error_msg = f"ð¨ SECURITY VIOLATION: Write operation missing barberia_id!\nQuery: {query[:100]}..."
+            error_msg = f"🚨 SECURITY VIOLATION: Write operation missing barberia_id!\nQuery: {query[:100]}..."
 
             logger.error(error_msg)
 
@@ -797,7 +797,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" �ndice 'idx_usuarios_barberia' creado o ya existe")
+                logger.info(" Índice 'idx_usuarios_barberia' creado o ya existe")
 
                 logger.info(" �ndice 'idx_usuarios_barberia' creado o ya existe")
 
@@ -1242,7 +1242,7 @@ def get_current_barberia_id():
 
         if not context_id:
 
-            error_msg = "ð¨ SUPER_ADMIN: Debes seleccionar una barbería antes de continuar"
+            error_msg = "🚨 SUPER_ADMIN: Debes seleccionar una barbería antes de continuar"
 
             logger.error(f"SECURITY BLOCK: SUPER_ADMIN tried to access without context")
 
@@ -1259,7 +1259,7 @@ def get_current_barberia_id():
 
     if not barberia_id:
 
-        error_msg = f"ð¨ {rol}: No barberia assigned to this user"
+        error_msg = f"🚨 {rol}: No barberia assigned to this user"
 
         logger.error(f"SECURITY BLOCK: {rol} has no barberia_id")
 
@@ -1303,7 +1303,7 @@ def enforce_access(target_barberia_id):
 
         st.error("Å No tienes permiso para acceder a esta barbería")
 
-        logger.warning(f"ð¨ ACCESS DENIED: Current={current_id}, Target={target_barberia_id}, Role={st.session_state.get('rol')}")
+        logger.warning(f"🚨 ACCESS DENIED: Current={current_id}, Target={target_barberia_id}, Role={st.session_state.get('rol')}")
 
         st.stop()
 
@@ -1372,7 +1372,7 @@ def enforce_barberia_access(target_barberia_id):
 
         user_barberia = get_user_barberia_id()
 
-        logger.warning(f"ð¨ UNAUTHORIZED ACCESS ATTEMPT: Role={user_role}, UserBarberia={user_barberia}, TargetBarberia={target_barberia_id}")
+        logger.warning(f"🚨 UNAUTHORIZED ACCESS ATTEMPT: Role={user_role}, UserBarberia={user_barberia}, TargetBarberia={target_barberia_id}")
 
         st.error(f"Å No tienes permiso para acceder a esta barbería")
 
@@ -2875,7 +2875,7 @@ def construir_eventos_calendario(reservas):
 
         if es_bloqueo:
 
-            titulo = "ð« BLOQUEADO"
+            titulo = "🚫 BLOQUEADO"
 
         else:
 
@@ -4611,7 +4611,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
     else:
 
-        st.info("ð Haz clic en un evento del calendario para ver detalles y opciones")
+        st.info("📍 Haz clic en un evento del calendario para ver detalles y opciones")
 
 def render_gestion_agenda(barbero_actual=None):
 
@@ -5062,7 +5062,7 @@ def flujo_reserva_publica():
 
         render_booking_header(
 
-            title="?Qu? servicio deseas?",
+            title="¿Qué servicio deseas?",
 
             subtitle="Elige una de nuestras especialidades",
 
@@ -5445,7 +5445,7 @@ def flujo_reserva_publica():
 
                 key="booking_telefono_premium",
 
-                help="Usaremos este n�ºmero para confirmarte"
+                help="Usaremos este número para confirmarte"
 
             )
 
@@ -5767,7 +5767,7 @@ def flujo_reserva_publica():
 
                 st.rerun()
 
-# ================= M�°TRICAS HELPERS =================
+# ================= MÉTRICAS HELPERS =================
 
 def calcular_metricas_header(barberia_id=None):
 
@@ -6409,7 +6409,7 @@ def validate_barbers(barbers):
 
     if len(usernames) != len(set(usernames)):
 
-        return ["Los nombres de usuario deben ser �ºnicos"], []
+        return ["Los nombres de usuario deben ser únicos"], []
 
 
     return [], valid_barbers
@@ -7368,7 +7368,7 @@ def render_success_screen():
 
             st.code(f"{usuario}: {password}", language="text")
 
-        st.caption("ð Cada barbero debe cambiar su contraseña al primer acceso")
+        st.caption("📍 Cada barbero debe cambiar su contraseña al primer acceso")
 
 
     # Next steps
@@ -8462,7 +8462,7 @@ def render_modal_booking(barberia):
 
         nombre = st.text_input("Nombre", placeholder="Tu nombre completo", key="modal_nombre", label_visibility="collapsed")
 
-        telefono = st.text_input("Teléfono", placeholder="Tu n�ºmero de teléfono", key="modal_telefono", label_visibility="collapsed")
+        telefono = st.text_input("Teléfono", placeholder="Tu número de teléfono", key="modal_telefono", label_visibility="collapsed")
 
         email = st.text_input("Email (opcional)", placeholder="tu@email.com", key="modal_email", label_visibility="collapsed")
 
@@ -8901,7 +8901,7 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     if not barberias:
 
-        st.warning("Å No se encontraron barberías que coincidan con tu b�ºsqueda. Intenta con otros filtros.")
+        st.warning("Å No se encontraron barberías que coincidan con tu búsqueda. Intenta con otros filtros.")
 
         return
 
@@ -8973,11 +8973,11 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
             else:
 
-                st.info("�°Å¸ Las barberías a�ºn no tienen ubicaciones geocodificadas.")
+                st.info("�°Å¸ Las barberías aún no tienen ubicaciones geocodificadas.")
 
         else:
 
-            st.info("�°Å¸ Las barberías a�ºn no tienen ubicaciones geocodificadas.")
+            st.info("�°Å¸ Las barberías aún no tienen ubicaciones geocodificadas.")
 
 
     # ===== MODAL BOOKING OVERLAY =====
@@ -9022,7 +9022,7 @@ def render_home_screen():
 
         else:
 
-            st.warning("Por favor, completa al menos un campo de b�ºsqueda")
+            st.warning("Por favor, completa al menos un campo de búsqueda")
 
         return  # Don't show main options if showing results
 
@@ -9038,7 +9038,7 @@ def render_home_screen():
 
     with col_center[1]:
 
-        st.markdown("<h2 style='text-align: center;'>�¿Qué deseas hacer?</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>¿Qué deseas hacer?</h2>", unsafe_allow_html=True)
 
         st.markdown("")
 
