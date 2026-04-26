@@ -69,6 +69,7 @@ def load_css(
             "forms",         # Form elements and inputs
             "cards",         # Card components
             "booking",       # Booking flow specific styles
+            "theme",         # Final SaaS token overrides
         ]
     
     # Resolve base path

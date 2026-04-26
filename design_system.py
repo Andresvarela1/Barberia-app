@@ -8,13 +8,13 @@ import streamlit as st
 # ==================== COLOR PALETTE ====================
 class Colors:
     """Centralized color definitions for the entire app"""
-    PRIMARY = "#7c3aed"  # Purple - main brand color
-    PRIMARY_DARK = "#6d28d9"  # Darker purple for hover
-    PRIMARY_LIGHT = "#a78bfa"  # Lighter purple for disabled
+    PRIMARY = "#2563eb"  # Blue - main SaaS brand color
+    PRIMARY_DARK = "#1d4ed8"  # Darker blue for hover
+    PRIMARY_LIGHT = "#93c5fd"  # Lighter blue for disabled
     
-    SECONDARY = "#06b6d4"  # Cyan - accent color
-    SECONDARY_DARK = "#0891b2"  # Darker cyan
-    SECONDARY_LIGHT = "#22d3ee"  # Lighter cyan
+    SECONDARY = "#0f766e"  # Teal - secondary accent
+    SECONDARY_DARK = "#115e59"  # Darker teal
+    SECONDARY_LIGHT = "#5eead4"  # Lighter teal
     
     SUCCESS = "#22c55e"  # Green - success states
     SUCCESS_DARK = "#16a34a"  # Darker green
@@ -26,16 +26,16 @@ class Colors:
     DANGER_DARK = "#dc2626"  # Darker red
     
     # Background & Surface
-    BACKGROUND = "#0f172a"  # Very dark blue (almost black)
-    CARD = "#1e293b"  # Dark slate
-    CARD_HOVER = "#334155"  # Lighter slate on hover
-    BORDER = "#334155"  # Subtle borders
+    BACKGROUND = "#f6f7fb"  # App canvas
+    CARD = "#ffffff"  # Primary surface
+    CARD_HOVER = "#f8fafc"  # Subtle hover surface
+    BORDER = "#d8dee8"  # Subtle borders
     
     # Text
-    TEXT = "#f1f5f9"  # Main text - light slate
-    TEXT_SECONDARY = "#cbd5e1"  # Secondary text - muted
-    TEXT_TERTIARY = "#94a3b8"  # Tertiary text - lighter
-    TEXT_DISABLED = "#64748b"  # Disabled text
+    TEXT = "#111827"  # Main text
+    TEXT_SECONDARY = "#4b5563"  # Secondary text
+    TEXT_TERTIARY = "#6b7280"  # Tertiary text
+    TEXT_DISABLED = "#9ca3af"  # Disabled text
     
     # Utility
     TRANSPARENT = "rgba(0, 0, 0, 0)"
@@ -91,16 +91,16 @@ class BorderRadius:
 class Shadows:
     """Shadow definitions for depth"""
     NONE = "none"
-    SM = "0 1px 2px 0 rgba(0, 0, 0, 0.25)"
-    MD = "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)"
-    LG = "0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -2px rgba(0, 0, 0, 0.25)"
-    XL = "0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3)"
+    SM = "0 1px 2px 0 rgba(15, 23, 42, 0.06)"
+    MD = "0 8px 18px -12px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06)"
+    LG = "0 16px 32px -20px rgba(15, 23, 42, 0.28), 0 6px 14px rgba(15, 23, 42, 0.08)"
+    XL = "0 24px 48px -28px rgba(15, 23, 42, 0.32), 0 10px 24px rgba(15, 23, 42, 0.10)"
     # Enhanced shadows for modern SaaS look
-    GLOW_SOFT = "0 0 20px rgba(124, 58, 237, 0.15)"
-    GLOW_STRONG = "0 0 30px rgba(124, 58, 237, 0.25)"
-    INSET_SUBTLE = "inset 0 1px 2px rgba(255, 255, 255, 0.1)"
-    ELEVATED = "0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 15px 20px -10px rgba(0, 0, 0, 0.3)"
-    FLOATING = "0 30px 60px -12px rgba(0, 0, 0, 0.6), 0 8px 24px -4px rgba(0, 0, 0, 0.4)"
+    GLOW_SOFT = "0 0 0 4px rgba(37, 99, 235, 0.10)"
+    GLOW_STRONG = "0 0 0 4px rgba(37, 99, 235, 0.16)"
+    INSET_SUBTLE = "inset 0 1px 0 rgba(255, 255, 255, 0.7)"
+    ELEVATED = "0 24px 48px -24px rgba(15, 23, 42, 0.28)"
+    FLOATING = "0 28px 60px -30px rgba(15, 23, 42, 0.32)"
 
 
 # ==================== GRADIENTS ====================
@@ -108,32 +108,32 @@ class Gradients:
     """Gradient definitions for modern SaaS aesthetic"""
     
     # Button gradients
-    PRIMARY_BUTTON = f"linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
-    PRIMARY_BUTTON_HOVER = f"linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)"
-    SECONDARY_BUTTON = f"linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)"
+    PRIMARY_BUTTON = f"linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)"
+    PRIMARY_BUTTON_HOVER = f"linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)"
+    SECONDARY_BUTTON = f"linear-gradient(135deg, #0f766e 0%, #115e59 100%)"
     SUCCESS_BUTTON = f"linear-gradient(135deg, #22c55e 0%, #16a34a 100%)"
     DANGER_BUTTON = f"linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
     
     # Card gradients (subtle)
-    CARD_SUBTLE = f"linear-gradient(135deg, #1e293b 0%, #1e293b 100%)"
-    CARD_HOVER = f"linear-gradient(135deg, #1e293b 0%, rgba(124, 58, 237, 0.05) 100%)"
-    CARD_SELECTED = f"linear-gradient(135deg, #1e293b 0%, rgba(124, 58, 237, 0.1) 100%)"
+    CARD_SUBTLE = f"linear-gradient(135deg, #ffffff 0%, #ffffff 100%)"
+    CARD_HOVER = f"linear-gradient(135deg, #ffffff 0%, rgba(37, 99, 235, 0.04) 100%)"
+    CARD_SELECTED = f"linear-gradient(135deg, #ffffff 0%, rgba(37, 99, 235, 0.08) 100%)"
     
     # Premium card gradients
-    PREMIUM = f"linear-gradient(135deg, #1e293b 0%, #0f172a 100%)"
-    PREMIUM_ACCENT = f"linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)"
+    PREMIUM = f"linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)"
+    PREMIUM_ACCENT = f"linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(15, 118, 110, 0.08) 100%)"
     
     # CTA gradients (eye-catching)
-    CTA_PRIMARY = f"linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)"
-    CTA_ACCENT = f"linear-gradient(135deg, #06b6d4 0%, #22c55e 100%)"
+    CTA_PRIMARY = f"linear-gradient(135deg, #2563eb 0%, #0f766e 100%)"
+    CTA_ACCENT = f"linear-gradient(135deg, #0f766e 0%, #22c55e 100%)"
     
     # Background gradients
-    HEADER = f"linear-gradient(135deg, #7c3aed 0%, #06b6d4 50%, #22c55e 100%)"
-    HERO = f"linear-gradient(to bottom, rgba(124, 58, 237, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%)"
+    HEADER = f"linear-gradient(135deg, #2563eb 0%, #0f766e 100%)"
+    HERO = f"linear-gradient(to bottom, rgba(37, 99, 235, 0.08) 0%, rgba(15, 118, 110, 0.04) 100%)"
     
     # Overlay gradients
-    OVERLAY_SUBTLE = f"linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)"
-    OVERLAY_MEDIUM = f"linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)"
+    OVERLAY_SUBTLE = f"linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(15, 118, 110, 0.04) 100%)"
+    OVERLAY_MEDIUM = f"linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(15, 118, 110, 0.08) 100%)"
 
 
 # ==================== TRANSITIONS ====================
@@ -152,15 +152,38 @@ def apply_global_theme():
         /* ==================== ROOT STYLES ==================== */
         :root {{
             --primary: {Colors.PRIMARY};
+            --primary-dark: {Colors.PRIMARY_DARK};
+            --primary-light: {Colors.PRIMARY_LIGHT};
             --secondary: {Colors.SECONDARY};
+            --secondary-dark: {Colors.SECONDARY_DARK};
             --success: {Colors.SUCCESS};
+            --success-dark: {Colors.SUCCESS_DARK};
             --warning: {Colors.WARNING};
+            --warning-dark: {Colors.WARNING_DARK};
             --danger: {Colors.DANGER};
+            --danger-dark: {Colors.DANGER_DARK};
             --background: {Colors.BACKGROUND};
+            --surface: {Colors.CARD};
             --card: {Colors.CARD};
+            --surface-muted: {Colors.CARD_HOVER};
             --border: {Colors.BORDER};
             --text: {Colors.TEXT};
             --text-secondary: {Colors.TEXT_SECONDARY};
+            --text-tertiary: {Colors.TEXT_TERTIARY};
+            --text-disabled: {Colors.TEXT_DISABLED};
+            --radius-sm: {BorderRadius.SM};
+            --radius-md: {BorderRadius.MD};
+            --radius-lg: {BorderRadius.LG};
+            --radius-xl: {BorderRadius.XL};
+            --shadow-sm: {Shadows.SM};
+            --shadow-md: {Shadows.MD};
+            --shadow-lg: {Shadows.LG};
+            --space-1: {Spacing.XS};
+            --space-2: {Spacing.SM};
+            --space-4: {Spacing.MD};
+            --space-5: {Spacing.LG};
+            --space-6: {Spacing.XL};
+            --space-7: {Spacing.XXL};
         }}
 
         /* ==================== BODY & MAIN STYLES ==================== */
@@ -876,6 +899,726 @@ def apply_global_theme():
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+
+
+def apply_public_booking_css():
+    """Apply public landing and booking styling without changing booking logic."""
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background: #f7f3ee !important;
+    }}
+
+    .block-container {{
+        max-width: 1180px !important;
+        padding: {Spacing.MD} {Spacing.LG} {Spacing.XXL} !important;
+    }}
+
+    .public-topbar {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: {Spacing.MD};
+        margin: {Spacing.SM} 0 {Spacing.LG};
+    }}
+
+    .public-logo {{
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: #111827;
+        color: #f8d47a;
+        font-size: 1.35rem;
+        font-weight: {Typography.BOLD};
+        box-shadow: {Shadows.MD};
+    }}
+
+    .public-brand-name {{
+        color: #111827;
+        font-size: 1rem;
+        font-weight: {Typography.BOLD};
+        margin: 0;
+    }}
+
+    .public-brand-meta {{
+        color: #6b7280;
+        font-size: {Typography.SMALL};
+        margin: 0;
+    }}
+
+    .public-hero {{
+        min-height: 480px;
+        border-radius: 28px;
+        padding: clamp(28px, 6vw, 72px);
+        color: #ffffff;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        background:
+            radial-gradient(circle at 82% 18%, rgba(197, 159, 85, 0.34), transparent 34%),
+            linear-gradient(135deg, #111827 0%, #2f241d 54%, #16110d 100%);
+        box-shadow: 0 28px 70px -38px rgba(17, 24, 39, 0.7);
+    }}
+
+    .public-logo img {{
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: inherit;
+    }}
+
+    .public-hero-content {{
+        max-width: 690px;
+        position: relative;
+        z-index: 1;
+    }}
+
+    .public-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: {BorderRadius.FULL};
+        padding: 8px 12px;
+        font-size: {Typography.SMALL};
+        font-weight: {Typography.SEMIBOLD};
+        margin-bottom: {Spacing.MD};
+        backdrop-filter: blur(8px);
+    }}
+
+    .public-hero h1 {{
+        color: #ffffff !important;
+        font-size: clamp(2.35rem, 6vw, 5rem);
+        line-height: 0.98;
+        margin: 0 0 {Spacing.MD};
+        letter-spacing: 0 !important;
+    }}
+
+    .public-hero p {{
+        color: rgba(255, 255, 255, 0.88) !important;
+        font-size: clamp(1rem, 2.4vw, 1.2rem);
+        line-height: 1.65;
+        margin: 0 0 {Spacing.LG};
+    }}
+
+    .public-contact-grid,
+    .public-trust-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: {Spacing.MD};
+        margin: {Spacing.LG} 0 {Spacing.XL};
+    }}
+
+    .public-info-card,
+    .public-trust-card {{
+        background: #ffffff;
+        border: 1px solid #e8dfd4;
+        border-radius: {BorderRadius.XL};
+        padding: {Spacing.LG};
+        box-shadow: 0 16px 40px -32px rgba(17, 24, 39, 0.45);
+    }}
+
+    .public-info-card strong,
+    .public-trust-card h3 {{
+        display: block;
+        color: #111827 !important;
+        font-size: {Typography.H4};
+        margin: 0 0 {Spacing.SM};
+    }}
+
+    .public-info-card span,
+    .public-info-card p,
+    .public-trust-card p {{
+        color: #6b7280 !important;
+        font-size: {Typography.SMALL};
+        margin: 0;
+    }}
+
+    .public-section-heading {{
+        text-align: center;
+        margin: {Spacing.XXL} auto {Spacing.XL};
+        max-width: 720px;
+    }}
+
+    .public-section-heading h2 {{
+        color: #111827 !important;
+        font-size: clamp(1.8rem, 4vw, 2.6rem);
+        margin: 0 0 {Spacing.SM};
+    }}
+
+    .public-section-heading p {{
+        color: #6b7280 !important;
+        margin: 0;
+    }}
+
+    .public-service-button .stButton > button {{
+        min-height: 150px !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #e8dfd4 !important;
+        border-radius: 18px !important;
+        text-align: left !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        padding: {Spacing.LG} !important;
+        white-space: pre-line !important;
+        box-shadow: 0 16px 40px -32px rgba(17, 24, 39, 0.45) !important;
+    }}
+
+    .public-service-button .stButton > button:hover {{
+        border-color: #c59f55 !important;
+        box-shadow: 0 22px 46px -34px rgba(17, 24, 39, 0.6) !important;
+        transform: translateY(-2px) !important;
+    }}
+
+    .public-cta .stButton > button,
+    .booking-panel .stButton > button,
+    .booking-panel [data-testid="stFormSubmitButton"] button {{
+        min-height: 52px !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, #111827 0%, #2f241d 100%) !important;
+        border: 1px solid rgba(17, 24, 39, 0.16) !important;
+        color: #ffffff !important;
+        box-shadow: 0 14px 28px -22px rgba(17, 24, 39, 0.7) !important;
+    }}
+
+    .public-booking-shell {{
+        max-width: 900px;
+        margin: {Spacing.MD} auto {Spacing.XXL};
+    }}
+
+    .booking-panel,
+    .booking-section {{
+        background: #ffffff !important;
+        border: 1px solid #e8dfd4 !important;
+        border-radius: 22px !important;
+        box-shadow: 0 22px 56px -42px rgba(17, 24, 39, 0.65) !important;
+    }}
+
+    .public-payment-notice {{
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-left: 5px solid #c2410c;
+        border-radius: 18px;
+        padding: {Spacing.LG};
+        margin: 0 0 {Spacing.LG};
+        text-align: center;
+    }}
+
+    .public-payment-notice h3 {{
+        color: #7c2d12 !important;
+        margin: 0 0 {Spacing.SM};
+        font-size: {Typography.H4};
+    }}
+
+    .public-payment-notice p {{
+        color: #9a3412 !important;
+        margin: 0;
+        font-size: {Typography.SMALL};
+        line-height: 1.55;
+    }}
+
+    .public-payment-helper {{
+        color: #4b5563 !important;
+        text-align: center;
+        font-size: {Typography.SMALL};
+        margin: {Spacing.SM} 0;
+    }}
+
+    .public-summary-card {{
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 16px;
+        padding: {Spacing.LG};
+    }}
+
+    .public-summary-grid {{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: {Spacing.MD};
+    }}
+
+    .public-summary-item {{
+        border-top: 1px solid rgba(22, 163, 74, 0.18);
+        padding-top: {Spacing.SM};
+    }}
+
+    .public-summary-item span {{
+        display: block;
+        color: #15803d;
+        font-size: {Typography.TINY};
+        font-weight: {Typography.BOLD};
+        margin-bottom: 4px;
+    }}
+
+    .public-summary-item strong {{
+        color: #166534;
+        font-size: {Typography.BODY};
+    }}
+
+    .public-note {{
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-left: 4px solid #2563eb;
+        border-radius: 14px;
+        padding: {Spacing.MD};
+        margin: {Spacing.MD} 0;
+        color: #1e40af;
+        text-align: center;
+        font-size: {Typography.SMALL};
+        font-weight: {Typography.SEMIBOLD};
+    }}
+
+    .public-warning-note {{
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-left: 4px solid #f59e0b;
+        border-radius: 14px;
+        padding: {Spacing.MD};
+        margin: {Spacing.MD} 0 {Spacing.LG};
+        color: #92400e;
+        font-size: {Typography.SMALL};
+        line-height: 1.6;
+    }}
+
+    .step-indicator {{
+        background: #ffffff;
+        border: 1px solid #e8dfd4;
+        border-radius: 18px;
+        padding: 14px;
+        box-shadow: 0 12px 32px -28px rgba(17, 24, 39, 0.45);
+    }}
+
+    @media (max-width: 768px) {{
+        .block-container {{
+            padding: {Spacing.SM} {Spacing.SM} {Spacing.XL} !important;
+        }}
+
+        .public-hero {{
+            min-height: 560px;
+            border-radius: 22px;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(197, 159, 85, 0.28), transparent 38%),
+                linear-gradient(180deg, #2f241d 0%, #111827 68%, #0b0f19 100%);
+        }}
+
+        .public-contact-grid,
+        .public-trust-grid {{
+            grid-template-columns: 1fr;
+        }}
+
+        .public-service-button .stButton > button {{
+            min-height: 120px !important;
+        }}
+
+        .step-indicator {{
+            overflow-x: auto;
+            justify-content: flex-start !important;
+        }}
+
+        .public-summary-grid {{
+            grid-template-columns: 1fr;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def render_public_landing_hero(barberia):
+    """Render the public barberia hero using shared public CSS classes."""
+    nombre = barberia.get("nombre", "Barbería")
+    telefono = barberia.get("telefono") or "Teléfono por confirmar"
+    direccion = barberia.get("direccion") or "Dirección por confirmar"
+    ciudad = barberia.get("ciudad") or "Atención local"
+    logo_url = barberia.get("logo_url")
+    banner_url = barberia.get("banner_url") or barberia.get("imagen_url") or barberia.get("foto_url")
+    logo_html = f'<img src="{logo_url}" alt="{nombre}">' if logo_url else "BL"
+    hero_style = ""
+    if banner_url:
+        hero_style = (
+            'style="background: linear-gradient(90deg, rgba(17, 24, 39, 0.92) 0%, '
+            'rgba(17, 24, 39, 0.68) 52%, rgba(17, 24, 39, 0.24) 100%), '
+            f'url(\'{banner_url}\') center/cover;"'
+        )
+
+    st.markdown(f"""
+    <div class="public-topbar">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="public-logo">{logo_html}</div>
+            <div>
+                <p class="public-brand-name">{nombre}</p>
+                <p class="public-brand-meta">Reserva online</p>
+            </div>
+        </div>
+    </div>
+    <section class="public-hero" {hero_style}>
+        <div class="public-hero-content">
+            <div class="public-badge">Barbería premium · Reserva simple</div>
+            <h1>{nombre}</h1>
+            <p>Cortes precisos, barberos expertos y horarios disponibles en segundos. Elige servicio, barbero y hora sin llamadas.</p>
+        </div>
+    </section>
+    <div class="public-contact-grid">
+        <div class="public-info-card"><strong>Teléfono</strong><span>{telefono}</span></div>
+        <div class="public-info-card"><strong>Dirección</strong><span>{direccion}</span></div>
+        <div class="public-info-card"><strong>Ciudad</strong><span>{ciudad}</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_public_payment_notice():
+    """Render public payment reminder without touching payment logic."""
+    st.markdown("""
+    <div class="public-payment-notice">
+        <h3>Finaliza tu pago ahora</h3>
+        <p>Tu hora está bloqueada temporalmente para ti. Completa el pago para asegurar tu cita.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_public_booking_summary(data):
+    """Render public booking summary card."""
+    st.markdown(f"""
+    <div class="public-summary-card">
+        <div class="public-summary-grid">
+            <div class="public-summary-item">
+                <span>Servicio</span>
+                <strong>{data.get('servicio', 'N/A')}</strong>
+            </div>
+            <div class="public-summary-item">
+                <span>Barbero</span>
+                <strong>{data.get('barbero_nombre', 'N/A')}</strong>
+            </div>
+            <div class="public-summary-item">
+                <span>Fecha y hora</span>
+                <strong>{data.get('fecha', 'N/A')} · {data.get('hora', 'N/A')}</strong>
+            </div>
+            <div class="public-summary-item">
+                <span>Monto</span>
+                <strong>${data.get('precio', 0):,}</strong>
+            </div>
+            <div class="public-summary-item">
+                <span>Reserva</span>
+                <strong>#{data.get('reserva_id', 'N/A')}</strong>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_public_note(message, warning=False):
+    """Render a compact public note."""
+    class_name = "public-warning-note" if warning else "public-note"
+    st.markdown(f'<div class="{class_name}">{message}</div>', unsafe_allow_html=True)
+
+
+def render_public_section_heading(title, subtitle=None):
+    """Render a public-facing section heading."""
+    subtitle_html = f"<p>{subtitle}</p>" if subtitle else ""
+    st.markdown(f"""
+    <div class="public-section-heading">
+        <h2>{title}</h2>
+        {subtitle_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def apply_internal_panel_css():
+    """Apply SaaS styling for authenticated internal panels only."""
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background: {Colors.BACKGROUND} !important;
+    }}
+
+    .block-container {{
+        max-width: 1380px !important;
+        padding: {Spacing.LG} {Spacing.XL} {Spacing.XXL} !important;
+    }}
+
+    [data-testid="stSidebar"] {{
+        background: {Colors.CARD} !important;
+        border-right: 1px solid {Colors.BORDER} !important;
+        box-shadow: 8px 0 28px -26px rgba(15, 23, 42, 0.35) !important;
+    }}
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {{
+        color: {Colors.TEXT} !important;
+    }}
+
+    [data-testid="stSidebar"] .stCaptionContainer {{
+        color: {Colors.TEXT_TERTIARY} !important;
+    }}
+
+    [data-testid="stSidebar"] hr {{
+        border: none !important;
+        border-top: 1px solid {Colors.BORDER} !important;
+        margin: {Spacing.MD} 0 !important;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] {{
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }}
+
+    [data-testid="stSidebar"] [role="radio"] {{
+        border-radius: {BorderRadius.MD} !important;
+        padding: 10px 12px !important;
+        border: 1px solid transparent !important;
+        background: transparent !important;
+        transition: all {Transitions.FAST} !important;
+    }}
+
+    [data-testid="stSidebar"] [role="radio"]:hover {{
+        background: {rgb_to_rgba(Colors.PRIMARY, 0.07)} !important;
+        border-color: {rgb_to_rgba(Colors.PRIMARY, 0.16)} !important;
+    }}
+
+    [data-testid="stSidebar"] [aria-checked="true"] {{
+        background: {rgb_to_rgba(Colors.PRIMARY, 0.10)} !important;
+        border-color: {rgb_to_rgba(Colors.PRIMARY, 0.22)} !important;
+        color: {Colors.PRIMARY} !important;
+        font-weight: {Typography.SEMIBOLD} !important;
+    }}
+
+    [data-testid="stSidebar"] .stButton > button {{
+        justify-content: flex-start !important;
+        background: {Colors.CARD_HOVER} !important;
+        color: {Colors.TEXT} !important;
+        border: 1px solid {Colors.BORDER} !important;
+        box-shadow: none !important;
+    }}
+
+    [data-testid="stSidebar"] .stButton > button:hover {{
+        background: {rgb_to_rgba(Colors.PRIMARY, 0.08)} !important;
+        color: {Colors.PRIMARY} !important;
+        border-color: {rgb_to_rgba(Colors.PRIMARY, 0.25)} !important;
+        transform: none !important;
+    }}
+
+    .panel-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: {Spacing.LG};
+        background: {Colors.CARD};
+        border: 1px solid {Colors.BORDER};
+        border-radius: {BorderRadius.XL};
+        padding: {Spacing.XL};
+        margin: 0 0 {Spacing.XL} 0;
+        box-shadow: {Shadows.SM};
+    }}
+
+    .panel-eyebrow {{
+        color: {Colors.PRIMARY};
+        font-size: {Typography.TINY};
+        font-weight: {Typography.BOLD};
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: {Spacing.SM};
+    }}
+
+    .panel-title {{
+        color: {Colors.TEXT};
+        font-size: 2rem;
+        font-weight: {Typography.BOLD};
+        line-height: 1.12;
+        margin: 0;
+    }}
+
+    .panel-subtitle {{
+        color: {Colors.TEXT_SECONDARY};
+        font-size: {Typography.BODY};
+        margin: {Spacing.SM} 0 0 0;
+        max-width: 760px;
+    }}
+
+    .panel-header-meta {{
+        color: {Colors.TEXT_SECONDARY};
+        background: {Colors.CARD_HOVER};
+        border: 1px solid {Colors.BORDER};
+        border-radius: {BorderRadius.FULL};
+        padding: 8px 12px;
+        font-size: {Typography.SMALL};
+        font-weight: {Typography.MEDIUM};
+        white-space: nowrap;
+    }}
+
+    [data-testid="metric-container"],
+    div[data-testid="stForm"],
+    [data-testid="stExpander"],
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    .card-container,
+    .premium-card {{
+        background: {Colors.CARD} !important;
+        border: 1px solid {Colors.BORDER} !important;
+        border-radius: {BorderRadius.LG} !important;
+        box-shadow: {Shadows.SM} !important;
+    }}
+
+    [data-testid="metric-container"] {{
+        padding: {Spacing.LG} !important;
+    }}
+
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {{
+        color: {Colors.TEXT} !important;
+        font-weight: {Typography.BOLD} !important;
+    }}
+
+    .section-title {{
+        color: {Colors.TEXT} !important;
+        font-size: 1.45rem !important;
+        font-weight: {Typography.BOLD} !important;
+        margin: {Spacing.LG} 0 {Spacing.SM} 0 !important;
+    }}
+
+    .subsection-title {{
+        color: {Colors.TEXT} !important;
+        font-size: 1.05rem !important;
+        font-weight: {Typography.SEMIBOLD} !important;
+        margin: {Spacing.LG} 0 {Spacing.SM} 0 !important;
+        border-left: 3px solid {Colors.PRIMARY};
+        padding-left: {Spacing.SM};
+    }}
+
+    .stTabs [data-baseweb="tab-list"] {{
+        background: {Colors.CARD};
+        border: 1px solid {Colors.BORDER};
+        border-radius: {BorderRadius.LG};
+        padding: 6px;
+        gap: 4px;
+        box-shadow: {Shadows.SM};
+    }}
+
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: {BorderRadius.MD};
+        color: {Colors.TEXT_SECONDARY};
+        font-weight: {Typography.MEDIUM};
+        padding: 10px 14px;
+    }}
+
+    .stTabs [aria-selected="true"] {{
+        background: {rgb_to_rgba(Colors.PRIMARY, 0.10)} !important;
+        color: {Colors.PRIMARY} !important;
+    }}
+
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"],
+    table {{
+        background: {Colors.CARD} !important;
+        border: 1px solid {Colors.BORDER} !important;
+        border-radius: {BorderRadius.LG} !important;
+        box-shadow: {Shadows.SM} !important;
+        overflow: hidden !important;
+    }}
+
+    th {{
+        background: {Colors.CARD_HOVER} !important;
+        color: {Colors.TEXT} !important;
+    }}
+
+    td {{
+        color: {Colors.TEXT_SECONDARY} !important;
+    }}
+
+    .fc, .fc-view-harness, .fc-scrollgrid {{
+        background: {Colors.CARD} !important;
+        border-color: {Colors.BORDER} !important;
+        border-radius: {BorderRadius.LG} !important;
+    }}
+
+    .fc-toolbar-title {{
+        color: {Colors.TEXT} !important;
+        font-size: 1.25rem !important;
+        font-weight: {Typography.BOLD} !important;
+    }}
+
+    .fc-button {{
+        background: {Colors.CARD_HOVER} !important;
+        color: {Colors.TEXT} !important;
+        border: 1px solid {Colors.BORDER} !important;
+        border-radius: {BorderRadius.MD} !important;
+        box-shadow: none !important;
+    }}
+
+    .fc-button-primary:not(:disabled).fc-button-active,
+    .fc-button-primary:not(:disabled):active {{
+        background: {Colors.PRIMARY} !important;
+        color: {Colors.WHITE} !important;
+        border-color: {Colors.PRIMARY} !important;
+    }}
+
+    .panel-empty-state {{
+        background: {Colors.CARD};
+        border: 1px dashed {Colors.BORDER};
+        border-radius: {BorderRadius.XL};
+        padding: {Spacing.XXL};
+        text-align: center;
+        color: {Colors.TEXT_SECONDARY};
+        box-shadow: {Shadows.SM};
+    }}
+
+    .panel-empty-state h3 {{
+        color: {Colors.TEXT};
+        margin: 0 0 {Spacing.SM} 0;
+        font-size: {Typography.H3};
+    }}
+
+    @media (max-width: 768px) {{
+        .block-container {{
+            padding: {Spacing.MD} !important;
+        }}
+
+        .panel-header {{
+            display: block;
+            padding: {Spacing.LG};
+        }}
+
+        .panel-title {{
+            font-size: 1.55rem;
+        }}
+
+        .panel-header-meta {{
+            display: inline-block;
+            margin-top: {Spacing.MD};
+            white-space: normal;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def render_panel_header(title, subtitle=None, eyebrow=None, meta=None):
+    """Render a consistent header for authenticated internal panels."""
+    eyebrow_html = f'<div class="panel-eyebrow">{eyebrow}</div>' if eyebrow else ""
+    subtitle_html = f'<p class="panel-subtitle">{subtitle}</p>' if subtitle else ""
+    meta_html = f'<div class="panel-header-meta">{meta}</div>' if meta else ""
+
+    st.markdown(f"""
+    <div class="panel-header">
+        <div>
+            {eyebrow_html}
+            <h1 class="panel-title">{title}</h1>
+            {subtitle_html}
+        </div>
+        {meta_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_panel_empty_state(title, description):
+    """Render a clean placeholder card for internal panel sections."""
+    st.markdown(f"""
+    <div class="panel-empty-state">
+        <h3>{title}</h3>
+        <p>{description}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ==================== COMPONENT BUILDERS ====================
@@ -1750,41 +2493,56 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
 
 def render_booking_container(content_func=None):
     """
-    Create a centered container for the booking flow (SaaS style).
-    
-    Features:
-    - Max-width 800px for optimal readability
-    - Centered with equal margins
-    - Clean, professional appearance
-    - Consistent padding
-    
-    Args:
-        content_func: Optional function to call inside container
-    
-    Returns:
-        None (renders directly to st)
+    Render a centered booking container.
+
+    Supports both legacy callback usage:
+        render_booking_container(lambda: ...)
+    and current context-manager usage:
+        with render_booking_container():
+            ...
     """
-    st.markdown(
-        f"""
-        <style>
-            .booking-container {{
-                max-width: 800px;
-                margin: 0 auto;
-                padding: {Spacing.XL} 0;
-            }}
-        </style>
-        <div class="booking-container">
-        """,
-        unsafe_allow_html=True
-    )
-    
+    from contextlib import contextmanager
+
+    @contextmanager
+    def booking_container():
+        st.markdown(
+            f"""
+            <style>
+                .booking-container {{
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: {Spacing.XL} 0;
+                }}
+                .booking-panel {{
+                    background: {Colors.CARD};
+                    border: 1px solid {Colors.BORDER};
+                    border-radius: {BorderRadius.LG};
+                    padding: {Spacing.XL};
+                    margin: {Spacing.LG} 0;
+                    box-shadow: {Shadows.SM};
+                }}
+            </style>
+            <div class="booking-container">
+                <div class="booking-panel">
+            """,
+            unsafe_allow_html=True
+        )
+        try:
+            yield
+        finally:
+            st.markdown("</div></div>", unsafe_allow_html=True)
+
     if content_func and callable(content_func):
-        content_func()
+        with booking_container():
+            content_func()
+        return None
+
+    return booking_container()
 
 
 def close_booking_container():
-    """Close the booking container div."""
-    st.markdown("</div>", unsafe_allow_html=True)
+    """Close a manually opened booking container div."""
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
 
 def render_booking_header(title, subtitle=None, step=None, total_steps=None):
@@ -1851,93 +2609,109 @@ def render_booking_header(title, subtitle=None, step=None, total_steps=None):
 
 def render_booking_section(title=None, content_func=None):
     """
-    Render a booking flow section with consistent spacing and styling.
-    
-    Args:
-        title: Optional section title
-        content_func: Optional function to call inside section
-    
-    Returns:
-        None (renders directly to st)
+    Render a booking section.
+
+    Supports both callback and context-manager usage.
     """
-    section_html = f"""
-    <div style="
-        background: {Gradients.CARD_SUBTLE};
-        border: 1px solid {Colors.BORDER};
-        border-radius: {BorderRadius.LG};
-        padding: {Spacing.XL};
-        margin-bottom: {Spacing.XL};
-        box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
-    ">
-    """
-    
-    if title:
-        section_html += f"""
-        <h2 style="
-            font-size: {Typography.H3};
-            font-weight: {Typography.SEMIBOLD};
-            color: {Colors.TEXT};
-            margin: 0 0 {Spacing.LG} 0;
-            padding-bottom: {Spacing.MD};
-            border-bottom: 2px solid {rgb_to_rgba(Colors.PRIMARY, 0.2)};
-        ">{title}</h2>
+    from contextlib import contextmanager
+
+    @contextmanager
+    def booking_section():
+        section_html = f"""
+        <div style="
+            background: {Gradients.CARD_SUBTLE};
+            border: 1px solid {Colors.BORDER};
+            border-radius: {BorderRadius.LG};
+            padding: {Spacing.XL};
+            margin-bottom: {Spacing.XL};
+            box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
+        ">
         """
-    
-    section_html += "</div>"
-    st.markdown(section_html, unsafe_allow_html=True)
-    
+
+        if title:
+            section_html += f"""
+            <h2 style="
+                font-size: {Typography.H3};
+                font-weight: {Typography.SEMIBOLD};
+                color: {Colors.TEXT};
+                margin: 0 0 {Spacing.LG} 0;
+                padding-bottom: {Spacing.MD};
+                border-bottom: 2px solid {rgb_to_rgba(Colors.PRIMARY, 0.2)};
+            ">{title}</h2>
+            """
+
+        st.markdown(section_html, unsafe_allow_html=True)
+        try:
+            yield
+        finally:
+            st.markdown("</div>", unsafe_allow_html=True)
+
     if content_func and callable(content_func):
-        content_func()
-    
-    # Note: Caller should close this with a matching </div> if needed
-    return section_html
+        with booking_section():
+            content_func()
+        return None
+
+    return booking_section()
 
 
-def render_form_group(label, input_func=None, help_text=None, error_text=None):
+def render_form_group(
+    label,
+    input_func=None,
+    help_text=None,
+    error_text=None,
+    placeholder=None,
+    key=None,
+    help=None,
+    value="",
+    input_type="text",
+    **input_kwargs,
+):
     """
     Render a form input group with label and optional help/error text.
-    
-    Args:
-        label: Form field label
-        input_func: Function that renders the input (e.g., st.text_input)
-        help_text: Optional helper text
-        error_text: Optional error message
-    
-    Returns:
-        None (renders directly to st)
+
+    If input_func is callable, it is rendered inside the group. If input_func is
+    a string, current booking-flow calls treat it as placeholder text.
     """
-    group_html = f"""
-    <div style="
-        margin-bottom: {Spacing.LG};
-    ">
-        <label style="
-            display: block;
-            font-size: {Typography.SMALL};
-            font-weight: {Typography.SEMIBOLD};
-            color: {Colors.TEXT};
-            margin-bottom: {Spacing.SM};
-            text-transform: none;
-            letter-spacing: 0;
-        ">{label}</label>
-    """
-    
-    st.markdown(group_html, unsafe_allow_html=True)
-    
+    if isinstance(input_func, str):
+        placeholder = placeholder or input_func
+        input_func = None
+
+    helper = help if help is not None else help_text
+
+    st.markdown(
+        f"""
+        <div style="margin-bottom: {Spacing.LG};">
+            <label style="
+                display: block;
+                font-size: {Typography.SMALL};
+                font-weight: {Typography.SEMIBOLD};
+                color: {Colors.TEXT};
+                margin-bottom: {Spacing.SM};
+                text-transform: none;
+                letter-spacing: 0;
+            ">{label}</label>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     if input_func and callable(input_func):
-        input_func()
-    
-    if help_text:
-        st.markdown(
-            f"""
-            <p style="
-                font-size: {Typography.TINY};
-                color: {Colors.TEXT_TERTIARY};
-                margin: {Spacing.SM} 0 0 0;
-            ">{help_text}</p>
-            """,
-            unsafe_allow_html=True
+        result = input_func()
+    else:
+        result = st.text_input(
+            help_text or label,
+            value=value,
+            placeholder=placeholder,
+            key=key,
+            type=input_type,
+            help=helper,
+            label_visibility="collapsed",
+            **input_kwargs,
         )
-    
+
+    if helper:
+        st.caption(helper)
+
     if error_text:
         st.markdown(
             f"""
@@ -1950,8 +2724,8 @@ def render_form_group(label, input_func=None, help_text=None, error_text=None):
             """,
             unsafe_allow_html=True
         )
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+
+    return result
 
 
 def render_button_group(buttons_config, layout="horizontal"):
@@ -2604,33 +3378,6 @@ def render_sidebar_section(title, items, active_item=None):
             <span>{icon}</span> <span style="margin-left: {Spacing.SM}; font-weight: {'bold' if is_active else 'normal'};">{label}</span>
         </div>
         """, unsafe_allow_html=True)
-
-
-def render_booking_container():
-    """
-    Render a centered container for booking flow steps.
-    Returns a container context manager for consistent booking flow spacing.
-    """
-    from contextlib import contextmanager
-    
-    @contextmanager
-    def booking_container():
-        """Context manager for booking step styling."""
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown(f"""
-            <div style="
-                background: {Colors.CARD};
-                border: 1px solid {Colors.BORDER};
-                border-radius: {BorderRadius.LG};
-                padding: {Spacing.XL};
-                margin: {Spacing.LG} 0;
-            ">
-            """, unsafe_allow_html=True)
-            yield
-            st.markdown("</div>", unsafe_allow_html=True)
-    
-    return booking_container()
 
 
 def render_calendar_wrapper():

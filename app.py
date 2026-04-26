@@ -30,6 +30,14 @@ from design_system import (
 
     apply_global_theme,
 
+    apply_layout_css,
+
+    apply_calendar_refinement,
+
+    apply_internal_panel_css,
+
+    apply_public_booking_css,
+
     Colors,
 
     Typography,
@@ -77,6 +85,20 @@ from design_system import (
     render_button_group,
 
     render_step_indicator,
+
+    render_panel_header,
+
+    render_panel_empty_state,
+
+    render_public_landing_hero,
+
+    render_public_section_heading,
+
+    render_public_payment_notice,
+
+    render_public_booking_summary,
+
+    render_public_note,
 
 )
 
@@ -143,6 +165,10 @@ apply_global_theme()
 # 6. booking.css - Booking flow and step styling
 
 load_css()
+
+apply_layout_css()
+
+apply_calendar_refinement()
 
 # ------------------ LOGGER ------------------
 
@@ -4975,6 +5001,8 @@ def flujo_reserva_publica():
 
     """Premium public booking flow without login required (AgendaPro style)."""
 
+    apply_public_booking_css()
+
     # Import time type at function start to avoid UnboundLocalError with datetime
 
     from datetime import time as time_type
@@ -5051,6 +5079,8 @@ def flujo_reserva_publica():
 
     progress = (st.session_state.booking_step - 1) / 5 * 100
 
+    st.markdown('<div class="public-booking-shell">', unsafe_allow_html=True)
+
     st.progress(int(progress) / 100, text=f"Paso {st.session_state.booking_step} de 5")
 
 
@@ -5076,17 +5106,21 @@ def flujo_reserva_publica():
 
             cols = st.columns(2)
 
-            services = list(SERVICES_CONFIG.keys())
+            services = list(servicios.keys())
 
             for idx, service in enumerate(services):
 
                 with cols[idx % 2]:
 
-                    config = SERVICES_CONFIG[service]
+                    config = servicios[service]
+
+                    precio_fmt = f"${config['precio']:,}".replace(",", ".")
+
+                    st.markdown('<div class="public-service-button">', unsafe_allow_html=True)
 
                     if st.button(
 
-                        f"{config['icon']} {service}\n({config['duration']} min | {config['price']}?)",
+                        f"{service}\n\n{config['duracion']} min · {precio_fmt}",
 
                         key=f"svc_{service}",
 
@@ -5094,11 +5128,17 @@ def flujo_reserva_publica():
 
                     ):
 
-                        st.session_state.booking_data['service'] = service
+                        st.session_state.booking_data["servicio"] = service
+
+                        st.session_state.booking_data["duracion"] = config["duracion"]
+
+                        st.session_state.booking_data["precio"] = config["precio"]
 
                         st.session_state.booking_step = 2
 
                         st.rerun()
+
+                    st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.booking_step == 2:
 
@@ -5426,84 +5466,84 @@ def flujo_reserva_publica():
 
                 nombre = render_form_group("Nombre", "Ej: Juan Pérez", 
 
-                "Nombre completo",
+                    "Nombre completo",
 
-                placeholder="Ej: Juan Pérez",
+                    placeholder="Ej: Juan Pérez",
 
-                key="booking_nombre_premium",
+                    key="booking_nombre_premium",
 
-                help="Nombre como aparecerá en tu reserva"
+                    help="Nombre como aparecerá en tu reserva"
 
-            )
-
-
-            telefono = render_form_group("Teléfono", "Ej: +56 9 1234 5678", 
-
-                "Teléfono",
-
-                placeholder="Ej: +56 9 1234 5678",
-
-                key="booking_telefono_premium",
-
-                help="Usaremos este número para confirmarte"
-
-            )
+                )
 
 
-            email = render_form_group("Email", "Ej: tu@email.com", 
+                telefono = render_form_group("Teléfono", "Ej: +56 9 1234 5678",
 
-                "Email (opcional)",
+                    "Teléfono",
 
-                placeholder="Ej: tu@email.com",
+                    placeholder="Ej: +56 9 1234 5678",
 
-                key="booking_email_premium",
+                    key="booking_telefono_premium",
 
-                help="Para recibir confirmación de tu reserva"
+                    help="Usaremos este número para confirmarte"
 
-            )
-
-
-            st.markdown("---")
+                )
 
 
-            col1, col2 = st.columns(2)
+                email = render_form_group("Email", "Ej: tu@email.com",
 
-            with col1:
+                    "Email (opcional)",
 
-                submit_btn = st.form_submit_button("✅ Ver resumen", use_container_width=True, type="primary")
+                    placeholder="Ej: tu@email.com",
 
-                if submit_btn:
+                    key="booking_email_premium",
 
-                    errors = []
+                    help="Para recibir confirmación de tu reserva"
 
-                    if not nombre or len(nombre) < 3:
-
-                        errors.append("Nombre debe tener al menos 3 caracteres")
-
-                    if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
-
-                        errors.append("Teléfono debe tener al menos 9 dígitos")
-
-                    if email and "@" not in email:
-
-                        errors.append("Email no válido")
+                )
 
 
-                    if errors:
+                st.markdown("---")
 
-                        st.error("Revisa los siguientes errores:\n" + "\n".join(errors))
 
-                    else:
+                col1, col2 = st.columns(2)
 
-                        st.session_state.booking_data["nombre"] = nombre
+                with col1:
 
-                        st.session_state.booking_data["telefono"] = telefono
+                    submit_btn = st.form_submit_button("Ver resumen", use_container_width=True, type="primary")
 
-                        st.session_state.booking_data["email"] = email
+                    if submit_btn:
 
-                        st.session_state.booking_step = 5
+                        errors = []
 
-                        st.rerun()
+                        if not nombre or len(nombre) < 3:
+
+                            errors.append("Nombre debe tener al menos 3 caracteres")
+
+                        if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
+
+                            errors.append("Teléfono debe tener al menos 9 dígitos")
+
+                        if email and "@" not in email:
+
+                            errors.append("Email no válido")
+
+
+                        if errors:
+
+                            st.error("Revisa los siguientes errores:\n" + "\n".join(errors))
+
+                        else:
+
+                            st.session_state.booking_data["nombre"] = nombre
+
+                            st.session_state.booking_data["telefono"] = telefono
+
+                            st.session_state.booking_data["email"] = email
+
+                            st.session_state.booking_step = 5
+
+                            st.rerun()
 
     elif st.session_state.booking_step == 5:
 
@@ -5640,6 +5680,8 @@ def flujo_reserva_publica():
 
     elif st.session_state.booking_step == 6:
 
+        data = st.session_state.booking_data
+
         render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
 
         render_booking_header("✅ Reserva confirmada!", "Tu cita está lista", step=6, total_steps=6)
@@ -5660,7 +5702,7 @@ def flujo_reserva_publica():
 
             if data.get('pago_url'):
 
-                st.markdown("""<div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 24px; border-radius: 16px; border: 3px solid #dc2626; margin-bottom: 28px; text-align: center; box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15);"><p style="margin: 0 0 12px 0; color: #7f1d1d; font-weight: 700; font-size: 18px;">Finaliza tu pago ahora</p><p style="margin: 0 0 16px 0; color: #991b1b; font-weight: 600; font-size: 15px;">Tu hora está bloqueada temporalmente para ti</p><p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">Completa el pago para asegurar tu cita. Sin pago, se libera la hora.</p></div>""", unsafe_allow_html=True)
+                render_public_payment_notice()
 
 
                 # PRIMARY PAYMENT BUTTON
@@ -5682,59 +5724,22 @@ def flujo_reserva_publica():
                 )
 
 
-                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 13px; color: #22c55e; font-weight: 600;">Pago seguro con MercadoPago</div>""", unsafe_allow_html=True)
+                st.markdown('<p class="public-payment-helper">Pago seguro con MercadoPago · No guardamos datos de tu tarjeta</p>', unsafe_allow_html=True)
 
 
-                st.markdown("""<div style="text-align: center; margin-top: 8px; padding: 6px; font-size: 12px; color: #666; font-weight: 500;">No guardamos datos de tu tarjeta</div>""", unsafe_allow_html=True)
-
-
-                st.markdown("""<div style="text-align: center; margin-top: 12px; padding: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; background: rgba(59, 130, 246, 0.08); border-radius: 8px;">⏳ Te tomará menos de 30 segundos completar tu reserva</div>""", unsafe_allow_html=True)
-
-
-        st.markdown("""<div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 16px; border-radius: 12px; border-left: 4px solid #3b82f6; margin-bottom: 24px; text-align: center;"><p style="margin: 0; color: #1e40af; font-weight: 600; font-size: 14px;">Te enviamos la confirmación a WhatsApp<br><span style="font-size: 13px; font-weight: 400;">Revisa tu teléfono para más detalles</span></p></div>""", unsafe_allow_html=True)
+        render_public_note("Te enviamos la confirmación a WhatsApp. Revisa tu teléfono para más detalles.")
 
 
         # BOOKING SUMMARY - EXPANDABLE/SECONDARY
 
         with st.expander("Ver detalles de tu cita", expanded=False):
 
-            st.markdown(f"""<div style="background: linear-gradient(135deg, #f0fdf4 0%, #e6ffed 100%); padding: 24px; border-radius: 12px; border: 1px solid #86efac;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Servicio</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('servicio', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Barbero</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('barbero_nombre', 'N/A')}</p></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2);"><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Fecha y hora</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">{data.get('fecha', 'N/A')} · {data.get('hora', 'N/A')}</p></div><div><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Monto</p><p style="margin: 8px 0 0 0; font-size: 15px; font-weight: 600; color: #16a34a; line-height: 1.4;">${data.get('precio', 0):,}</p></div></div><div style="padding-top: 16px; border-top: 1px solid rgba(22, 163, 74, 0.2); margin-top: 16px;"><p style="margin: 0; font-size: 12px; color: #65a30d; font-weight: 600;">Reserva</p><p style="margin: 8px 0 0 0; font-size: 16px; font-weight: 700; color: #16a34a; line-height: 1.3;">#{data.get('reserva_id', 'N/A')}</p></div></div>""", unsafe_allow_html=True)
+            render_public_booking_summary(data)
 
 
-        st.markdown("""<div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(74, 222, 128, 0.05) 100%); padding: 14px; border-radius: 10px; border-left: 3px solid #22c55e; margin-bottom: 20px; text-align: center;"><p style="margin: 0; color: #16a34a; font-weight: 600; font-size: 13px;">­ Más de 100 clientes ya se depilaron aquí</p></div>""", unsafe_allow_html=True)
+        render_public_note("Más de 100 clientes ya reservaron online.", warning=False)
 
-
-        # INFO SECTION - COMPACT
-
-        st.markdown("""
-
-        <div style="
-
-            background: #fef3c7;
-
-            padding: 14px;
-
-            border-radius: 8px;
-
-            border-left: 3px solid #f59e0b;
-
-            margin-bottom: 24px;
-
-        ">
-
-            <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;">
-
-                <strong>Tu hora está reservada</strong><br>
-
-                <strong>Confirmación en tu WhatsApp</strong><br>
-
-                <strong>Cancela hasta 24h antes</strong>
-
-            </p>
-
-        </div>
-
-        """, unsafe_allow_html=True)
+        render_public_note("Tu hora está reservada. Recibirás confirmación por WhatsApp y puedes cancelar hasta 24h antes.", warning=True)
 
 
         # ACTION BUTTONS - CLEAR HIERARCHY
@@ -5766,6 +5771,8 @@ def flujo_reserva_publica():
                 st.session_state.selected_fecha = datetime.now().date()
 
                 st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= MÉTRICAS HELPERS =================
 
@@ -9184,6 +9191,8 @@ def render_landing_publico(barberia):
 
     """Render authentic barberia landing page with barber-focused experience."""
 
+    apply_public_booking_css()
+
     barberia_id = barberia["id"]
 
     barberia_name = barberia.get("nombre", "Barbería")
@@ -9210,13 +9219,11 @@ def render_landing_publico(barberia):
     servicios_list = obtener_servicios(barberia_id)
 
 
-    # Back button navigation
+    col_back, _ = st.columns([1, 6], gap="small")
 
-    col1, col2, col3 = st.columns([0.5, 19, 0.5], gap="small")
+    with col_back:
 
-    with col1:
-
-        if st.button(" ", key="back_landing", help="Volver al inicio", use_container_width=True):
+        if st.button("Volver", key="back_landing", help="Volver al inicio", use_container_width=True):
 
             st.session_state.view = "home"
 
@@ -9227,156 +9234,23 @@ def render_landing_publico(barberia):
             st.rerun()
 
 
-    # Authentic Barberia Hero Section - warm & welcoming
-
-    st.markdown(f"""
-
-    <div style="
-
-        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-
-        padding: 80px 60px;
-
-        border-radius: 20px;
-
-        text-align: center;
-
-        margin: 40px 0 60px 0;
-
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-
-        position: relative;
-
-        overflow: hidden;
-
-    ">
-
-        <div style="position: relative; z-index: 1;">
-
-            <h1 style="
-
-                font-size: 4.5em;
-
-                color: #FFD700;
-
-                margin: 0 0 20px 0;
-
-                font-weight: 800;
-
-                text-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
-
-                letter-spacing: -1px;
-
-            ">ï¸ {barberia_name}</h1>
-
-
-            <p style="
-
-                font-size: 1.6em;
-
-                color: #ffffff;
-
-                margin: 0 0 16px 0;
-
-                font-weight: 600;
-
-                letter-spacing: 0.5px;
-
-            ">Tu estilo, tu flow</p>
-
-
-            <p style="
-
-                font-size: 1.1em;
-
-                color: rgba(255, 255, 255, 0.9);
-
-                margin: 0;
-
-                max-width: 600px;
-
-                margin-left: auto;
-
-                margin-right: auto;
-
-                line-height: 1.6;
-
-            ">Barberos expertos en tu barrio. Cortes clásicos y modernos.</p>
-
-        </div>
-
-    </div>
-
-    """, unsafe_allow_html=True)
-
-
-    # Simplified Trust Section - authentic barberia vibes
+    render_public_landing_hero(barberia)
 
     st.markdown("""
-
-    <div style="
-
-        display: grid;
-
-        grid-template-columns: repeat(2, 1fr);
-
-        gap: 30px;
-
-        margin: 60px 0;
-
-    ">
-
-        <div style="
-
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
-
-            padding: 35px;
-
-            border-radius: 16px;
-
-            text-align: center;
-
-            border-left: 4px solid #FFD700;
-
-            backdrop-filter: blur(10px);
-
-        ">
-
-            <div style="font-size: 3em; margin-bottom: 12px;">Å¡¡</div>
-
-            <h3 style="color: #1a1a1a; margin: 0 0 8px 0; font-size: 1.2em; font-weight: 700;">Reserva en segundos</h3>
-
-            <p style="color: #666; margin: 0; font-size: 0.95em; line-height: 1.5;">Elige tu corte, barbero y horario</p>
-
+    <div class="public-trust-grid">
+        <div class="public-trust-card">
+            <h3>Reserva en segundos</h3>
+            <p>Elige servicio, barbero y horario desde tu teléfono.</p>
         </div>
-
-
-        <div style="
-
-            background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(56, 142, 60, 0.05) 100%);
-
-            padding: 35px;
-
-            border-radius: 16px;
-
-            text-align: center;
-
-            border-left: 4px solid #4CAF50;
-
-            backdrop-filter: blur(10px);
-
-        ">
-
-            <div style="font-size: 3em; margin-bottom: 12px;">Å</div>
-
-            <h3 style="color: #1a1a1a; margin: 0 0 8px 0; font-size: 1.2em; font-weight: 700;">Confirmación inmediata</h3>
-
-            <p style="color: #666; margin: 0; font-size: 0.95em; line-height: 1.5;">Te llega por WhatsApp al instante</p>
-
+        <div class="public-trust-card">
+            <h3>Confirmación inmediata</h3>
+            <p>Recibe el detalle de tu cita y mantén tu hora organizada.</p>
         </div>
-
+        <div class="public-trust-card">
+            <h3>Atención profesional</h3>
+            <p>Una experiencia clara, rápida y confiable de principio a fin.</p>
+        </div>
     </div>
-
     """, unsafe_allow_html=True)
 
 
@@ -9384,29 +9258,10 @@ def render_landing_publico(barberia):
 
     if servicios_list:
 
-        st.markdown("""
-
-        <div style="margin: 80px 0 60px 0;">
-
-            <h2 style="
-
-                text-align: center;
-
-                color: #1a1a1a;
-
-                margin: 0 0 50px 0;
-
-                font-size: 2.5em;
-
-                font-weight: 700;
-
-                letter-spacing: -0.5px;
-
-            ">Elige tu corte</h2>
-
-        </div>
-
-        """, unsafe_allow_html=True)
+        render_public_section_heading(
+            "Elige tu servicio",
+            "Selecciona una categoría y continúa con tu barbero y horario.",
+        )
 
 
         # Display services in responsive grid - CLICKABLE
@@ -9432,22 +9287,9 @@ def render_landing_publico(barberia):
             cols_list = cols
 
 
-        gradients = [
-
-            ("linear-gradient(135deg, #667eea 0%, #764ba2 100%)", "rgba(102, 126, 234, 0.15)"),
-
-            ("linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", "rgba(245, 87, 108, 0.15)"),
-
-            ("linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", "rgba(79, 172, 254, 0.15)"),
-
-        ]
-
-
         for idx, servicio in enumerate(servicios_list):
 
             col = cols_list[idx % len(cols_list)] if isinstance(cols_list[0], object) else cols_list[idx]
-
-            gradient, shadow_color = gradients[idx % len(gradients)]
 
 
             with col:
@@ -9459,9 +9301,11 @@ def render_landing_publico(barberia):
 
                 # Clickable service button - looks like card, acts like button
 
+                st.markdown('<div class="public-service-button">', unsafe_allow_html=True)
+
                 button_clicked = st.button(
 
-                    label=f"{servicio['icono']}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n⏳ {servicio['duracion']} min ⚠️ {precio_formateado}",
+                    label=f"{servicio.get('icono') or 'Servicio'}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n{servicio['duracion']} min · {precio_formateado}",
 
                     key=f"service_card_{servicio['id']}",
 
@@ -9470,6 +9314,8 @@ def render_landing_publico(barberia):
                     help=f"Seleccionar {servicio['nombre']}"
 
                 )
+
+                st.markdown('</div>', unsafe_allow_html=True)
 
 
                 if button_clicked:
@@ -9495,69 +9341,17 @@ def render_landing_publico(barberia):
         st.info("Los servicios se mostrarán aquí una vez configurados")
 
 
-    # Spacer
-
-    st.markdown("<div style='margin: 60px 0;'></div>", unsafe_allow_html=True)
-
-
-    # Friendly CTA Section - Barber Shop Vibe
-
-    st.markdown("""
-
-    <div style="
-
-        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-
-        padding: 60px 40px;
-
-        border-radius: 20px;
-
-        text-align: center;
-
-        margin: 40px 0;
-
-        box-shadow: 0 12px 40px rgba(255, 215, 0, 0.25);
-
-    ">
-
-        <h2 style="
-
-            color: #1a1a1a;
-
-            margin: 0 0 20px 0;
-
-            font-size: 2.2em;
-
-            font-weight: 700;
-
-        ">Selecciona tu servicio y agenda tu cita</h2>
-
-
-        <p style="
-
-            color: #333;
-
-            margin: 0;
-
-            font-size: 1.05em;
-
-            line-height: 1.6;
-
-        ">O toca el botón de abajo para empezar sin elegir</p>
-
-    </div>
-
-    """, unsafe_allow_html=True)
-
-
-    # Main CTA Button - Personal & Action-Driven
-
-    st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
+    render_public_section_heading(
+        "Agenda tu próxima cita",
+        "También puedes comenzar sin elegir servicio y decidir en el primer paso.",
+    )
 
 
     col_btn_1, col_btn_2, col_btn_3 = st.columns([1, 2, 1])
 
     with col_btn_2:
+
+        st.markdown('<div class="public-cta">', unsafe_allow_html=True)
 
         cta_clicked = st.button(
 
@@ -9571,6 +9365,8 @@ def render_landing_publico(barberia):
 
         )
 
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
         if cta_clicked:
 
@@ -9581,34 +9377,7 @@ def render_landing_publico(barberia):
             st.rerun()
 
 
-    # Footer - Authentic Barberia Message
-
-    st.markdown("""
-
-    <div style="
-
-        text-align: center;
-
-        margin-top: 60px;
-
-        padding: 30px;
-
-        color: #999;
-
-        font-size: 0.95em;
-
-        line-height: 1.8;
-
-    ">
-
-        <p style="margin: 0;">✂️ Barbería profesional · Barberos expertos · Tu estilo</p>
-
-    </div>
-
-    """, unsafe_allow_html=True)
-
-
-    st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
+    st.caption("Barbería profesional · Barberos expertos · Reserva online")
 
 def render_booking_publico(barberia_slug):
 
@@ -9958,6 +9727,8 @@ try:
 
     # ===== MAIN APP (Only runs if logged in) =====
 
+    apply_internal_panel_css()
+
     user = st.session_state.get("user")
 
     usuario = user[1] if user and len(user) > 1 else None
@@ -9990,7 +9761,7 @@ try:
 
     with st.sidebar:
 
-        st.markdown("## ✂️ Barbería Leveling")
+        st.markdown("## Barbería Leveling")
 
         st.markdown(f"**{usuario or 'Invitado'}**")
 
@@ -10117,11 +9888,51 @@ try:
 
         nav_opts = ["Dashboard", "Agenda", "Barberos", "Configuración"]
 
+        if nr in ("ADMIN", "SUPER_ADMIN"):
+
+            nav_opts = [
+                "Dashboard",
+                "Agenda",
+                "Barberos",
+                "Servicios",
+                "Clientes",
+                "Sitio Web",
+                "Complementos",
+                "Configuración",
+            ]
+
+        elif nr == "BARBERO":
+
+            nav_opts = ["Dashboard", "Agenda", "Configuración"]
+
         if nr == "CLIENTE":
 
             nav_opts = ["Dashboard", "Agenda"]
 
-        seccion = st.radio("", nav_opts, key=f"nav_main_{nr}", label_visibility="collapsed")
+        nav_labels = {
+            "Dashboard": "Visión general",
+            "Agenda": "Agenda y calendario",
+            "Barberos": "Equipo",
+            "Servicios": "Servicios",
+            "Clientes": "Clientes",
+            "Sitio Web": "Sitio Web",
+            "Complementos": "Complementos",
+            "Configuración": "Configuración",
+        }
+
+        nav_key = f"nav_main_{nr}"
+
+        if st.session_state.get(nav_key) not in nav_opts:
+
+            st.session_state[nav_key] = nav_opts[0]
+
+        seccion = st.radio(
+            "Navegación principal",
+            nav_opts,
+            key=nav_key,
+            label_visibility="collapsed",
+            format_func=lambda item: nav_labels.get(item, item),
+        )
 
         st.markdown("---")
 
@@ -10553,7 +10364,12 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("Mi panel · Barbero", subtitle="Panel de control de cortes y ingresos")
+            render_panel_header(
+                "Visión general",
+                "Panel de control de cortes, agenda e ingresos.",
+                eyebrow="Panel barbero",
+                meta=barberia_name,
+            )
 
 
             if not db_ok:
@@ -10653,7 +10469,12 @@ try:
 
         elif seccion == "Agenda":
 
-            render_section_title("Mi agenda", subtitle="Gestiona tu calendario")
+            render_panel_header(
+                "Agenda y calendario",
+                "Gestiona tus reservas, disponibilidad y listado de citas.",
+                eyebrow="Agenda",
+                meta=barberia_name,
+            )
 
 
             tab_cal, tab_crear, tab_lista = st.tabs([
@@ -10783,7 +10604,12 @@ try:
 
         elif seccion == "Configuración":
 
-            render_section_title("Configuración", subtitle="Preferencias y ajustes de la barbería")
+            render_panel_header(
+                "Configuración",
+                "Preferencias y ajustes disponibles para tu cuenta.",
+                eyebrow="Ajustes",
+                meta=nr.replace("_", " "),
+            )
 
             render_alert("Preferencias y ajustes próximamente", alert_type="info")
 
@@ -10799,7 +10625,12 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("Panel administrativo", subtitle="Gestiona tu barbería")
+            render_panel_header(
+                "Visión general",
+                "Gestiona métricas, agenda y actividad diaria de tu barbería.",
+                eyebrow="Panel administrativo",
+                meta=barberia_name,
+            )
 
 
             if not db_ok:
@@ -10897,7 +10728,12 @@ try:
 
         elif seccion == "Agenda":
 
-            st.markdown("## Agenda")
+            render_panel_header(
+                "Agenda y calendario",
+                "Consulta reservas, crea citas y revisa ingresos desde una vista operativa.",
+                eyebrow="Agenda",
+                meta=barberia_name,
+            )
 
 
             # Fetch eventos for calendar
@@ -11102,7 +10938,12 @@ try:
 
         elif seccion == "Barberos":
 
-            render_section_title("Gestión de barberos", subtitle="Crea y administra tu equipo")
+            render_panel_header(
+                "Equipo",
+                "Crea y administra los barberos asociados a esta barbería.",
+                eyebrow="Gestión",
+                meta=barberia_name,
+            )
 
 
             with st.container(border=True):
@@ -11159,9 +11000,70 @@ try:
 
         elif seccion == "Configuración":
 
-            render_section_title("Configuración", subtitle="Datos de la barbería y preferencias")
+            render_panel_header(
+                "Configuración",
+                "Datos de la barbería, preferencias y ajustes generales.",
+                eyebrow="Ajustes",
+                meta=barberia_name,
+            )
 
             render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
+
+        elif seccion == "Servicios":
+
+            render_panel_header(
+                "Servicios",
+                "Administra la presentación visual de tus servicios dentro del panel.",
+                eyebrow="Catálogo",
+                meta=barberia_name,
+            )
+
+            render_panel_empty_state(
+                "Gestión de servicios pendiente",
+                "La base visual está lista para mover aquí la administración de servicios sin tocar todavía la lógica existente.",
+            )
+
+        elif seccion == "Clientes":
+
+            render_panel_header(
+                "Clientes",
+                "Centraliza la vista de clientes, historial y actividad.",
+                eyebrow="CRM",
+                meta=barberia_name,
+            )
+
+            render_panel_empty_state(
+                "Vista de clientes pendiente",
+                "Esta sección queda preparada visualmente para una futura pantalla de clientes sin cambiar consultas ni base de datos.",
+            )
+
+        elif seccion == "Sitio Web":
+
+            render_panel_header(
+                "Sitio Web",
+                "Configura la experiencia pública de tu barbería desde el panel.",
+                eyebrow="Presencia online",
+                meta=barberia_name,
+            )
+
+            render_panel_empty_state(
+                "Editor del sitio pendiente",
+                "La sección está preparada para centralizar la configuración del sitio público en una fase posterior.",
+            )
+
+        elif seccion == "Complementos":
+
+            render_panel_header(
+                "Complementos",
+                "Extensiones, integraciones y herramientas adicionales.",
+                eyebrow="Add-ons",
+                meta=barberia_name,
+            )
+
+            render_panel_empty_state(
+                "Complementos pendiente",
+                "No se detectó una lógica existente de complementos; se deja una pantalla visual segura sin efectos laterales.",
+            )
 
     # ================= SUPER_ADMIN =================
 
@@ -11169,7 +11071,12 @@ try:
 
         if seccion == "Dashboard":
 
-            render_section_title("Panel global", subtitle="Supervisa todas tus barberías")
+            render_panel_header(
+                "Visión global",
+                "Supervisa métricas y operación de todas las barberías.",
+                eyebrow="Super admin",
+                meta="Vista plataforma",
+            )
 
 
             if not db_ok:
@@ -11231,7 +11138,12 @@ try:
 
         elif seccion == "Agenda":
 
-            render_section_title("Agenda global", subtitle="Vista de todas las citas")
+            render_panel_header(
+                "Agenda global",
+                "Vista consolidada de citas, reservas e ingresos.",
+                eyebrow="Agenda",
+                meta="Contexto global",
+            )
 
 
             # Fetch eventos for calendar
@@ -11433,7 +11345,12 @@ try:
 
         elif seccion == "Barberos":
 
-            st.markdown("## Barberos (contexto)")
+            render_panel_header(
+                "Equipo",
+                "Barberos del contexto de barbería seleccionado.",
+                eyebrow="Gestión",
+                meta="Contexto activo",
+            )
 
             if bid_ctx:
 
@@ -11463,9 +11380,70 @@ try:
 
         elif seccion == "Configuración":
 
-            st.markdown("## Configuración global")
+            render_panel_header(
+                "Configuración global",
+                "Parámetros generales de la plataforma.",
+                eyebrow="Ajustes",
+                meta="Super admin",
+            )
 
             st.info("Parámetros de plataforma próximamente.")
+
+        elif seccion == "Servicios":
+
+            render_panel_header(
+                "Servicios",
+                "Vista preparada para administrar servicios por barbería.",
+                eyebrow="Catálogo",
+                meta="Contexto activo",
+            )
+
+            render_panel_empty_state(
+                "Gestión global de servicios pendiente",
+                "Esta pantalla no modifica datos todavía; queda lista para una fase funcional posterior.",
+            )
+
+        elif seccion == "Clientes":
+
+            render_panel_header(
+                "Clientes",
+                "Vista preparada para clientes e historial por barbería.",
+                eyebrow="CRM",
+                meta="Contexto activo",
+            )
+
+            render_panel_empty_state(
+                "Clientes pendiente",
+                "No se agregaron consultas nuevas para respetar el alcance visual y no tocar base de datos.",
+            )
+
+        elif seccion == "Sitio Web":
+
+            render_panel_header(
+                "Sitio Web",
+                "Sección preparada para gestionar presencia pública por barbería.",
+                eyebrow="Presencia online",
+                meta="Contexto activo",
+            )
+
+            render_panel_empty_state(
+                "Configuración del sitio pendiente",
+                "El sitio público no fue modificado; esta pantalla solo prepara el panel interno.",
+            )
+
+        elif seccion == "Complementos":
+
+            render_panel_header(
+                "Complementos",
+                "Integraciones y herramientas adicionales de plataforma.",
+                eyebrow="Add-ons",
+                meta="Super admin",
+            )
+
+            render_panel_empty_state(
+                "Complementos pendiente",
+                "No se detectó una lógica existente de complementos; se deja una pantalla visual segura.",
+            )
 
     else:
 
