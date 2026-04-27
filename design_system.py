@@ -912,7 +912,12 @@ def apply_public_booking_css():
     .block-container,
     [data-testid="stMainBlockContainer"] {{
         max-width: 1120px !important;
-        padding: {Spacing.LG} {Spacing.XXL} {Spacing.XXL} !important;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 2rem !important;
+    }}
+
+    [data-testid="stVerticalBlock"] {{
+        gap: 1rem;
     }}
 
     .public-topbar {{
@@ -1073,7 +1078,6 @@ def apply_public_booking_css():
     .public-service-button .stButton > button:hover {{
         border-color: #c59f55 !important;
         box-shadow: 0 22px 46px -34px rgba(17, 24, 39, 0.6) !important;
-        transform: translateY(-2px) !important;
     }}
 
     .public-cta .stButton > button,
@@ -1098,6 +1102,74 @@ def apply_public_booking_css():
         border: 1px solid #e8dfd4 !important;
         border-radius: 22px !important;
         box-shadow: 0 22px 56px -42px rgba(17, 24, 39, 0.65) !important;
+    }}
+
+    .stProgress {{
+        max-width: 960px;
+        margin: 0 auto 1rem;
+    }}
+
+    .stProgress [data-testid="stProgressBar"] {{
+        background: #c59f55;
+    }}
+
+    .stButton > button,
+    [data-testid="stFormSubmitButton"] button,
+    .stLinkButton > a {{
+        min-height: 48px;
+        border-radius: 12px;
+        border: 1px solid #d9cdbc;
+        background: #ffffff;
+        color: #111827;
+        font-weight: 700;
+        white-space: pre-line;
+        line-height: 1.35;
+        padding: 0.75rem 1rem;
+        box-shadow: 0 10px 26px -24px rgba(17, 24, 39, 0.5);
+    }}
+
+    .stButton > button:hover,
+    [data-testid="stFormSubmitButton"] button:hover,
+    .stLinkButton > a:hover {{
+        border-color: #c59f55;
+        background: #fffaf2;
+        color: #111827;
+        box-shadow: 0 14px 32px -24px rgba(17, 24, 39, 0.55);
+    }}
+
+    [data-testid="stForm"] {{
+        background: #ffffff;
+        border: 1px solid #eadfce;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 16px 42px -36px rgba(17, 24, 39, 0.55);
+    }}
+
+    [data-testid="stTextInput"] input,
+    [data-testid="stDateInput"] input {{
+        min-height: 46px;
+        border-radius: 12px;
+        border: 1px solid #d9cdbc;
+        background: #fffdf9;
+        color: #111827;
+        font-size: 1rem;
+    }}
+
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stDateInput"] input:focus {{
+        border-color: #c59f55;
+        box-shadow: 0 0 0 3px rgba(197, 159, 85, 0.18);
+    }}
+
+    [data-testid="stAlert"] {{
+        border-radius: 14px;
+    }}
+
+    [data-testid="stExpander"] {{
+        border: 1px solid #eadfce;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
     }}
 
     .public-payment-notice {{
@@ -1190,13 +1262,15 @@ def apply_public_booking_css():
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 24px;
-        gap: 8px;
+        max-width: 960px;
+        margin: 0 auto 1.25rem;
+        gap: 10px;
         background: #ffffff;
         border: 1px solid #e8dfd4;
         border-radius: 18px;
-        padding: 14px;
+        padding: 0.85rem;
         box-shadow: 0 12px 32px -28px rgba(17, 24, 39, 0.45);
+        overflow-x: auto;
     }}
 
     .step-item {{
@@ -1208,21 +1282,22 @@ def apply_public_booking_css():
     }}
 
     .step-circle {{
-        width: 44px;
-        height: 44px;
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 16px;
+        font-size: 1rem;
         transition: all 0.3s ease-in-out;
     }}
 
     .step-circle.active {{
-        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        background: #111827;
         color: white;
-        box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+        box-shadow: 0 0 0 4px rgba(197, 159, 85, 0.18);
     }}
 
     .step-circle.completed {{
@@ -1231,27 +1306,30 @@ def apply_public_booking_css():
     }}
 
     .step-circle.pending {{
-        background: #334155;
-        color: #cbd5e1;
-        border: 2px solid #475569;
+        background: #f8f4ee;
+        color: #6b7280;
+        border: 2px solid #eadfce;
     }}
 
     .step-connector {{
         flex: 1;
         height: 2px;
-        background: #334155;
+        min-width: 18px;
+        background: #eadfce;
         margin-top: 22px;
     }}
 
     .step-connector.active {{
-        background: #7c3aed;
+        background: #c59f55;
     }}
 
     .step-label {{
-        font-size: 12px;
-        color: #cbd5e1;
+        font-size: 0.85rem;
+        color: #4b5563;
         text-align: center;
-        max-width: 80px;
+        min-width: 72px;
+        max-width: 92px;
+        line-height: 1.25;
     }}
 
     .step-label.active {{
@@ -1262,7 +1340,7 @@ def apply_public_booking_css():
     @media (max-width: 768px) {{
         .block-container,
         [data-testid="stMainBlockContainer"] {{
-            padding: {Spacing.SM} {Spacing.MD} {Spacing.XL} !important;
+            padding: 1rem 1rem 1.5rem !important;
         }}
 
         .public-hero {{
@@ -1285,6 +1363,15 @@ def apply_public_booking_css():
         .step-indicator {{
             overflow-x: auto;
             justify-content: flex-start !important;
+            padding: 0.75rem;
+        }}
+
+        .step-item {{
+            min-width: 78px;
+        }}
+
+        .step-label {{
+            font-size: 0.85rem;
         }}
 
         .public-summary-grid {{
@@ -2337,29 +2424,6 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
     # Build the enhanced card HTML with premium UX
     card_html = f"""
     <style>
-        @keyframes barber-check-pulse {{
-            0% {{
-                transform: scale(0.8);
-                opacity: 0;
-            }}
-            50% {{
-                transform: scale(1.15);
-            }}
-            100% {{
-                transform: scale(1);
-                opacity: 1;
-            }}
-        }}
-        
-        @keyframes barber-icon-float {{
-            0%, 100% {{
-                transform: translateY(0px);
-            }}
-            50% {{
-                transform: translateY(-3px);
-            }}
-        }}
-        
         .{card_class} {{
             background: {Gradients.CARD_SUBTLE};
             border: {border_width} solid {border_color};
@@ -2371,7 +2435,6 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             transition: all 0.2s ease-in-out;
             box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
             opacity: {opacity};
-            transform: translateY(0px) scale(1);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -2384,14 +2447,12 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
         }}
         
         .{card_class}:hover {{
-            transform: translateY(-2px) scale(1.03);
             border-color: {Colors.PRIMARY};
             box-shadow: {Shadows.LG}, {Shadows.INSET_SUBTLE}, {Shadows.GLOW_SOFT};
             background: {Gradients.CARD_HOVER};
         }}
         
         .{card_class}:active {{
-            transform: scale(0.97) translateY(0px);
             transition: all 0.1s ease-in-out;
         }}
         
@@ -2405,11 +2466,6 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             margin-bottom: {Spacing.MD};
             display: block;
             line-height: 1;
-            animation: barber-icon-float 3s ease-in-out infinite;
-        }}
-        
-        .{card_class}:hover .barber-icon-container {{
-            animation: barber-icon-float 2s ease-in-out infinite;
         }}
         
         .barber-name {{
@@ -2438,7 +2494,6 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             gap: {Spacing.SM};
             margin-top: {Spacing.SM};
             font-weight: {Typography.MEDIUM};
-            text-transform: none;
             letter-spacing: 0;
         }}
         
@@ -2469,7 +2524,6 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             font-weight: {Typography.BOLD};
             font-size: 1.5rem;
             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
-            animation: barber-check-pulse 0.4s ease-out;
             z-index: 10;
         }}
     </style>
@@ -2651,14 +2705,12 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
                 }}
                 
                 .chip-btn-{idx}:hover {{
-                    transform: scale(1.05);
                     border-color: {Colors.PRIMARY};
                     background-color: {"linear-gradient(135deg, " + Colors.PRIMARY + " 0%, " + Colors.PRIMARY_DARK + " 100%)" if is_selected else rgb_to_rgba(Colors.PRIMARY, 0.08)};
                     box-shadow: {Shadows.MD}, {Shadows.GLOW_SOFT};
                 }}
                 
                 .chip-btn-{idx}:active {{
-                    transform: scale(0.97);
                     box-shadow: {Shadows.SM}, inset 0 0 8px rgba(124, 58, 237, 0.1);
                 }}
             </style>
@@ -2836,7 +2888,6 @@ def render_form_group(
                 font-weight: {Typography.SEMIBOLD};
                 color: {Colors.TEXT};
                 margin-bottom: {Spacing.SM};
-                text-transform: none;
                 letter-spacing: 0;
             ">{label}</label>
         </div>
