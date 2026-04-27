@@ -70,6 +70,20 @@ from design_system import (
 
     render_time_chips,
 
+    render_metric_grid,
+
+    render_status_legend,
+
+    render_reservation_card,
+
+    render_preview_card,
+
+    render_success_hero,
+
+    render_hero_banner,
+
+    render_loading_panel,
+
     # Layout wrappers
 
     render_booking_container,
@@ -136,7 +150,7 @@ st.set_page_config(
 
     page_title="Barbería Leveling",
 
-    page_icon="✂️",
+    page_icon="Barberia",
 
     layout="wide",
 
@@ -278,7 +292,7 @@ def create_fresh_connection():
 
         )
 
-        logger.info(" Conexión a DB creada exitosamente")
+        logger.info("[OK] Conexión a DB creada exitosamente")
 
         return conn
 
@@ -416,7 +430,7 @@ def execute_query(query, params=None, fetch=None):
 
             else:
 
-                logger.warning("Å¡ ï¸ Error en base de datos, reintentando... (intento %d)", attempt + 1)
+                logger.warning("[AVISO] Error en base de datos, reintentando... (intento %d)", attempt + 1)
 
                 # Force connection recreation on next attempt
 
@@ -677,7 +691,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Tabla 'barberias' creada o ya existe")
+                logger.info("[OK] Tabla 'barberias' creada o ya existe")
 
             except Exception as e:
 
@@ -729,7 +743,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Tabla 'usuarios' creada o ya existe")
+                logger.info("[OK] Tabla 'usuarios' creada o ya existe")
 
             except Exception as e:
 
@@ -825,7 +839,7 @@ def ensure_database_tables():
 
                 logger.info(" Índice 'idx_usuarios_barberia' creado o ya existe")
 
-                logger.info(" �ndice 'idx_usuarios_barberia' creado o ya existe")
+                logger.info("[OK] Índice 'idx_usuarios_barberia' creado o ya existe")
 
             except Exception as e:
 
@@ -879,7 +893,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Tabla 'reservas' creada o ya existe")
+                logger.info("[OK] Tabla 'reservas' creada o ya existe")
 
             except Exception as e:
 
@@ -913,7 +927,7 @@ def ensure_database_tables():
 
                         descripcion TEXT,
 
-                        icono TEXT DEFAULT 'ï¸',
+                        icono TEXT DEFAULT 'Servicio',
 
                         CONSTRAINT fk_servicios_barberia
 
@@ -933,7 +947,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Tabla 'servicios' creada o ya existe")
+                logger.info("[OK] Tabla 'servicios' creada o ya existe")
 
             except Exception as e:
 
@@ -953,7 +967,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" �ndice 'idx_servicios_barberia' creado o ya existe")
+                logger.info("[OK] Índice 'idx_servicios_barberia' creado o ya existe")
 
             except Exception as e:
 
@@ -995,13 +1009,13 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Columnas en tabla 'barberias' aseguradas")
+                logger.info("[OK] Columnas en tabla 'barberias' aseguradas")
 
             except Exception as e:
 
                 conn.rollback()
 
-                logger.warning(f"Å¡ ï¸ Error añadiendo columnas a barberias: {e}")
+                logger.warning(f"[AVISO] Error añadiendo columnas a barberias: {e}")
 
             # Optional columns for usuarios
 
@@ -1013,13 +1027,13 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Columnas en tabla 'usuarios' aseguradas")
+                logger.info("[OK] Columnas en tabla 'usuarios' aseguradas")
 
             except Exception as e:
 
                 conn.rollback()
 
-                logger.warning(f"Å¡ ï¸ Error añadiendo columnas a usuarios: {e}")
+                logger.warning(f"[AVISO] Error añadiendo columnas a usuarios: {e}")
 
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
 
@@ -1031,7 +1045,7 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" �ndices de 'reservas' creados o ya existen")
+                logger.info("[OK] Índices de 'reservas' creados o ya existen")
 
             except Exception as e:
 
@@ -1069,13 +1083,13 @@ def ensure_database_tables():
 
                 conn.commit()
 
-                logger.info(" Columnas opcionales en 'reservas' añadidas o actualizadas")
+                logger.info("[OK] Columnas opcionales en 'reservas' añadidas o actualizadas")
 
-                logger.info(" payment_id column ensured")
+                logger.info("[OK] payment_id column ensured")
 
-                logger.info(" updated_at column ensured")
+                logger.info("[OK] updated_at column ensured")
 
-                logger.info(" barbero_id column ensured")
+                logger.info("[OK] barbero_id column ensured")
 
             except Exception as e:
 
@@ -1092,27 +1106,27 @@ def ensure_database_tables():
 
             try:
 
-                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS icono TEXT DEFAULT 'ï¸';")
+                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS icono TEXT DEFAULT 'Servicio';")
 
                 cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS descripcion TEXT;")
 
                 conn.commit()
 
-                logger.info(" Columnas en tabla 'servicios' aseguradas")
+                logger.info("[OK] Columnas en tabla 'servicios' aseguradas")
 
             except Exception as e:
 
                 conn.rollback()
 
-                logger.warning(f"Å¡ ï¸ Error añadiendo columnas a servicios: {e}")
+                logger.warning(f"[AVISO] Error añadiendo columnas a servicios: {e}")
 
         if all_ok:
 
-            logger.info(" Todas las tablas y restricciones creadas correctamente")
+            logger.info("[OK] Todas las tablas y restricciones creadas correctamente")
 
         else:
 
-            logger.warning("Å¡ ï¸ Algunas operaciones de base de datos fallaron")
+            logger.warning("[AVISO] Algunas operaciones de base de datos fallaron")
 
     except Exception as e:
 
@@ -1430,7 +1444,7 @@ def verificar_password(password, password_guardada):
 
     if not password_guardada:
 
-        logger.warning("Å No hay contraseña guardada")
+        logger.warning("[ERROR] No hay contraseña guardada")
 
         return False
 
@@ -1448,13 +1462,13 @@ def verificar_password(password, password_guardada):
 
             )
 
-            logger.info(f" Verificación bcrypt: {resultado}")
+            logger.info(f"[OK] Verificación bcrypt: {resultado}")
 
             return resultado
 
         except ValueError as e:
 
-            logger.exception("Å Error en hash bcrypt: %s", str(e))
+            logger.exception("[ERROR] Error en hash bcrypt: %s", str(e))
 
             return False
 
@@ -1464,7 +1478,7 @@ def verificar_password(password, password_guardada):
 
         resultado = password == password_guardada
 
-        logger.warning(f"Å¡ ï¸ Usando comparación plain text (legacy): {resultado}")
+        logger.warning(f"[AVISO] Usando comparación plain text (legacy): {resultado}")
 
         return resultado
 
@@ -1478,13 +1492,13 @@ def login(usuario, password):
 
     if not usuario or not password:
 
-        logger.warning(f"Å Usuario o contraseña vacío. Usuario: '{usuario}'")
+        logger.warning(f"[ERROR] Usuario o contraseña vacío. Usuario: '{usuario}'")
 
         return None
 
     if not st.session_state.get("db_available", True):
 
-        logger.warning("Å Base de datos no disponible")
+        logger.warning("[ERROR] Base de datos no disponible")
 
         return None
 
@@ -1509,26 +1523,26 @@ def login(usuario, password):
 
     if not user:
 
-        logger.warning(f"Å Usuario no encontrado: '{usuario}'")
+        logger.warning(f"[ERROR] Usuario no encontrado: '{usuario}'")
 
         return None
 
 
-    logger.info(f" Usuario encontrado: {user[1]} (ID: {user[0]})")
+    logger.info(f"[OK] Usuario encontrado: {user[1]} (ID: {user[0]})")
 
-    logger.info(f"�°Å¸ Hash format: {user[2][:20]}... (bcrypt: {es_hash_bcrypt(user[2])})")
+    logger.info(f"Verificando Hash format: {user[2][:20]}... (bcrypt: {es_hash_bcrypt(user[2])})")
 
 
     # Verificar contraseña
 
     if not verificar_password(password, user[2]):
 
-        logger.warning(f"Å Contraseña incorrecta para usuario: {usuario}")
+        logger.warning(f"[ERROR] Contraseña incorrecta para usuario: {usuario}")
 
         return None
 
 
-    logger.info(f" Contraseña verificada para: {usuario}")
+    logger.info(f"[OK] Contraseña verificada para: {usuario}")
 
 
     # Normalizar rol para asegurar que siempre sea válido
@@ -1537,7 +1551,7 @@ def login(usuario, password):
 
     if rol_normalizado != user[3]:
 
-        logger.info(f"�°Å¸ Normalizando rol de '{user[3]}' a '{rol_normalizado}' para: {usuario}")
+        logger.info(f"Procesando Normalizando rol de '{user[3]}' a '{rol_normalizado}' para: {usuario}")
 
         # Actualizar rol en la base de datos si es diferente
 
@@ -1551,11 +1565,11 @@ def login(usuario, password):
 
             user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
 
-            logger.info(f" Rol actualizado en BD para: {usuario}")
+            logger.info(f"[OK] Rol actualizado en BD para: {usuario}")
 
         else:
 
-            logger.warning(f"Å¡ ï¸ No se pudo actualizar rol en BD, usando rol normalizado localmente")
+            logger.warning(f"[AVISO] No se pudo actualizar rol en BD, usando rol normalizado localmente")
 
             user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
 
@@ -1563,7 +1577,7 @@ def login(usuario, password):
 
     if not es_hash_bcrypt(user[2]):
 
-        logger.info(f"�°Å¸ Rehasheando contraseña para: {usuario}")
+        logger.info(f"Procesando Rehasheando contraseña para: {usuario}")
 
         nuevo_hash = hash_password(password)
 
@@ -1575,15 +1589,15 @@ def login(usuario, password):
 
         ):
 
-            logger.info(f" Contraseña rehashada para: {usuario}")
+            logger.info(f"[OK] Contraseña rehashada para: {usuario}")
 
             user = (user[0], user[1], nuevo_hash, user[3], user[4], user[5], user[6])
 
         else:
 
-            logger.warning(f"Å¡ ï¸ No se pudo rehasear contraseña para: {usuario}")
+            logger.warning(f"[AVISO] No se pudo rehasear contraseña para: {usuario}")
 
-    logger.info(f" Login exitoso para: {usuario} con rol: {user[3]}")
+    logger.info(f"[OK] Login exitoso para: {usuario} con rol: {user[3]}")
 
     return user
 
@@ -1781,7 +1795,7 @@ def seed_default_data():
 
     if not get_database_url():
 
-        logger.warning("Å¡ ï¸ DATABASE_URL no configurada - seed_default_data ignorado")
+        logger.warning("[AVISO] DATABASE_URL no configurada - seed_default_data ignorado")
 
         return False
 
@@ -1793,7 +1807,7 @@ def seed_default_data():
 
         if conn is None:
 
-            logger.warning("Å¡ ï¸ No se pudo conectar a la BD - seed_default_data ignorado")
+            logger.warning("[AVISO] No se pudo conectar a la BD - seed_default_data ignorado")
 
             return False
 
@@ -1801,7 +1815,7 @@ def seed_default_data():
 
             # 1. Crear barbería Leveling si no existe
 
-            logger.info("�°Å¸ Verificando si barbería 'Barberia Leveling' existe...")
+            logger.info("Verificando Verificando si barbería 'Barberia Leveling' existe...")
 
             cur.execute("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
 
@@ -1811,11 +1825,11 @@ def seed_default_data():
 
                 bid = barberia_row[0]
 
-                logger.info(f" Barbería Leveling ya existe (ID: {bid})")
+                logger.info(f"[OK] Barbería Leveling ya existe (ID: {bid})")
 
             else:
 
-                logger.info("Å¡ ï¸ Barbería Leveling NO existe - creando...")
+                logger.info("[AVISO] Barbería Leveling NO existe - creando...")
 
                 cur.execute(
 
@@ -1831,7 +1845,7 @@ def seed_default_data():
 
                     bid = barberia_row[0]
 
-                    logger.info(f" Barbería Leveling creada con ID: {bid}")
+                    logger.info(f"[OK] Barbería Leveling creada con ID: {bid}")
 
                 else:
 
@@ -1839,7 +1853,7 @@ def seed_default_data():
 
             # 2. Crear SUPER_ADMIN si no existe
 
-            logger.info("�°Å¸ Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...")
+            logger.info("Verificando Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...")
 
             cur.execute("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
 
@@ -1847,11 +1861,11 @@ def seed_default_data():
 
             if super_admin_row:
 
-                logger.info(f" SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: {super_admin_row[0]})")
+                logger.info(f"[OK] SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: {super_admin_row[0]})")
 
             else:
 
-                logger.info("Å¡ ï¸ SUPER_ADMIN 'JoanBeatsAD' NO existe - creando...")
+                logger.info("[AVISO] SUPER_ADMIN 'JoanBeatsAD' NO existe - creando...")
 
                 password_hash = hash_password("suguha09")
 
@@ -1863,11 +1877,11 @@ def seed_default_data():
 
                 )
 
-                logger.info(" INSERT SUPER_ADMIN ejecutado")
+                logger.info("[OK] INSERT SUPER_ADMIN ejecutado")
 
             # 3. Crear barberos si no existen
 
-            logger.info("�°Å¸ Verificando barberos...")
+            logger.info("Verificando Verificando barberos...")
 
             pwd_barb = hash_password("barbero123")
 
@@ -1877,7 +1891,7 @@ def seed_default_data():
 
                 if cur.fetchone():
 
-                    logger.info(f" Barbero '{bu}' ya existe")
+                    logger.info(f"[OK] Barbero '{bu}' ya existe")
 
                     continue
 
@@ -1889,11 +1903,11 @@ def seed_default_data():
 
                 )
 
-                logger.info(f" Barbero '{bu}' creado")
+                logger.info(f"[OK] Barbero '{bu}' creado")
 
         conn.commit()
 
-        logger.info(" Commit exitoso - verificando SUPER_ADMIN...")
+        logger.info("[OK] Commit exitoso - verificando SUPER_ADMIN...")
 
         try:
 
@@ -1901,7 +1915,7 @@ def seed_default_data():
 
             if user_check:
 
-                logger.info(" SUPER_ADMIN listo en la base de datos")
+                logger.info("[OK] SUPER_ADMIN listo en la base de datos")
 
                 return True
 
@@ -1925,7 +1939,7 @@ def seed_default_data():
 
             conn.rollback()
 
-        logger.exception("Å Error en seed_default_data")
+        logger.exception("[ERROR] Error en seed_default_data")
 
         # st.sidebar.error(f"Seed error: {str(e)}")
 
@@ -1945,7 +1959,7 @@ if "app_initialized" not in st.session_state:
 
     try:
 
-        with st.spinner("�°Å¸ Inicializando base de datos..."):
+        with st.spinner("Procesando Inicializando base de datos..."):
 
             ensure_database_tables()
 
@@ -1969,7 +1983,7 @@ if "app_initialized" not in st.session_state:
 
                 elif seed_result is False:
 
-                    logger.warning("Å Seed falló - SUPER_ADMIN NO garantizado")
+                    logger.warning("[ERROR] Seed falló - SUPER_ADMIN NO garantizado")
 
 
             default_barberia_id = inicializar_barberia()
@@ -2201,7 +2215,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
     token_preview = access_token[:10] + "..." if len(access_token) > 10 else access_token
 
-    logger.info(f"�°Å¸ Token cargado: {token_preview}")
+    logger.info(f"Token Token cargado: {token_preview}")
 
 
     try:
@@ -2290,14 +2304,14 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
             preference_data["payer"] = {"email": str(cliente_email)}
 
 
-        logger.info(f"�°Å¸¤ Enviando preference a MercadoPago para reserva {reserva_id}...")
+        logger.info(f"Enviando preference a MercadoPago para reserva {reserva_id}...")
 
 
         # Create preference
 
         preference_response = sdk.preference().create(preference_data)
 
-        logger.info(f"�°Å¸¥ Respuesta de MercadoPago: {preference_response}")
+        logger.info(f"Respuesta de MercadoPago: {preference_response}")
 
 
         # Validate response structure
@@ -2377,7 +2391,7 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
             return None
 
 
-        logger.info(f" Pago creado para reserva {reserva_id}: {init_point}")
+        logger.info(f"[OK] Pago creado para reserva {reserva_id}: {init_point}")
 
         return init_point
 
@@ -2448,7 +2462,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
     access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
-    token_status = " Cargado" if access_token else "Å No configurado"
+    token_status = "[OK] Cargado" if access_token else "[ERROR] No configurado"
 
     with st.expander(f"Debug - Token: {token_status}"):
 
@@ -2504,7 +2518,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
             ):
 
-                with st.spinner("³ Generando enlace de pago..."):
+                with st.spinner("Generando enlace de pago..."):
 
                     descripcion = f"Barbería - {servicio} ({fecha_label})"
 
@@ -2527,7 +2541,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
                         st.session_state[f"pago_url_{reserva_id}"] = pago_url
 
-                        st.success(f" Enlace generado para reserva #{reserva_id}")
+                        st.success(f"[OK] Enlace generado para reserva #{reserva_id}")
 
                         st.balloons()
 
@@ -2574,7 +2588,7 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
                 st.caption(
 
-                    "⏳ Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. "
+                    " Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. "
 
                     "La confirmación puede tomar algunos minutos."
 
@@ -2905,7 +2919,7 @@ def construir_eventos_calendario(reservas):
 
         else:
 
-            titulo = f"{cliente} ⚠️ {servicio}"
+            titulo = f"{cliente} - {servicio}"
 
 
         # Color by payment status: Green for paid, Orange for pending
@@ -3007,26 +3021,22 @@ def mostrar_detalles_reserva(reserva_id):
 
     pagado = reserva.get("pagado", False)
 
-    estado = " Pagado" if pagado else "³ Pendiente"
+    estado = "[OK] Pagado" if pagado else "Pendiente"
 
     estado_color = "#16a34a" if pagado else "#f59e0b"
 
     monto = reserva.get('monto', 0)
 
 
-    # Build the inner card with all reservation details - FLEX LAYOUT
-
-    inner_card_html = f"""<div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">CLIENTE</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">SERVICIO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div></div></div><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">HORA</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div><div style="font-size: 12px; color: #666;">{fecha_str}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">MONTO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div></div></div><div style="border-top: 1px solid #333; padding-top: 12px;"><div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">{estado}</div></div>"""
-
-
-    # Wrap in premium container - MAIN WRAPPER
-
-    card_html = f"""<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"><h3 style="margin: 0 0 20px 0; color: white; font-size: 20px;">Tu reserva</h3>{inner_card_html}</div>"""
-
-
-    # Render the reservation card
-
-    st.markdown(card_html, unsafe_allow_html=True)
+    render_reservation_card(
+        cliente,
+        servicio,
+        inicio_str,
+        fecha_str,
+        monto,
+        estado,
+        estado_color,
+    )
 
 
     return reserva
@@ -3053,7 +3063,7 @@ def agrupar_por_barbero(events):
 
                 barbero_id = item.get("resourceId", "unknown")
 
-                barber_name = item.get("title", "").split("⚠️")[0].strip() or "Barbero"
+                barber_name = item.get("title", "").split("-")[0].strip() or "Barbero"
 
                 key = (barbero_id, barber_name)
 
@@ -3120,17 +3130,7 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     with col_legend:
 
-        st.markdown("""
-
-        <div style="display: flex; gap: 12px; font-size: 11px; padding: 8px;">
-
-            <div><span style="display: inline-block; width: 10px; height: 10px; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span><strong>Pagado</strong></div>
-
-            <div><span style="display: inline-block; width: 10px; height: 10px; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span><strong>Pendiente</strong></div>
-
-        </div>
-
-        """, unsafe_allow_html=True)
+        render_status_legend(compact=True)
 
 
     st.markdown("---")
@@ -4045,7 +4045,7 @@ def listar_reservas_filtradas(barberia_id_arg=None, rol_tag=None, usuario_login=
 
             results = safe_fetch_all(sql, tuple(params)) or []
 
-            logger.info(f"�°Å¸ SUPER_ADMIN global query - found {len(results)} reservations")
+            logger.info(f"Consulta SUPER_ADMIN global query - found {len(results)} reservations")
 
             return [normalizar_reserva(r) for r in results]
 
@@ -4055,7 +4055,7 @@ def listar_reservas_filtradas(barberia_id_arg=None, rol_tag=None, usuario_login=
 
         if not bid:
 
-            logger.warning(f"Å¡ ï¸ Query blocked: No barberia_id for role {nr}")
+            logger.warning(f"[AVISO] Query blocked: No barberia_id for role {nr}")
 
             return []
 
@@ -4165,9 +4165,9 @@ def mostrar_reservas_dataframe(rows):
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
 
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">⏰</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Hora</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
 
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">✂️</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
+        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Tijeras</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
 
         <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">·</span><span style="color: #e0e0e0;"><strong>{barbero}</strong></span></div>
 
@@ -4219,7 +4219,7 @@ def ui_marcar_pagado_reservas(rows, key_prefix):
 
             hora_str = hora_str.strftime("%H:%M")
 
-        return f"#{i} �· {barbero_str} �· {fecha_str} {hora_str}"
+        return f"#{i} - {barbero_str} - {fecha_str} {hora_str}"
 
     rid = st.selectbox(
 
@@ -4261,7 +4261,7 @@ def ui_eliminar_reserva_lista(rows, key_prefix):
 
         row = next(x for x in rows if x.get("id") == i)
 
-        return f"#{i} �· {row.get('barbero')} �· {row.get('servicio')} �· {row.get('inicio')}"
+        return f"#{i} - {row.get('barbero')} - {row.get('servicio')} - {row.get('inicio')}"
 
     rid = st.selectbox(
 
@@ -4551,19 +4551,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
     with col_legend:
 
-        st.markdown("""
-
-        <div style="display: flex; gap: 12px; font-size: 12px; padding: 8px;">
-
-            <div><span style="display: inline-block; width: 12px; height: 12px; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span>Pagado</div>
-
-            <div><span style="display: inline-block; width: 12px; height: 12px; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span>Pendiente</div>
-
-        </div>
-
-        <p style="font-size: 10px; color: #999;">Haz clic en un evento para ver detalles</p>
-
-        """, unsafe_allow_html=True)
+        render_status_legend()
 
 
     st.markdown("---")
@@ -4831,7 +4819,7 @@ def render_modo_sin_db_banner():
 
         st.info(
 
-            "**Modo sin base de datos** ¬ No hay conexión PostgreSQL disponible. "
+            "**Modo sin base de datos** -- No hay conexión PostgreSQL disponible. "
 
             "Inicio de sesión, registro, reservas y sincronización de agenda están desactivados. "
 
@@ -5065,7 +5053,7 @@ def flujo_reserva_publica():
 
     servicios_list = obtener_servicios(barberia_id)
 
-    servicios = {s["nombre"]: {"duracion": s["duracion_minutos"], "precio": s["precio"]} 
+    servicios = {s["nombre"]: {"duracion": s.get("duracion") or s.get("duracion_minutos"), "precio": s["precio"]}
 
                  for s in servicios_list if isinstance(servicios_list, list) and len(s) > 0}
 
@@ -5077,11 +5065,11 @@ def flujo_reserva_publica():
 
     # Progress bar
 
-    progress = (st.session_state.booking_step - 1) / 5 * 100
+    total_booking_steps = 6
 
-    st.markdown('<div class="public-booking-shell">', unsafe_allow_html=True)
+    progress = (st.session_state.booking_step - 1) / (total_booking_steps - 1) * 100
 
-    st.progress(int(progress) / 100, text=f"Paso {st.session_state.booking_step} de 5")
+    st.progress(int(progress) / 100, text=f"Paso {st.session_state.booking_step} de {total_booking_steps}")
 
 
     # ===== STEP 1: SELECT SERVICE =====
@@ -5108,6 +5096,12 @@ def flujo_reserva_publica():
 
             services = list(servicios.keys())
 
+            if not services:
+
+                st.info("No hay servicios disponibles para reservar en este momento.")
+
+                return
+
             for idx, service in enumerate(services):
 
                 with cols[idx % 2]:
@@ -5115,8 +5109,6 @@ def flujo_reserva_publica():
                     config = servicios[service]
 
                     precio_fmt = f"${config['precio']:,}".replace(",", ".")
-
-                    st.markdown('<div class="public-service-button">', unsafe_allow_html=True)
 
                     if st.button(
 
@@ -5138,11 +5130,9 @@ def flujo_reserva_publica():
 
                         st.rerun()
 
-                    st.markdown('</div>', unsafe_allow_html=True)
-
     elif st.session_state.booking_step == 2:
 
-        render_step_indicator(2, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
+        render_step_indicator(2, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
 
         render_booking_header("Selecciona tu barbero", "¿Con quién quieres tu corte?", step=2, total_steps=6)
 
@@ -5150,7 +5140,7 @@ def flujo_reserva_publica():
 
             # Botón volver
 
-            if st.button("⬅️ Cambiar servicio", key="back_to_svc"):
+            if st.button("<- Cambiar servicio", key="back_to_svc"):
 
                  st.session_state.booking_step = 1
 
@@ -5239,17 +5229,7 @@ def flujo_reserva_publica():
 
             with col2:
 
-                st.markdown("""
-
-                <div style="text-align: center; padding: 20px;">
-
-                    <div style="font-size: 2rem; margin-bottom: 10px;">⏳</div>
-
-                    <p style="color: #7c3aed; font-weight: 600; margin: 0;">Seleccionando barbero...</p>
-
-                </div>
-
-                """, unsafe_allow_html=True)
+                render_loading_panel("Seleccionando barbero...", padding="20px")
 
             # Wait briefly then advance
 
@@ -5283,7 +5263,7 @@ def flujo_reserva_publica():
 
             selected_id=st.session_state.booking_data.get("barbero_id"),
 
-            icon="✂️",
+            icon="Tijeras",
 
             on_select_callback=on_barber_selected
 
@@ -5304,13 +5284,13 @@ def flujo_reserva_publica():
 
     elif st.session_state.booking_step == 3:
 
-        render_step_indicator(3, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
+        render_step_indicator(3, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
 
-        render_booking_header("Elige tu fecha y hora", "🕐 Cuándo te gustaría venir?", step=3, total_steps=6)
+        render_booking_header("Elige tu fecha y hora", "Cuándo te gustaría venir?", step=3, total_steps=6)
 
         with render_booking_container():
 
-            if st.button("⬅️ Volver a barbero", key="back_to_brb"):
+            if st.button("<- Volver a barbero", key="back_to_brb"):
 
                 st.session_state.booking_step = 2
 
@@ -5370,7 +5350,7 @@ def flujo_reserva_publica():
             st.warning("Quedan pocos horarios disponibles hoy")
 
 
-        st.markdown(f"⏰ Horarios disponibles ({num_slots})")
+        st.markdown(f"Horarios disponibles ({num_slots})")
 
 
                 # Render time chips with responsive grid
@@ -5450,13 +5430,13 @@ def flujo_reserva_publica():
 
     elif st.session_state.booking_step == 4:
 
-        render_step_indicator(4, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
+        render_step_indicator(4, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
 
         render_booking_header("Tu información", "Necesitamos tus datos para la reserva", step=4, total_steps=6)
 
         with render_booking_container():
 
-            if st.button("⬅️ Volver a horario", key="back_to_time"):
+            if st.button("<- Volver a horario", key="back_to_time"):
 
                 st.session_state.booking_step = 3
 
@@ -5547,7 +5527,7 @@ def flujo_reserva_publica():
 
     elif st.session_state.booking_step == 5:
 
-        render_step_indicator(5, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
+        render_step_indicator(5, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
 
         render_booking_header("Revisa tu reserva", "Verifica que todo esté correcto", step=5, total_steps=6)
 
@@ -5661,17 +5641,25 @@ def flujo_reserva_publica():
 
                                 if pago_url:
 
-                                    st.session_state.booking_step = 6
-
                                     st.session_state.booking_data["pago_url"] = pago_url
 
-                                    st.session_state.booking_data["reserva_id"] = reserva_id
+                                    st.session_state.booking_data["pago_pendiente"] = False
 
-                                    st.rerun()
+                                    st.session_state.booking_data.pop("pago_mensaje", None)
 
                                 else:
 
-                                    st.warning("Reserva confirmada, pero no se pudo generar el enlace de pago. Contacta al local.")
+                                    st.session_state.booking_data["pago_url"] = None
+
+                                    st.session_state.booking_data["pago_pendiente"] = True
+
+                                    st.session_state.booking_data["pago_mensaje"] = "Reserva creada, pago pendiente"
+
+                                st.session_state.booking_step = 6
+
+                                st.session_state.booking_data["reserva_id"] = reserva_id
+
+                                st.rerun()
 
                         else:
 
@@ -5682,9 +5670,9 @@ def flujo_reserva_publica():
 
         data = st.session_state.booking_data
 
-        render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "✅ Listo!"])
+        render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
 
-        render_booking_header("✅ Reserva confirmada!", "Tu cita está lista", step=6, total_steps=6)
+        render_booking_header("[OK] Reserva confirmada!", "Tu cita está lista", step=6, total_steps=6)
 
         with render_booking_container():
 
@@ -5692,7 +5680,7 @@ def flujo_reserva_publica():
 
             render_cta_section(
 
-                "✅ Reserva confirmada!",
+                "[OK] Reserva confirmada!",
 
                 "Tu cita ha sido programada con éxito. Te hemos enviado un WhatsApp con la confirmación.",
 
@@ -5725,6 +5713,10 @@ def flujo_reserva_publica():
 
 
                 st.markdown('<p class="public-payment-helper">Pago seguro con MercadoPago · No guardamos datos de tu tarjeta</p>', unsafe_allow_html=True)
+
+            elif data.get("pago_pendiente"):
+
+                st.warning("Reserva creada, pago pendiente. Contacta al local para coordinar el pago.")
 
 
         render_public_note("Te enviamos la confirmación a WhatsApp. Revisa tu teléfono para más detalles.")
@@ -5771,8 +5763,6 @@ def flujo_reserva_publica():
                 st.session_state.selected_fecha = datetime.now().date()
 
                 st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= MÉTRICAS HELPERS =================
 
@@ -6253,7 +6243,7 @@ def obtener_servicios(barberia_id=None):
 
                 "descripcion": row[4],
 
-                "icono": row[5] or "ï¸",
+                "icono": row[5] or "Servicio",
 
             })
 
@@ -6298,26 +6288,26 @@ def geocode_address(direccion: str, ciudad: str = ""):
 
         if location:
 
-            logger.info(f" Geocoded address: {full_address}   ({location.latitude}, {location.longitude})")
+            logger.info(f"[OK] Geocoded address: {full_address} -> ({location.latitude}, {location.longitude})")
 
             return float(location.latitude), float(location.longitude)
 
         else:
 
-            logger.warning(f"Å¡ ï¸ Could not geocode address: {full_address}")
+            logger.warning(f"[AVISO] Could not geocode address: {full_address}")
 
             return None, None
 
 
     except (GeocoderTimedOut, GeocoderUnavailable) as e:
 
-        logger.warning(f"Å¡ ï¸ Geocoding service unavailable: {e}")
+        logger.warning(f"[AVISO] Geocoding service unavailable: {e}")
 
         return None, None
 
     except Exception as e:
 
-        logger.warning(f"Å¡ ï¸ Error geocoding address '{full_address}': {e}")
+        logger.warning(f"[AVISO] Error geocoding address '{full_address}': {e}")
 
         return None, None
 
@@ -6453,7 +6443,7 @@ def create_barberia_in_db(data):
 
     nombre = data["nombre"].lower()
 
-    slug = nombre.replace(" ", "-").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("�º", "u").replace("ñ", "n")
+    slug = nombre.replace(" ", "-").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("?", "u").replace("ñ", "n")
 
     slug = "".join(c for c in slug if c.isalnum() or c in "-_")  # Remove special chars
 
@@ -6513,7 +6503,7 @@ def create_barberia_in_db(data):
 
         if result and result[0]:
 
-            logger.info(f" Barbería creada: {data['nombre']} (ID: {result[0]}, Slug: {slug})")
+            logger.info(f"[OK] Barbería creada: {data['nombre']} (ID: {result[0]}, Slug: {slug})")
 
             return result[0]
 
@@ -6552,7 +6542,7 @@ def create_admin_user_in_db(barberia_id, slug, telefono):
 
         )
 
-        logger.info(f" Admin user creado: {admin_user}")
+        logger.info(f"[OK] Admin user creado: {admin_user}")
 
         return admin_user, admin_password
 
@@ -6594,7 +6584,7 @@ def create_services_in_db(barberia_id, services):
 
                     int(service["precio"]),
 
-                    "ï¸"
+                    "Servicio"
 
                 )
 
@@ -6602,7 +6592,7 @@ def create_services_in_db(barberia_id, services):
 
             count += 1
 
-        logger.info(f" Servicios creados: {count}")
+        logger.info(f"[OK] Servicios creados: {count}")
 
         return count
 
@@ -6662,7 +6652,7 @@ def create_barbers_in_db(barberia_id, barbers):
             barber_passwords[barber["usuario"]] = barber_password
 
 
-        logger.info(f" Barberos creados: {len(barber_passwords)}")
+        logger.info(f"[OK] Barberos creados: {len(barber_passwords)}")
 
         return barber_passwords
 
@@ -6678,27 +6668,14 @@ def render_header_and_progress(step):
 
     """Render header with title and progress bar."""
 
-    st.markdown("""<div style="
-
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-
-        padding: 40px;
-
-        border-radius: 20px;
-
-        text-align: center;
-
-        color: white;
-
-        margin-bottom: 40px;
-
-    ">
-
-        <h1 style="margin: 0; font-size: 2.5em;">Crea Tu Barbería</h1>
-
-        <p style="margin: 10px 0 0 0; font-size: 1.1em; opacity: 0.9;">En 5 simples pasos estarás listo</p>
-
-    </div>""", unsafe_allow_html=True)
+    render_hero_banner(
+        "Crea Tu Barbería",
+        "En 5 simples pasos estarás listo",
+        "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding: 40px;border-radius: 20px;text-align: center;color: white;",
+        title_size="2.5em",
+        subtitle_size="1.1em",
+        margin_bottom="40px",
+    )
 
 
     progress_pct = (step - 1) / 5
@@ -6899,25 +6876,7 @@ def render_step_2_branding(data):
 
     with preview_col1:
 
-        st.markdown(f"""<div style="
-
-            background: {data['color_primario']};
-
-            padding: 60px;
-
-            border-radius: 15px;
-
-            text-align: center;
-
-            color: white;
-
-        ">
-
-            <p style="font-size: 2em; margin: 0;">✂️</p>
-
-            <p style="font-size: 0.9em; margin: 10px 0 0 0;">{data['nombre']}</p>
-
-        </div>""", unsafe_allow_html=True)
+        render_preview_card(data['nombre'], data['color_primario'])
 
     with preview_col2:
 
@@ -7177,7 +7136,7 @@ def render_step_4_barbers(data):
 
                 for error in errors:
 
-                    st.error(f"Å¡ ï¸ {error}")
+                    st.error(f"[AVISO] {error}")
 
             else:
 
@@ -7202,7 +7161,7 @@ def render_step_5_schedule(data):
 
         data["hora_apertura"] = st.time_input(
 
-            "�°Å¸Å¦ Apertura",
+            "Apertura Apertura",
 
             value=datetime.strptime(data["hora_apertura"], "%H:%M").time(),
 
@@ -7217,7 +7176,7 @@ def render_step_5_schedule(data):
 
         data["hora_cierre"] = st.time_input(
 
-            "�°Å¸Å  Cierre",
+            "Cierre Cierre",
 
             value=datetime.strptime(data["hora_cierre"], "%H:%M").time(),
 
@@ -7290,31 +7249,10 @@ def render_success_screen():
 
     # Animated success header
 
-    st.markdown("""<div style="
-
-        background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-
-        padding: 80px 40px;
-
-        border-radius: 20px;
-
-        text-align: center;
-
-        color: white;
-
-        margin-bottom: 50px;
-
-        box-shadow: 0 20px 60px rgba(16, 185, 129, 0.2);
-
-    ">
-
-        <p style="font-size: 5em; margin: 0;">🎉</p>
-
-        <h1 style="margin: 20px 0 0 0; font-size: 2.8em; font-weight: 700;">¡Tu Barbería está Lista!</h1>
-
-        <p style="margin: 15px 0 0 0; font-size: 1.2em; opacity: 0.95;">En menos de 2 minutos ya puedes recibir reservas</p>
-
-    </div>""", unsafe_allow_html=True)
+    render_success_hero(
+        "¡Tu Barbería está Lista!",
+        "En menos de 2 minutos ya puedes recibir reservas",
+    )
 
 
     # Main booking link section
@@ -7465,7 +7403,7 @@ def create_barberia_and_transition(data):
 
     """Main orchestration: Create barberia and all related data."""
 
-    with st.spinner("³ Creando tu barbería..."):
+    with st.spinner("Cargando Creando tu barbería..."):
 
         try:
 
@@ -8368,7 +8306,7 @@ def render_modal_booking(barberia):
 
             precio = st.session_state.modal_booking_data.get("precio", 0)
 
-            st.info(f"ï¸ {servicio} ⚠️ ${precio:,}")
+            st.info(f"Servicio {servicio} - ${precio:,}")
 
 
         # Date picker
@@ -8396,7 +8334,7 @@ def render_modal_booking(barberia):
 
         hora = st.time_input(
 
-            "ð Hora",
+            "ð Hora",
 
             value=datetime.now().replace(hour=10, minute=0),
 
@@ -8796,7 +8734,7 @@ def render_barberia_card(barberia, index):
 
     # Card HTML - with rating stars (placeholder for future integration)
 
-    rating_stars = "­" * min(5, max(1, 4))  # Placeholder: 4 stars
+    rating_stars = "­" * min(5, max(1, 4))  # Placeholder: 4 stars
 
 
     card_html = f"""
@@ -8831,7 +8769,7 @@ def render_barberia_card(barberia, index):
 
         <div class="card-meta-{index}">
 
-            ° {barberia.get('hora_apertura', '--:--')} - {barberia.get('hora_cierre', '--:--')}
+            Horario {barberia.get('hora_apertura', '--:--')} - {barberia.get('hora_cierre', '--:--')}
 
         </div>
 
@@ -8997,7 +8935,7 @@ def render_home_screen():
 
         page_title="Barbería Leveling",
 
-        page_icon="�°Å¸Ë",
+        page_icon="Barberia",
 
         layout="wide",
 
@@ -9301,8 +9239,6 @@ def render_landing_publico(barberia):
 
                 # Clickable service button - looks like card, acts like button
 
-                st.markdown('<div class="public-service-button">', unsafe_allow_html=True)
-
                 button_clicked = st.button(
 
                     label=f"{servicio.get('icono') or 'Servicio'}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n{servicio['duracion']} min · {precio_formateado}",
@@ -9314,9 +9250,6 @@ def render_landing_publico(barberia):
                     help=f"Seleccionar {servicio['nombre']}"
 
                 )
-
-                st.markdown('</div>', unsafe_allow_html=True)
-
 
                 if button_clicked:
 
@@ -9405,7 +9338,7 @@ def render_booking_publico(barberia_slug):
 
         page_title=f"Reserva en {barberia['nombre']}",
 
-        page_icon="✂️",
+        page_icon="Barberia",
 
         layout="wide",
 
@@ -9640,7 +9573,7 @@ try:
 
                         else:
 
-                            st.error("Å Datos incorrectos. Intenta nuevamente.")
+                            st.error("[ERROR] Datos incorrectos. Intenta nuevamente.")
 
                 except Exception as e:
 
@@ -10002,19 +9935,11 @@ try:
 
                 # Dashboard metrics with new design system
 
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "📅", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "✅", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "⏳", Colors.WARNING)
+                render_metric_grid([
+                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Espera", Colors.WARNING),
+                ], columns=3)
 
 
                 render_divider()
@@ -10022,23 +9947,12 @@ try:
 
                 render_subsection_title("Resumen de actividad")
 
-                col_a, col_b, col_c, col_d = st.columns(4, gap="large")
-
-                with col_a:
-
-                    render_stat_box("Total", total_reservas, "📊", Colors.SECONDARY)
-
-                with col_b:
-
-                    render_stat_box("Hoy", hoy_reservas, "📆", Colors.PRIMARY)
-
-                with col_c:
-
-                    render_stat_box("Ingresos", "$0", "💰", Colors.SUCCESS)
-
-                with col_d:
-
-                    render_stat_box("Barberos", num_barberos_cached, "✂️", Colors.WARNING)
+                render_metric_grid([
+                    ("Total", total_reservas, "📊", Colors.SECONDARY),
+                    ("Hoy", hoy_reservas, "📆", Colors.PRIMARY),
+                    ("Ingresos", "$0", "Ingresos", Colors.SUCCESS),
+                    ("Barberos", num_barberos_cached, "Tijeras", Colors.WARNING),
+                ], columns=4)
 
 
                 render_divider()
@@ -10179,7 +10093,7 @@ try:
 
                                     availability="Disponible",
 
-                                    icon="✂️",
+                                    icon="Tijeras",
 
                                     is_selected=is_selected
 
@@ -10196,21 +10110,12 @@ try:
 
                         if st.session_state.cliente_barber_loading and not barber_clicked:
 
-                            st.markdown("""
-
-                            <div style="text-align: center; padding: 15px; margin-top: 10px;">
-
-                                <div style="display: inline-block; color: #7c3aed; font-weight: 600;">
-
-                                    <div style="font-size: 1.5rem; margin-bottom: 5px;">⏳</div>
-
-                                    Preparando formulario...
-
-                                </div>
-
-                            </div>
-
-                            """, unsafe_allow_html=True)
+                            render_loading_panel(
+                                "Preparando formulario...",
+                                icon="Espera",
+                                padding="15px",
+                                top_margin="10px",
+                            )
 
                             import time
 
@@ -10391,15 +10296,15 @@ try:
 
                 with col1:
 
-                    render_stat_box("Reservas Hoy", total_hoy, "📅", Colors.PRIMARY)
+                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
 
                 with col2:
 
-                    render_stat_box("Pagadas", pagadas_hoy, "✅", Colors.SUCCESS)
+                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
 
                 with col3:
 
-                    render_stat_box("Pendientes", pendientes_hoy, "⏳", Colors.WARNING)
+                    render_stat_box("Pendientes", pendientes_hoy, "Espera", Colors.WARNING)
 
 
                 render_divider()
@@ -10411,15 +10316,15 @@ try:
 
                 with col_x:
 
-                    render_stat_box("Cortes", total_reservas, "ï¸", Colors.PRIMARY)
+                    render_stat_box("Cortes", total_reservas, "Servicio", Colors.PRIMARY)
 
                 with col_y:
 
-                    render_stat_box("Hoy", hoy_reservas, "�°Å¸Å½¯", Colors.SECONDARY)
+                    render_stat_box("Hoy", hoy_reservas, "Hoy", Colors.SECONDARY)
 
                 with col_z:
 
-                    render_stat_box("Ingresos", f"${total_ingresos}", "�°Å¸°", Colors.SUCCESS)
+                    render_stat_box("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS)
 
 
                 render_divider()
@@ -10479,11 +10384,11 @@ try:
 
             tab_cal, tab_crear, tab_lista = st.tabs([
 
-                "�°Å¸  Calendario",
+                "Calendario Calendario",
 
-                "Å¾¢ Crear/Editar",
+                "Editar Crear/Editar",
 
-                "�°Å¸¹ Listado"
+                "Listado Listado"
 
             ])
 
@@ -10525,7 +10430,7 @@ try:
 
                     "Modo de vista",
 
-                    ["�°Å¸¡ Tarjetas", "�°Å¸¦ Calendario"],
+                    ["Tarjetas Tarjetas", "Calendario Calendario"],
 
                     horizontal=True,
 
@@ -10540,14 +10445,14 @@ try:
 
                 else:
 
-                    with st.spinner("³ Cargando tus reservas..."):
+                    with st.spinner("Cargando tus reservas..."):
 
                         rows_bar = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
 
 
                     if rows_bar:
 
-                        if view_type == "�°Å¸¡ Tarjetas":
+                        if view_type == "Tarjetas Tarjetas":
 
                             mostrar_reservas_dataframe(rows_bar)
 
@@ -10639,7 +10544,7 @@ try:
 
             else:
 
-                with st.spinner("³ Cargando métricas..."):
+                with st.spinner("Cargando métricas..."):
 
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
 
@@ -10648,19 +10553,11 @@ try:
 
                 # Dashboard metrics
 
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "�°Å¸¦", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "³", Colors.WARNING)
+                render_metric_grid([
+                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING),
+                ], columns=3)
 
 
                 render_divider()
@@ -10668,28 +10565,17 @@ try:
 
                 render_subsection_title("Resumen general")
 
-                col_a, col_b, col_c, col_d = st.columns(4, gap="large")
-
-                with col_a:
-
-                    render_stat_box("Total Reservas", total_reservas, "�°Å¸¹", Colors.SECONDARY)
-
-                with col_b:
-
-                    render_stat_box("Hoy", hoy_reservas, "�°Å¸Å½¯", Colors.PRIMARY)
-
-                with col_c:
-
-                    render_stat_box("Ingresos", f"${total_ingresos}", "�°Å¸°", Colors.SUCCESS)
-
-                with col_d:
-
-                    render_stat_box("Barberos", num_barberos, "ï¸", Colors.WARNING)
+                render_metric_grid([
+                    ("Total Reservas", total_reservas, "Listado", Colors.SECONDARY),
+                    ("Hoy", hoy_reservas, "Hoy", Colors.PRIMARY),
+                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
+                    ("Barberos", num_barberos, "Servicio", Colors.WARNING),
+                ], columns=4)
 
 
                 render_divider()
 
-                with st.spinner("³ Cargando próximas citas..."):
+                with st.spinner("Cargando próximas citas..."):
 
                     todas_reservas = safe_fetch_all(
 
@@ -10716,7 +10602,7 @@ try:
 
                 if hoy_reservas_list:
 
-                    st.markdown("### ð Próximas Citas (Hoy)")
+                    st.markdown("### ð Próximas Citas (Hoy)")
 
                     for r in hoy_reservas_list[:5]:
 
@@ -10724,7 +10610,7 @@ try:
 
                         cliente_str = r[5] or r[6]
 
-                        st.caption(f"ð {hora_str} - {cliente_str} con {r[1]} ({r[2]})")
+                        st.caption(f"ð {hora_str} - {cliente_str} con {r[1]} ({r[2]})")
 
         elif seccion == "Agenda":
 
@@ -10755,13 +10641,13 @@ try:
 
             tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
 
-                "�°Å¸  Calendario",
+                "Calendario Calendario",
 
-                "Å¾¢ Crear/Editar",
+                "Editar Crear/Editar",
 
-                "�°Å¸¹ Reservas",
+                "Listado Reservas",
 
-                "�°Å¸° Ingresos"
+                "$ Ingresos"
 
             ])
 
@@ -10772,7 +10658,7 @@ try:
 
                 if db_ok:
 
-                    with st.spinner("³ Cargando calendario..."):
+                    with st.spinner("Cargando calendario..."):
 
                         render_calendario_multi_barbero(eventos, read_only=not db_ok)
 
@@ -10805,7 +10691,7 @@ try:
 
                         "Modo de vista",
 
-                        ["�°Å¸¡ Tarjetas", "�°Å¸¦ Calendario"],
+                        ["Tarjetas Tarjetas", "Calendario Calendario"],
 
                         horizontal=True,
 
@@ -10841,7 +10727,7 @@ try:
 
                     if rows_adm:
 
-                        if view_type == "�°Å¸¡ Tarjetas":
+                        if view_type == "Tarjetas Tarjetas":
 
                             mostrar_reservas_dataframe(rows_adm)
 
@@ -10918,7 +10804,7 @@ try:
 
                     st.markdown("#### Desglose por barbero")
 
-                    with st.spinner("³ Cargando desglose..."):
+                    with st.spinner("Cargando desglose..."):
 
                         barberos_list = listar_usuarios_barberos(barberia_id)
 
@@ -10956,19 +10842,19 @@ try:
 
                     with col1:
 
-                        nu = st.text_input("�°Å¸¤ Usuario", placeholder="Ej: Andrea")
+                        nu = st.text_input("Usuario Usuario", placeholder="Ej: Andrea")
 
                     with col2:
 
-                        np = st.text_input("�°Å¸ Contraseña", type="password")
+                        np = st.text_input("Contrase?a Contraseña", type="password")
 
-                    if st.form_submit_button(" Crear Barbero", use_container_width=True):
+                    if st.form_submit_button("[OK] Crear Barbero", use_container_width=True):
 
-                        with st.spinner("³ Creando barbero..."):
+                        with st.spinner("Creando barbero..."):
 
                             if registrar(nu, np, "BARBERO", barberia_id=barberia_id):
 
-                                st.success(" Barbero creado exitosamente")
+                                st.success("[OK] Barbero creado exitosamente")
 
                                 st.rerun()
 
@@ -10978,7 +10864,7 @@ try:
 
             render_subsection_title("Barberos registrados")
 
-            with st.spinner("³ Cargando barberos..."):
+            with st.spinner("Cargando barberos..."):
 
                 barberos_data = listar_usuarios_barberos(barberia_id)
 
@@ -10986,7 +10872,7 @@ try:
 
                 st.dataframe(
 
-                    [{"�°Å¸¤ Usuario": r[0], "�°Å¸¥ Rol": r[1]} for r in barberos_data],
+                    [{"Usuario Usuario": r[0], "Rol Rol": r[1]} for r in barberos_data],
 
                     use_container_width=True,
 
@@ -11085,7 +10971,7 @@ try:
 
             else:
 
-                with st.spinner("³ Cargando métricas globales..."):
+                with st.spinner("Cargando métricas globales..."):
 
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(bid_ctx) if bid_ctx else (0, 0, 0)
 
@@ -11098,15 +10984,15 @@ try:
 
                 with col1:
 
-                    render_stat_box("Reservas Hoy", total_hoy, "�°Å¸¦", Colors.PRIMARY)
+                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
 
                 with col2:
 
-                    render_stat_box("Pagadas", pagadas_hoy, "", Colors.SUCCESS)
+                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
 
                 with col3:
 
-                    render_stat_box("Pendientes", pendientes_hoy, "³", Colors.WARNING)
+                    render_stat_box("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING)
 
 
                 render_divider()
@@ -11114,27 +11000,13 @@ try:
 
                 render_subsection_title("Resumen global")
 
-                col_a, col_b, col_c, col_d, col_e = st.columns(5, gap="large")
-
-                with col_a:
-
-                    render_stat_box("Barberías", num_barberias, "�°Å¸¢", Colors.PRIMARY)
-
-                with col_b:
-
-                    render_stat_box("Usuarios", num_usuarios, "�°Å¸¥", Colors.SECONDARY)
-
-                with col_c:
-
-                    render_stat_box("Total", num_reservas, "�°Å¸¹", Colors.PRIMARY)
-
-                with col_d:
-
-                    render_stat_box("Hoy", hoy_count, "�°Å¸Å½¯", Colors.SECONDARY)
-
-                with col_e:
-
-                    render_stat_box("Ingresos", f"${total_ingresos}", "�°Å¸°", Colors.SUCCESS)
+                render_metric_grid([
+                    ("Barberías", num_barberias, "Barberias", Colors.PRIMARY),
+                    ("Usuarios", num_usuarios, "Rol", Colors.SECONDARY),
+                    ("Total", num_reservas, "Listado", Colors.PRIMARY),
+                    ("Hoy", hoy_count, "Hoy", Colors.SECONDARY),
+                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
+                ], columns=5)
 
         elif seccion == "Agenda":
 
@@ -11165,13 +11037,13 @@ try:
 
             tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
 
-                "�°Å¸  Calendario",
+                "Calendario Calendario",
 
-                "Å¾¢ Crear/Editar",
+                "Editar Crear/Editar",
 
-                "�°Å¸¹ Reservas",
+                "Listado Reservas",
 
-                "�°Å¸° Ingresos"
+                "$ Ingresos"
 
             ])
 
@@ -11182,7 +11054,7 @@ try:
 
                 if db_ok:
 
-                    with st.spinner("³ Cargando calendario..."):
+                    with st.spinner("Cargando calendario..."):
 
                         render_calendario_multi_barbero(eventos, read_only=not db_ok)
 
@@ -11210,7 +11082,7 @@ try:
 
                     "Modo de vista",
 
-                    ["�°Å¸¡ Tarjetas", "�°Å¸¦ Calendario"],
+                    ["Tarjetas Tarjetas", "Calendario Calendario"],
 
                     horizontal=True,
 
@@ -11235,7 +11107,7 @@ try:
 
                     )
 
-                    with st.spinner("³ Cargando reservas..."):
+                    with st.spinner("Cargando reservas..."):
 
                         rows_su = listar_reservas_filtradas(
 
@@ -11245,7 +11117,7 @@ try:
 
                     if rows_su:
 
-                        if view_type == "�°Å¸¡ Tarjetas":
+                        if view_type == "Tarjetas Tarjetas":
 
                             mostrar_reservas_dataframe(rows_su)
 
@@ -11302,7 +11174,7 @@ try:
 
                 if db_ok and bid_ctx:
 
-                    with st.spinner("³ Cargando datos de ingresos..."):
+                    with st.spinner("Cargando datos de ingresos..."):
 
                         total_row = safe_fetch_one(
 
@@ -11321,7 +11193,7 @@ try:
 
                     st.markdown("#### Desglose por barbero")
 
-                    with st.spinner("³ Cargando desglose..."):
+                    with st.spinner("Cargando desglose..."):
 
                         barberos_list = listar_usuarios_barberos(bid_ctx)
 
@@ -11354,7 +11226,7 @@ try:
 
             if bid_ctx:
 
-                with st.spinner("³ Cargando barberos..."):
+                with st.spinner("Cargando barberos..."):
 
                     barberos_data = listar_usuarios_barberos(bid_ctx)
 
@@ -11362,7 +11234,7 @@ try:
 
                     st.dataframe(
 
-                        [{"�°Å¸¤ Usuario": r[0], "�°Å¸¥ Rol": r[1]} for r in barberos_data],
+                        [{"Usuario Usuario": r[0], "Rol Rol": r[1]} for r in barberos_data],
 
                         use_container_width=True,
 

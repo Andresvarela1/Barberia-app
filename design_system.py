@@ -909,9 +909,10 @@ def apply_public_booking_css():
         background: #f7f3ee !important;
     }}
 
-    .block-container {{
-        max-width: 1180px !important;
-        padding: {Spacing.MD} {Spacing.LG} {Spacing.XXL} !important;
+    .block-container,
+    [data-testid="stMainBlockContainer"] {{
+        max-width: 1120px !important;
+        padding: {Spacing.LG} {Spacing.XXL} {Spacing.XXL} !important;
     }}
 
     .public-topbar {{
@@ -1186,6 +1187,11 @@ def apply_public_booking_css():
     }}
 
     .step-indicator {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        gap: 8px;
         background: #ffffff;
         border: 1px solid #e8dfd4;
         border-radius: 18px;
@@ -1193,9 +1199,70 @@ def apply_public_booking_css():
         box-shadow: 0 12px 32px -28px rgba(17, 24, 39, 0.45);
     }}
 
+    .step-item {{
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }}
+
+    .step-circle {{
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        transition: all 0.3s ease-in-out;
+    }}
+
+    .step-circle.active {{
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        color: white;
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+    }}
+
+    .step-circle.completed {{
+        background: #22c55e;
+        color: white;
+    }}
+
+    .step-circle.pending {{
+        background: #334155;
+        color: #cbd5e1;
+        border: 2px solid #475569;
+    }}
+
+    .step-connector {{
+        flex: 1;
+        height: 2px;
+        background: #334155;
+        margin-top: 22px;
+    }}
+
+    .step-connector.active {{
+        background: #7c3aed;
+    }}
+
+    .step-label {{
+        font-size: 12px;
+        color: #cbd5e1;
+        text-align: center;
+        max-width: 80px;
+    }}
+
+    .step-label.active {{
+        color: #7c3aed;
+        font-weight: 600;
+    }}
+
     @media (max-width: 768px) {{
-        .block-container {{
-            padding: {Spacing.SM} {Spacing.SM} {Spacing.XL} !important;
+        .block-container,
+        [data-testid="stMainBlockContainer"] {{
+            padding: {Spacing.SM} {Spacing.MD} {Spacing.XL} !important;
         }}
 
         .public-hero {{
@@ -1771,6 +1838,27 @@ def render_stat_box(label, value, icon="📊", color=Colors.PRIMARY):
     )
 
 
+def render_metric_grid(metrics, columns=None, gap="large"):
+    """Render a row of stat boxes using the existing metric card style."""
+    if not metrics:
+        return
+
+    column_count = columns or len(metrics)
+    cols = st.columns(column_count, gap=gap)
+
+    for index, metric in enumerate(metrics):
+        if isinstance(metric, dict):
+            label = metric.get("label", "")
+            value = metric.get("value", "")
+            icon = metric.get("icon", "📊")
+            color = metric.get("color", Colors.PRIMARY)
+        else:
+            label, value, icon, color = metric
+
+        with cols[index % column_count]:
+            render_stat_box(label, value, icon, color)
+
+
 def render_alert(message, alert_type="info", title=None):
     """
     Render a styled alert message
@@ -1827,6 +1915,112 @@ def render_alert(message, alert_type="info", title=None):
         """,
         unsafe_allow_html=True
     )
+
+
+def render_note(message, note_type="info", title=None):
+    """Render a compact informational note using the existing alert style."""
+    render_alert(message, alert_type=note_type, title=title)
+
+
+def render_info_card(title, body, icon=None, class_name="card-container"):
+    """Render a reusable informational card with optional icon and body text."""
+    heading = f"{icon} {title}" if icon else title
+    card_body = f'<div style="color: {Colors.TEXT_SECONDARY}; line-height: 1.6;">{body}</div>'
+    render_card(card_body, title=heading, class_name=class_name)
+
+
+def render_container(content, class_name=None, style="", unsafe_allow_html=True):
+    """Render a lightweight HTML container wrapper for simple presentational blocks."""
+    class_attr = f' class="{class_name}"' if class_name else ""
+    st.markdown(
+        f'<div{class_attr} style="{style}">{content}</div>',
+        unsafe_allow_html=unsafe_allow_html,
+    )
+
+
+def render_hero_banner(title, subtitle, style, icon=None, icon_size="5em", title_size="2.8em", subtitle_size="1.2em", margin_bottom="50px"):
+    """Render a reusable centered hero banner for simple presentational screens."""
+    icon_html = f'<p style="font-size: {icon_size}; margin: 0;">{icon}</p>' if icon else ""
+    content = f"""
+        {icon_html}
+        <h1 style="margin: 20px 0 0 0; font-size: {title_size}; font-weight: 700;">{title}</h1>
+        <p style="margin: 15px 0 0 0; font-size: {subtitle_size}; opacity: 0.95;">{subtitle}</p>
+    """
+    render_container(
+        content,
+        style=f"{style}margin-bottom: {margin_bottom};",
+    )
+
+
+def render_preview_card(title, background_color, text_color="white", icon="Tijeras"):
+    """Render the centered preview tile used in the registration flow."""
+    content = f"""
+            <p style="font-size: 2em; margin: 0;">{icon}</p>
+            <p style="font-size: 0.9em; margin: 10px 0 0 0;">{title}</p>
+    """
+    render_container(
+        content,
+        style=(
+            f"background: {background_color};"
+            "padding: 60px;"
+            "border-radius: 15px;"
+            "text-align: center;"
+            f"color: {text_color};"
+        ),
+    )
+
+
+def render_success_hero(title, subtitle, icon="Exito"):
+    """Render the success hero used on the final registration screen."""
+    render_hero_banner(
+        title,
+        subtitle,
+        "background: linear-gradient(135deg, #10b981 0%, #34d399 100%);padding: 80px 40px;border-radius: 20px;text-align: center;color: white;box-shadow: 0 20px 60px rgba(16, 185, 129, 0.2);",
+        icon=icon,
+        icon_size="5em",
+        title_size="2.8em",
+        subtitle_size="1.2em",
+        margin_bottom="50px",
+    )
+
+
+def render_status_legend(paid_label="Pagado", pending_label="Pendiente", compact=False):
+    """Render the calendar status legend used in reservation views."""
+    font_size = "11px" if compact else "12px"
+    icon_size = "10px" if compact else "12px"
+    st.markdown(f"""
+    <div style="display: flex; gap: 12px; font-size: {font_size}; padding: 8px;">
+        <div><span style="display: inline-block; width: {icon_size}; height: {icon_size}; background: #16a34a; border-radius: 2px; margin-right: 4px;"></span><strong>{paid_label}</strong></div>
+        <div><span style="display: inline-block; width: {icon_size}; height: {icon_size}; background: #f59e0b; border-radius: 2px; margin-right: 4px;"></span><strong>{pending_label}</strong></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_loading_panel(message, icon="Espera", padding="20px", top_margin="0"):
+    """Render a small centered loading panel with a short status message."""
+    content = f"""
+        <div style="font-size: 2rem; margin-bottom: 10px;">{icon}</div>
+        <p style="color: #7c3aed; font-weight: 600; margin: 0;">{message}</p>
+    """
+    render_container(
+        content,
+        style=(
+            f"text-align: center;"
+            f"padding: {padding};"
+            f"margin-top: {top_margin};"
+            "display: inline-block;"
+            "color: #7c3aed;"
+            "font-weight: 600;"
+        ),
+    )
+
+
+def render_reservation_card(cliente, servicio, inicio_str, fecha_str, monto, estado, estado_color):
+    """Render the detailed reservation card used in reservation listings."""
+    inner_card_html = f"""<div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">CLIENTE</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{cliente}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">SERVICIO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{servicio}</div></div></div><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">HORA</div><div style="font-size: 18px; font-weight: 600; color: #fff;">{inicio_str}</div><div style="font-size: 12px; color: #666;">{fecha_str}</div></div><div><div style="font-size: 12px; color: #999; margin-bottom: 4px;">MONTO</div><div style="font-size: 18px; font-weight: 600; color: #fff;">${monto}</div></div></div><div style="border-top: 1px solid #333; padding-top: 12px;"><div style="display: inline-block; background: {estado_color}20; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; color: {estado_color}; border: 1px solid {estado_color};">{estado}</div></div>"""
+
+    card_html = f"""<div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"><h3 style="margin: 0 0 20px 0; color: white; font-size: 20px;">Tu reserva</h3>{inner_card_html}</div>"""
+    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def render_interactive_card(content, title=None, icon=None, clickable=True, on_click=None):
@@ -2111,8 +2305,9 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
     """
     
     # Generate unique key for this card's button
-    button_key = f"barber_card_{barber_id}_{barber_name.replace(' ', '_')}"
-    card_class = f"barber-card-{barber_id.replace(' ', '_').replace('-', '_').lower()}"
+    barber_id_str = str(barber_id)
+    button_key = f"barber_card_{barber_id_str}_{barber_name.replace(' ', '_')}"
+    card_class = f"barber-card-{barber_id_str.replace(' ', '_').replace('-', '_').lower()}"
     
     # Determine colors and styles based on state
     if is_selected:
@@ -2409,9 +2604,6 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
         else:
             selected_time_str = str(selected_time)
     
-    # Render chips container
-    st.markdown(f'<div class="time-chips-container">', unsafe_allow_html=True)
-    
     selected = None
     cols = st.columns(min(columns, len(available_times)))
     
@@ -2484,8 +2676,6 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
                 if on_time_selected:
                     on_time_selected(time_obj)
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     return selected
 
 
@@ -2506,8 +2696,7 @@ def render_booking_container(content_func=None):
     @contextmanager
     def booking_container():
         st.markdown(
-            f"""
-            <style>
+            f"""<style>
                 .booking-container {{
                     max-width: 800px;
                     margin: 0 auto;
@@ -2521,16 +2710,11 @@ def render_booking_container(content_func=None):
                     margin: {Spacing.LG} 0;
                     box-shadow: {Shadows.SM};
                 }}
-            </style>
-            <div class="booking-container">
-                <div class="booking-panel">
-            """,
+            </style>""",
             unsafe_allow_html=True
         )
-        try:
+        with st.container():
             yield
-        finally:
-            st.markdown("</div></div>", unsafe_allow_html=True)
 
     if content_func and callable(content_func):
         with booking_container():
@@ -2558,52 +2742,29 @@ def render_booking_header(title, subtitle=None, step=None, total_steps=None):
     Returns:
         None (renders directly to st)
     """
-    header_html = f"""
-    <div style="
-        text-align: center;
-        margin-bottom: {Spacing.XXL};
-        padding-bottom: {Spacing.XL};
-        border-bottom: 1px solid {Colors.BORDER};
-    ">
-        <h1 style="
-            font-size: {Typography.H1};
-            font-weight: {Typography.BOLD};
-            color: {Colors.TEXT};
-            margin: 0 0 {Spacing.MD} 0;
-        ">{title}</h1>
-    """
-    
-    if subtitle:
-        header_html += f"""
-        <p style="
-            font-size: {Typography.BODY};
-            color: {Colors.TEXT_SECONDARY};
-            margin: 0 0 {Spacing.LG} 0;
-            line-height: 1.6;
-        ">{subtitle}</p>
-        """
-    
-    if step and total_steps:
-        header_html += f"""
-        <div style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: {Spacing.SM};
-            margin-top: {Spacing.MD};
-        ">
-            <span style="
-                font-size: {Typography.SMALL};
-                color: {Colors.PRIMARY};
-                font-weight: {Typography.BOLD};
-            ">Paso {step}</span>
-            <span style="
-                color: {Colors.TEXT_TERTIARY};
-            ">de {total_steps}</span>
-        </div>
-        """
-    
-    header_html += "</div>"
+    subtitle_html = (
+        f'<p style="font-size:{Typography.BODY};color:{Colors.TEXT_SECONDARY};'
+        f'margin:0 0 {Spacing.LG} 0;line-height:1.6;">{subtitle}</p>'
+    ) if subtitle else ""
+
+    step_html = (
+        f'<div style="display:flex;align-items:center;justify-content:center;'
+        f'gap:{Spacing.SM};margin-top:{Spacing.MD};">'
+        f'<span style="font-size:{Typography.SMALL};color:{Colors.PRIMARY};'
+        f'font-weight:{Typography.BOLD};">Paso {step}</span>'
+        f'<span style="color:{Colors.TEXT_TERTIARY};">de {total_steps}</span>'
+        f'</div>'
+    ) if (step and total_steps) else ""
+
+    header_html = (
+        f'<div style="text-align:center;margin-bottom:{Spacing.XXL};'
+        f'padding-bottom:{Spacing.XL};border-bottom:1px solid {Colors.BORDER};">'
+        f'<h1 style="font-size:{Typography.H1};font-weight:{Typography.BOLD};'
+        f'color:{Colors.TEXT};margin:0 0 {Spacing.MD} 0;">{title}</h1>'
+        f'{subtitle_html}'
+        f'{step_html}'
+        f'</div>'
+    )
     st.markdown(header_html, unsafe_allow_html=True)
 
 
@@ -2617,34 +2778,22 @@ def render_booking_section(title=None, content_func=None):
 
     @contextmanager
     def booking_section():
-        section_html = f"""
-        <div style="
-            background: {Gradients.CARD_SUBTLE};
-            border: 1px solid {Colors.BORDER};
-            border-radius: {BorderRadius.LG};
-            padding: {Spacing.XL};
-            margin-bottom: {Spacing.XL};
-            box-shadow: {Shadows.MD}, {Shadows.INSET_SUBTLE};
-        ">
-        """
-
+        # Emit a self-contained title block (complete open+close in one st.markdown call)
         if title:
-            section_html += f"""
-            <h2 style="
-                font-size: {Typography.H3};
-                font-weight: {Typography.SEMIBOLD};
-                color: {Colors.TEXT};
-                margin: 0 0 {Spacing.LG} 0;
-                padding-bottom: {Spacing.MD};
-                border-bottom: 2px solid {rgb_to_rgba(Colors.PRIMARY, 0.2)};
-            ">{title}</h2>
-            """
-
-        st.markdown(section_html, unsafe_allow_html=True)
-        try:
+            title_html = (
+                f'<div style="background:{Gradients.CARD_SUBTLE};'
+                f'border:1px solid {Colors.BORDER};'
+                f'border-radius:{BorderRadius.LG} {BorderRadius.LG} 0 0;'
+                f'padding:{Spacing.LG} {Spacing.XL};'
+                f'border-bottom:2px solid {rgb_to_rgba(Colors.PRIMARY, 0.2)};">'
+                f'<h2 style="font-size:{Typography.H3};font-weight:{Typography.SEMIBOLD};'
+                f'color:{Colors.TEXT};margin:0;">{title}</h2>'
+                f'</div>'
+            )
+            st.markdown(title_html, unsafe_allow_html=True)
+        # Use native st.container() — no open HTML tags left dangling
+        with st.container():
             yield
-        finally:
-            st.markdown("</div>", unsafe_allow_html=True)
 
     if content_func and callable(content_func):
         with booking_section():
@@ -2786,78 +2935,7 @@ def render_step_indicator(current_step, total_steps, step_titles=None):
     Returns:
         None (renders directly to st)
     """
-    indicator_html = """<style>
-        .step-indicator {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            gap: 8px;
-        }
-        
-        .step-item {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .step-circle {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            transition: all 0.3s ease-in-out;
-        }
-        
-        .step-circle.active {
-            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-            color: white;
-            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
-        }
-        
-        .step-circle.completed {
-            background: #22c55e;
-            color: white;
-        }
-        
-        .step-circle.pending {
-            background: #334155;
-            color: #cbd5e1;
-            border: 2px solid #475569;
-        }
-        
-        .step-connector {
-            flex: 1;
-            height: 2px;
-            background: #334155;
-            margin-top: 22px;
-        }
-        
-        .step-connector.active {
-            background: #7c3aed;
-        }
-        
-        .step-label {
-            font-size: 12px;
-            color: #cbd5e1;
-            text-align: center;
-            max-width: 80px;
-        }
-        
-        .step-label.active {
-            color: #7c3aed;
-            font-weight: 600;
-        }
-    </style>
-    
-    <div class="step-indicator">
-    """
+    indicator_html = '<div class="step-indicator">'
     
     for step_num in range(1, total_steps + 1):
         if step_num < current_step:
