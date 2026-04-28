@@ -4,6 +4,7 @@ Ensures consistent, modern, and premium UI across all screens
 """
 
 import streamlit as st
+import textwrap
 
 # ==================== COLOR PALETTE ====================
 class Colors:
@@ -906,7 +907,7 @@ def apply_public_booking_css():
     st.markdown(f"""
     <style>
     .stApp {{
-        background: #f7f3ee !important;
+        background: #080808 !important;
     }}
 
     .block-container,
@@ -926,6 +927,8 @@ def apply_public_booking_css():
         justify-content: space-between;
         gap: {Spacing.MD};
         margin: {Spacing.SM} 0 {Spacing.LG};
+        padding-bottom: {Spacing.SM};
+        border-bottom: 1px solid rgba(197,159,85,0.15);
     }}
 
     .public-logo {{
@@ -942,14 +945,14 @@ def apply_public_booking_css():
     }}
 
     .public-brand-name {{
-        color: #111827;
+        color: #f5f0e8;
         font-size: 1rem;
         font-weight: {Typography.BOLD};
         margin: 0;
     }}
 
     .public-brand-meta {{
-        color: #6b7280;
+        color: rgba(245,240,232,0.55);
         font-size: {Typography.SMALL};
         margin: 0;
     }}
@@ -1021,17 +1024,17 @@ def apply_public_booking_css():
 
     .public-info-card,
     .public-trust-card {{
-        background: #ffffff;
-        border: 1px solid #e8dfd4;
+        background: #141414;
+        border: 1px solid rgba(197,159,85,0.25);
         border-radius: {BorderRadius.XL};
         padding: {Spacing.LG};
-        box-shadow: 0 16px 40px -32px rgba(17, 24, 39, 0.45);
+        box-shadow: 0 16px 40px -32px rgba(0,0,0,0.75);
     }}
 
     .public-info-card strong,
     .public-trust-card h3 {{
         display: block;
-        color: #111827 !important;
+        color: #c5a028 !important;
         font-size: {Typography.H4};
         margin: 0 0 {Spacing.SM};
     }}
@@ -1039,7 +1042,7 @@ def apply_public_booking_css():
     .public-info-card span,
     .public-info-card p,
     .public-trust-card p {{
-        color: #6b7280 !important;
+        color: rgba(245,240,232,0.65) !important;
         font-size: {Typography.SMALL};
         margin: 0;
     }}
@@ -1051,33 +1054,34 @@ def apply_public_booking_css():
     }}
 
     .public-section-heading h2 {{
-        color: #111827 !important;
+        color: #f5f0e8 !important;
         font-size: clamp(1.8rem, 4vw, 2.6rem);
         margin: 0 0 {Spacing.SM};
     }}
 
     .public-section-heading p {{
-        color: #6b7280 !important;
+        color: rgba(245,240,232,0.6) !important;
         margin: 0;
     }}
 
     .public-service-button .stButton > button {{
         min-height: 150px !important;
-        background: #ffffff !important;
-        color: #111827 !important;
-        border: 1px solid #e8dfd4 !important;
+        background: #141414 !important;
+        color: #f5f0e8 !important;
+        border: 1px solid rgba(197,159,85,0.3) !important;
         border-radius: 18px !important;
         text-align: left !important;
         align-items: flex-start !important;
         justify-content: flex-start !important;
         padding: {Spacing.LG} !important;
         white-space: pre-line !important;
-        box-shadow: 0 16px 40px -32px rgba(17, 24, 39, 0.45) !important;
+        box-shadow: 0 16px 40px -32px rgba(0,0,0,0.7) !important;
     }}
 
     .public-service-button .stButton > button:hover {{
-        border-color: #c59f55 !important;
-        box-shadow: 0 22px 46px -34px rgba(17, 24, 39, 0.6) !important;
+        border-color: #c5a028 !important;
+        background: #1c1c1c !important;
+        box-shadow: 0 22px 46px -28px rgba(197,160,40,0.3) !important;
     }}
 
     .public-cta .stButton > button,
@@ -1085,10 +1089,11 @@ def apply_public_booking_css():
     .booking-panel [data-testid="stFormSubmitButton"] button {{
         min-height: 52px !important;
         border-radius: 14px !important;
-        background: linear-gradient(135deg, #111827 0%, #2f241d 100%) !important;
-        border: 1px solid rgba(17, 24, 39, 0.16) !important;
-        color: #ffffff !important;
-        box-shadow: 0 14px 28px -22px rgba(17, 24, 39, 0.7) !important;
+        background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%) !important;
+        border: 1px solid rgba(197,160,40,0.45) !important;
+        color: #080808 !important;
+        font-weight: 800 !important;
+        box-shadow: 0 14px 28px -16px rgba(197,160,40,0.5) !important;
     }}
 
     .public-booking-shell {{
@@ -1098,10 +1103,10 @@ def apply_public_booking_css():
 
     .booking-panel,
     .booking-section {{
-        background: #ffffff !important;
-        border: 1px solid #e8dfd4 !important;
+        background: #111111 !important;
+        border: 1px solid rgba(197,159,85,0.2) !important;
         border-radius: 22px !important;
-        box-shadow: 0 22px 56px -42px rgba(17, 24, 39, 0.65) !important;
+        box-shadow: 0 22px 56px -42px rgba(0,0,0,0.8) !important;
     }}
 
     .stProgress {{
@@ -1118,47 +1123,47 @@ def apply_public_booking_css():
     .stLinkButton > a {{
         min-height: 48px;
         border-radius: 12px;
-        border: 1px solid #d9cdbc;
-        background: #ffffff;
-        color: #111827;
+        border: 1px solid rgba(197,159,85,0.3);
+        background: #1a1a1a;
+        color: #f5f0e8;
         font-weight: 700;
         white-space: pre-line;
         line-height: 1.35;
         padding: 0.75rem 1rem;
-        box-shadow: 0 10px 26px -24px rgba(17, 24, 39, 0.5);
+        box-shadow: 0 10px 26px -24px rgba(0,0,0,0.7);
     }}
 
     .stButton > button:hover,
     [data-testid="stFormSubmitButton"] button:hover,
     .stLinkButton > a:hover {{
-        border-color: #c59f55;
-        background: #fffaf2;
-        color: #111827;
-        box-shadow: 0 14px 32px -24px rgba(17, 24, 39, 0.55);
+        border-color: #c5a028;
+        background: #222222;
+        color: #f5f0e8;
+        box-shadow: 0 14px 32px -24px rgba(197,160,40,0.35);
     }}
 
     [data-testid="stForm"] {{
-        background: #ffffff;
-        border: 1px solid #eadfce;
+        background: #111111;
+        border: 1px solid rgba(197,159,85,0.2);
         border-radius: 18px;
         padding: 1.25rem;
-        box-shadow: 0 16px 42px -36px rgba(17, 24, 39, 0.55);
+        box-shadow: 0 16px 42px -36px rgba(0,0,0,0.8);
     }}
 
     [data-testid="stTextInput"] input,
     [data-testid="stDateInput"] input {{
         min-height: 46px;
         border-radius: 12px;
-        border: 1px solid #d9cdbc;
-        background: #fffdf9;
-        color: #111827;
+        border: 1px solid rgba(197,159,85,0.25);
+        background: #1a1a1a;
+        color: #f5f0e8;
         font-size: 1rem;
     }}
 
     [data-testid="stTextInput"] input:focus,
     [data-testid="stDateInput"] input:focus {{
-        border-color: #c59f55;
-        box-shadow: 0 0 0 3px rgba(197, 159, 85, 0.18);
+        border-color: #c5a028;
+        box-shadow: 0 0 0 3px rgba(197,160,40,0.22);
     }}
 
     [data-testid="stAlert"] {{
@@ -1166,10 +1171,10 @@ def apply_public_booking_css():
     }}
 
     [data-testid="stExpander"] {{
-        border: 1px solid #eadfce;
+        border: 1px solid rgba(197,159,85,0.2);
         border-radius: 16px;
         overflow: hidden;
-        background: #ffffff;
+        background: #111111;
     }}
 
     .public-payment-notice {{
@@ -1265,11 +1270,11 @@ def apply_public_booking_css():
         max-width: 960px;
         margin: 0 auto 1.25rem;
         gap: 10px;
-        background: #ffffff;
-        border: 1px solid #e8dfd4;
+        background: #111111;
+        border: 1px solid rgba(197,159,85,0.2);
         border-radius: 18px;
         padding: 0.85rem;
-        box-shadow: 0 12px 32px -28px rgba(17, 24, 39, 0.45);
+        box-shadow: 0 12px 32px -28px rgba(0,0,0,0.7);
         overflow-x: auto;
     }}
 
@@ -1306,9 +1311,9 @@ def apply_public_booking_css():
     }}
 
     .step-circle.pending {{
-        background: #f8f4ee;
-        color: #6b7280;
-        border: 2px solid #eadfce;
+        background: #1e1e1e;
+        color: rgba(245,240,232,0.45);
+        border: 2px solid rgba(197,159,85,0.2);
     }}
 
     .step-connector {{
@@ -1325,7 +1330,7 @@ def apply_public_booking_css():
 
     .step-label {{
         font-size: 0.85rem;
-        color: #4b5563;
+        color: rgba(245,240,232,0.55);
         text-align: center;
         min-width: 72px;
         max-width: 92px;
@@ -2528,8 +2533,7 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
         }}
     </style>
     
-    <div class="{card_class}">
-        {f'<div class="barber-check">{check_mark}</div>' if is_selected else ''}
+    <div class="{card_class}">{f'<div class="barber-check">{check_mark}</div>' if is_selected else ''}
         <span class="barber-icon-container">{icon}</span>
         <div class="barber-name">{barber_name}</div>
         <div class="barber-divider"></div>
@@ -2538,7 +2542,7 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
     """
     
     # Render the card and button
-    st.markdown(card_html, unsafe_allow_html=True)
+    st.markdown(textwrap.dedent(card_html).strip(), unsafe_allow_html=True)
     
     # Create invisible button with the same width as the card container
     clicked = st.button(

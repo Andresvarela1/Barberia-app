@@ -1055,8 +1055,6 @@ def ensure_database_tables():
 
                 logger.error(f"Error creando índices de 'reservas': {e}")
 
-                st.error(f"Error creando índices de 'reservas': {e}")
-
             # Optional columns
 
             try:
@@ -1099,8 +1097,6 @@ def ensure_database_tables():
 
                 logger.error(f"Error alterando tabla 'reservas': {e}")
 
-                st.error(f"Error alterando tabla 'reservas': {e}")
-
 
             # Ensure servicios has all required columns for multi-tenant
 
@@ -1135,8 +1131,6 @@ def ensure_database_tables():
             conn.rollback()
 
         logger.exception("Error al asegurar tablas de base de datos")
-
-        st.error(f"Error de base de datos:\n{traceback.format_exc()}")
 
     finally:
 
@@ -1953,6 +1947,13 @@ def seed_default_data():
 
             conn.close()
 
+# ---------------------------------------------------------------------------
+# Migration guard: only run DDL (CREATE/ALTER/INDEX) when explicitly enabled.
+# Set ALLOW_SCHEMA_MIGRATIONS=true in the environment (server-side) to run them.
+# In public / read-only mode the variable is absent, so DDL is skipped.
+# ---------------------------------------------------------------------------
+_ALLOW_MIGRATIONS = os.getenv("ALLOW_SCHEMA_MIGRATIONS", "false").strip().lower() == "true"
+
 # Initialize app state and data only once
 
 if "app_initialized" not in st.session_state:
@@ -1961,7 +1962,14 @@ if "app_initialized" not in st.session_state:
 
         with st.spinner("Procesando Inicializando base de datos..."):
 
-            ensure_database_tables()
+            if _ALLOW_MIGRATIONS:
+                ensure_database_tables()
+            else:
+                logger.info(
+                    "[SKIP] ensure_database_tables() omitida: "
+                    "ALLOW_SCHEMA_MIGRATIONS no está activado. "
+                    "Las migraciones no se ejecutan en modo público/read-only."
+                )
 
 
             # Run seed only once
@@ -1996,7 +2004,21 @@ if "app_initialized" not in st.session_state:
 
         logger.exception("Error inesperado inicializando la base de datos")
 
-        st.error(str(e))
+        # Do NOT expose technical DDL/migration errors in the public UI.
+        # Log the full detail server-side; show nothing to the visitor.
+        _err_lower = str(e).lower()
+        _is_ddl_error = any(
+            kw in _err_lower
+            for kw in ("create table", "create index", "alter table", "read-only transaction")
+        )
+        if not _is_ddl_error:
+            st.error(str(e))
+        else:
+            logger.error(
+                "[READ-ONLY] La base de datos rechazó una operación DDL. "
+                "Active ALLOW_SCHEMA_MIGRATIONS=true en el entorno del servidor para ejecutar migraciones. "
+                f"Detalle: {e}"
+            )
 
         default_barberia_id = None
 
@@ -4151,33 +4173,27 @@ def mostrar_reservas_dataframe(rows):
 
             estado_bg = "rgba(22, 163, 74, 0.1)" if estado else "rgba(245, 158, 11, 0.1)"
 
-            st.markdown(f"""
-
-<div style="border-radius: 12px; padding: 16px; margin-bottom: 12px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-left: 6px solid {estado_color}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease;">
-
-    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-
-        <h4 style="margin: 0; color: #ffffff; font-size: 18px; font-weight: 600;">{cliente}</h4>
-
-        <span style="background-color: {estado_bg}; color: {estado_color}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid {estado_color};">{estado_label}</span>
-
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
-
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Hora</span><span style="color: #e0e0e0;"><strong>{hora_label}</strong></span></div>
-
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Tijeras</span><span style="color: #e0e0e0;"><strong>{servicio}</strong></span></div>
-
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">·</span><span style="color: #e0e0e0;"><strong>{barbero}</strong></span></div>
-
-        <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px;">Monto</span><span style="color: #e0e0e0;"><strong>${monto}</strong></span></div>
-
-    </div>
-
-</div>
-
-""", unsafe_allow_html=True)
+            # Single-line HTML avoids Markdown blank-line re-entry that causes
+            # 4-space-indented inner tags to be rendered as <pre><code> blocks.
+            card_html = (
+                f'<div style="border-radius:12px;padding:16px;margin-bottom:12px;'
+                f'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);'
+                f'border-left:6px solid {estado_color};'
+                f'box-shadow:0 2px 8px rgba(0,0,0,0.15);'
+                f'border:1px solid rgba(255,255,255,0.1);">'
+                f'<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px;">'
+                f'<h4 style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">{cliente}</h4>'
+                f'<span style="background-color:{estado_bg};color:{estado_color};padding:4px 12px;'
+                f'border-radius:20px;font-size:12px;font-weight:600;border:1px solid {estado_color};">'
+                f'{estado_label}</span></div>'
+                f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px;">'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Hora</span><span style="color:#e0e0e0;"><strong>{hora_label}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Tijeras</span><span style="color:#e0e0e0;"><strong>{servicio}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>·</span><span style="color:#e0e0e0;"><strong>{barbero}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Monto</span><span style="color:#e0e0e0;"><strong>${monto}</strong></span></div>'
+                f'</div></div>'
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
 def ui_marcar_pagado_reservas(rows, key_prefix):
 
@@ -5895,6 +5911,97 @@ def obtener_servicios(barberia_id=None):
 
         return []
 
+
+def crear_servicio(barberia_id, nombre, duracion, precio, descripcion, icono):
+
+    """Insert a new service for a barberia. Returns True on success."""
+
+    current = get_current_barberia_id()
+
+    if int(barberia_id) != int(current):
+
+        raise Exception("SECURITY: barberia_id mismatch in crear_servicio")
+
+    try:
+
+        execute_write(
+
+            """INSERT INTO servicios (barberia_id, nombre, duracion_minutos, precio, descripcion, icono)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               ON CONFLICT (barberia_id, nombre) DO NOTHING""",
+
+            (barberia_id, nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip()),
+
+        )
+
+        return True
+
+    except Exception as e:
+
+        logger.exception(f"Error creating service: {e}")
+
+        return False
+
+
+def actualizar_servicio(servicio_id, barberia_id, nombre, duracion, precio, descripcion, icono):
+
+    """Update an existing service. Enforces barberia_id ownership."""
+
+    current = get_current_barberia_id()
+
+    if int(barberia_id) != int(current):
+
+        raise Exception("SECURITY: barberia_id mismatch in actualizar_servicio")
+
+    try:
+
+        execute_write(
+
+            """UPDATE servicios
+               SET nombre = %s, duracion_minutos = %s, precio = %s, descripcion = %s, icono = %s
+               WHERE id = %s AND barberia_id = %s""",
+
+            (nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip(), int(servicio_id), int(barberia_id)),
+
+        )
+
+        return True
+
+    except Exception as e:
+
+        logger.exception(f"Error updating service {servicio_id}: {e}")
+
+        return False
+
+
+def eliminar_servicio(servicio_id, barberia_id):
+
+    """Delete a service. Enforces barberia_id ownership."""
+
+    current = get_current_barberia_id()
+
+    if int(barberia_id) != int(current):
+
+        raise Exception("SECURITY: barberia_id mismatch in eliminar_servicio")
+
+    try:
+
+        execute_write(
+
+            "DELETE FROM servicios WHERE id = %s AND barberia_id = %s",
+
+            (int(servicio_id), int(barberia_id)),
+
+        )
+
+        return True
+
+    except Exception as e:
+
+        logger.exception(f"Error deleting service {servicio_id}: {e}")
+
+        return False
+
 # ================= BARBER SHOP REGISTRATION FLOW (PRODUCTION) =================
 
 # --------- GEOCODING FUNCTIONS ---------
@@ -7212,11 +7319,22 @@ def render_hero_marketplace():
 
     <style>
 
+        .stApp {
+            background: #080808 !important;
+        }
+
+        .block-container,
+        [data-testid="stMainBlockContainer"] {
+            max-width: 1120px !important;
+            margin: 0 auto;
+            padding: 1.25rem 1.5rem 2rem !important;
+        }
+
         /* Hero Container */
 
         .hero-container {
 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1505 100%);
 
             padding: 80px 40px;
 
@@ -7227,6 +7345,8 @@ def render_hero_marketplace():
             margin: 0 -40px 60px -40px;
 
             color: white;
+
+            border: 1px solid rgba(197,159,85,0.2);
 
         }
 
@@ -7275,21 +7395,23 @@ def render_hero_marketplace():
 
         .search-container {
 
-            background: white;
+            background: #111111;
 
-            padding: 25px;
+            padding: 20px;
 
             border-radius: 16px;
 
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
 
-            margin-top: 40px;
+            margin-top: 28px;
 
-            max-width: 1000px;
+            max-width: 900px;
 
             margin-left: auto;
 
             margin-right: auto;
+
+            border: 1px solid rgba(197,159,85,0.25);
 
         }
 
@@ -7315,9 +7437,9 @@ def render_hero_marketplace():
 
         .search-input input:focus {
 
-            border-color: #667eea !important;
+            border-color: #c5a028 !important;
 
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+            box-shadow: 0 0 0 3px rgba(197,160,40,0.2) !important;
 
             outline: none !important;
 
@@ -7328,9 +7450,9 @@ def render_hero_marketplace():
 
         .search-button button {
 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%) !important;
 
-            color: white !important;
+            color: #080808 !important;
 
             border: none !important;
 
@@ -7340,7 +7462,7 @@ def render_hero_marketplace():
 
             font-size: 16px !important;
 
-            font-weight: 600 !important;
+            font-weight: 700 !important;
 
             height: 50px !important;
 
@@ -7348,7 +7470,7 @@ def render_hero_marketplace():
 
             transition: all 0.3s ease !important;
 
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+            box-shadow: 0 4px 15px rgba(197,160,40,0.35) !important;
 
             width: 100% !important;
 
@@ -7359,7 +7481,7 @@ def render_hero_marketplace():
 
             transform: translateY(-2px) !important;
 
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+            box-shadow: 0 8px 25px rgba(197,160,40,0.5) !important;
 
         }
 
@@ -8633,23 +8755,23 @@ def render_home_screen():
 
         div.stButton > button {
 
-            height: 180px !important;
+            min-height: 120px !important;
 
             border-radius: 16px !important;
 
-            font-size: 20px !important;
+            font-size: 15px !important;
 
             font-weight: 600 !important;
 
-            border: none !important;
+            border: 1px solid rgba(197,159,85,0.22) !important;
 
             transition: all 0.3s ease !important;
 
             white-space: pre-line !important;
 
-            line-height: 1.8 !important;
+            line-height: 1.5 !important;
 
-            padding: 40px 20px !important;
+            padding: 1.25rem 1rem !important;
 
             display: flex !important;
 
@@ -8661,74 +8783,51 @@ def render_home_screen():
 
             text-align: center !important;
 
-            color: white !important;
+            color: #f5f0e8 !important;
 
             cursor: pointer !important;
 
+            background: #141414 !important;
+
         }
 
 
-        /* Hover effects - scale and shadow */
+        /* Hover effects - scale and gold glow */
 
         div.stButton > button:hover {
 
-            transform: translateY(-4px) scale(1.02) !important;
+            border-color: #c5a028 !important;
 
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25) !important;
+            background: #1e1a0e !important;
+
+            box-shadow: 0 12px 28px rgba(197,160,40,0.25) !important;
 
         }
 
 
-        /* Login card - First button */
+        /* Login card */
 
         div.stButton:nth-of-type(1) > button {
 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3) !important;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
 
         }
 
 
-        div.stButton:nth-of-type(1) > button:hover {
-
-            box-shadow: 0 16px 32px rgba(102, 126, 234, 0.5) !important;
-
-        }
-
-
-        /* Register card - Second button */
+        /* Register card */
 
         div.stButton:nth-of-type(2) > button {
 
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-
-            box-shadow: 0 8px 20px rgba(245, 87, 108, 0.3) !important;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
 
         }
 
 
-        div.stButton:nth-of-type(2) > button:hover {
-
-            box-shadow: 0 16px 32px rgba(245, 87, 108, 0.5) !important;
-
-        }
-
-
-        /* Booking card - Third button */
+        /* Booking card */
 
         div.stButton:nth-of-type(3) > button {
 
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-
-            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3) !important;
-
-        }
-
-
-        div.stButton:nth-of-type(3) > button:hover {
-
-            box-shadow: 0 16px 32px rgba(79, 172, 254, 0.5) !important;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
 
         }
 
@@ -9127,7 +9226,15 @@ try:
 
         # Show login form
 
-        st.set_page_config(layout="wide")
+        st.markdown("""<style>
+.stApp { background: #080808 !important; }
+section[data-testid="stSidebar"] { display: none !important; }
+div[data-testid="stForm"] { background: #141414 !important; border: 1px solid rgba(197,159,85,0.25) !important; border-radius: 12px !important; padding: 24px !important; }
+div[data-testid="stTextInput"] input { background: #1a1a1a !important; color: #f5f0e8 !important; border: 1px solid rgba(197,159,85,0.3) !important; border-radius: 8px !important; }
+div[data-testid="stTextInput"] label { color: #c5a028 !important; }
+div[data-testid="stForm"] button[kind="primaryFormSubmit"] { background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%) !important; color: #080808 !important; font-weight: 700 !important; border: none !important; border-radius: 8px !important; }
+h3 { color: #f5f0e8 !important; }
+</style>""", unsafe_allow_html=True)
 
         col_center = st.columns([1, 2, 1])
 
@@ -9516,6 +9623,312 @@ try:
             st.session_state.barberia_context_id = None
 
             st.rerun()
+
+    def render_equipo_barberos(barberia_id):
+
+        """Render barber team as cards with create and delete actions."""
+
+        if not db_ok or not barberia_id:
+
+            render_alert("Gestión de equipo no disponible sin base de datos", alert_type="info")
+
+            return
+
+        # --- Card CSS ---
+
+        st.markdown("""<style>
+.barbero-card {
+    background: #1a1a1a;
+    border: 1px solid rgba(197,159,85,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.barbero-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c5a028, #8a6e17);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #080808;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.barbero-info { flex: 1; }
+.barbero-nombre { font-size: 17px; font-weight: 600; color: #f5f0e8; margin: 0; }
+.barbero-rol { font-size: 13px; color: rgba(197,159,85,0.8); margin: 2px 0 0 0; }
+</style>""", unsafe_allow_html=True)
+
+        # --- Create new barber form ---
+
+        render_subsection_title("Agregar barbero")
+
+        with st.form("form_crear_barbero_equipo", clear_on_submit=True):
+
+            col_u, col_p = st.columns(2)
+
+            with col_u:
+
+                nuevo_usuario = st.text_input("Nombre de usuario", placeholder="Ej: carlos")
+
+            with col_p:
+
+                nueva_password = st.text_input("Contraseña", type="password")
+
+            crear_btn = st.form_submit_button("Agregar al equipo", use_container_width=True, type="primary")
+
+        if crear_btn:
+
+            if not nuevo_usuario or not nuevo_usuario.strip():
+
+                st.error("El nombre de usuario es obligatorio.")
+
+            elif not nueva_password or len(nueva_password) < 4:
+
+                st.error("La contraseña debe tener al menos 4 caracteres.")
+
+            else:
+
+                ok = registrar(nuevo_usuario.strip(), nueva_password, "BARBERO", barberia_id=barberia_id)
+
+                if ok:
+
+                    st.success(f"Barbero '{nuevo_usuario}' añadido al equipo.")
+
+                    st.rerun()
+
+        render_divider()
+
+        # --- Barber cards ---
+
+        render_subsection_title("Equipo registrado")
+
+        with st.spinner("Cargando equipo..."):
+
+            barberos_data = listar_usuarios_barberos(barberia_id)
+
+        if not barberos_data:
+
+            render_panel_empty_state(
+
+                "Sin barberos aún",
+
+                "Usa el formulario de arriba para añadir el primer barbero al equipo.",
+
+            )
+
+            return
+
+        for row in barberos_data:
+
+            bid_barber, bname = row[0], row[1]
+
+            inicial = bname[0].upper() if bname else "B"
+
+            st.markdown(
+
+                f'<div class="barbero-card">'
+
+                f'<div class="barbero-avatar">{inicial}</div>'
+
+                f'<div class="barbero-info">'
+
+                f'<p class="barbero-nombre">{bname}</p>'
+
+                f'<p class="barbero-rol">Barbero</p>'
+
+                f'</div></div>',
+
+                unsafe_allow_html=True,
+
+            )
+
+            col_space, col_del = st.columns([4, 1])
+
+            with col_del:
+
+                if st.button("Eliminar", key=f"del_barbero_{bid_barber}", type="secondary", use_container_width=True):
+
+                    try:
+
+                        execute_write(
+
+                            "DELETE FROM usuarios WHERE id = %s AND barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'",
+
+                            (int(bid_barber), int(barberia_id)),
+
+                        )
+
+                        st.success(f"Barbero '{bname}' eliminado.")
+
+                        st.rerun()
+
+                    except Exception as _e:
+
+                        logger.exception(f"Error eliminando barbero {bid_barber}")
+
+                        st.error("Error al eliminar el barbero.")
+
+    def render_gestion_servicios(barberia_id):
+
+        """Render CRUD UI for services management in admin/super_admin panels."""
+
+        if not db_ok or not barberia_id:
+
+            render_alert("Gestión de servicios no disponible sin base de datos", alert_type="info")
+
+            return
+
+        # --- Load current services ---
+
+        servicios_actuales = safe_fetch_all(
+
+            "SELECT id, nombre, duracion_minutos, precio, descripcion, icono FROM servicios WHERE barberia_id = %s ORDER BY id ASC",
+
+            (barberia_id,),
+
+        )
+
+        # --- Add new service form ---
+
+        render_subsection_title("Agregar servicio")
+
+        with st.form("form_crear_servicio", clear_on_submit=True):
+
+            col_n, col_d, col_p = st.columns([3, 2, 2])
+
+            with col_n:
+
+                nuevo_nombre = st.text_input("Nombre del servicio", max_chars=80)
+
+            with col_d:
+
+                nueva_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=30, step=5)
+
+            with col_p:
+
+                nuevo_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=0, step=100)
+
+            nueva_descripcion = st.text_input("Descripción (opcional)", max_chars=200)
+
+            nuevo_icono = st.text_input("Icono / etiqueta (opcional)", value="Servicio", max_chars=40)
+
+            guardar = st.form_submit_button("Agregar servicio", use_container_width=True, type="primary")
+
+        if guardar:
+
+            if not nuevo_nombre or not nuevo_nombre.strip():
+
+                st.error("El nombre del servicio es obligatorio.")
+
+            else:
+
+                ok = crear_servicio(barberia_id, nuevo_nombre, nueva_duracion, nuevo_precio, nueva_descripcion or "", nuevo_icono or "Servicio")
+
+                if ok:
+
+                    st.success(f"Servicio '{nuevo_nombre}' creado correctamente.")
+
+                    st.rerun()
+
+                else:
+
+                    st.error("Error al crear el servicio. Verifica que el nombre no esté duplicado.")
+
+        render_divider()
+
+        # --- List + edit/delete ---
+
+        render_subsection_title("Servicios registrados")
+
+        if not servicios_actuales:
+
+            render_panel_empty_state(
+
+                "Sin servicios aún",
+
+                "Agrega un servicio con el formulario de arriba y aparecerá aquí y en el flujo de reservas.",
+
+            )
+
+            return
+
+        for row in servicios_actuales:
+
+            sid, snombre, sduracion, sprecio, sdesc, sicono = row
+
+            with st.expander(f"{sicono or 'Servicio'} — {snombre} | {sduracion} min | ${sprecio}", expanded=False):
+
+                with st.form(f"form_editar_{sid}", clear_on_submit=False):
+
+                    col_en, col_ed, col_ep = st.columns([3, 2, 2])
+
+                    with col_en:
+
+                        edit_nombre = st.text_input("Nombre", value=snombre, max_chars=80, key=f"en_{sid}")
+
+                    with col_ed:
+
+                        edit_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=int(sduracion or 30), step=5, key=f"ed_{sid}")
+
+                    with col_ep:
+
+                        edit_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=int(sprecio or 0), step=100, key=f"ep_{sid}")
+
+                    edit_desc = st.text_input("Descripción", value=sdesc or "", max_chars=200, key=f"edesc_{sid}")
+
+                    edit_icono = st.text_input("Icono / etiqueta", value=sicono or "Servicio", max_chars=40, key=f"eico_{sid}")
+
+                    col_save, col_del = st.columns(2)
+
+                    with col_save:
+
+                        update_btn = st.form_submit_button("Guardar cambios", use_container_width=True, type="primary")
+
+                    with col_del:
+
+                        delete_btn = st.form_submit_button("Eliminar servicio", use_container_width=True, type="secondary")
+
+                if update_btn:
+
+                    if not edit_nombre or not edit_nombre.strip():
+
+                        st.error("El nombre no puede estar vacío.")
+
+                    else:
+
+                        ok = actualizar_servicio(sid, barberia_id, edit_nombre, edit_duracion, edit_precio, edit_desc or "", edit_icono or "Servicio")
+
+                        if ok:
+
+                            st.success("Servicio actualizado.")
+
+                            st.rerun()
+
+                        else:
+
+                            st.error("Error al actualizar el servicio.")
+
+                if delete_btn:
+
+                    ok = eliminar_servicio(sid, barberia_id)
+
+                    if ok:
+
+                        st.success(f"Servicio '{snombre}' eliminado.")
+
+                        st.rerun()
+
+                    else:
+
+                        st.error("Error al eliminar el servicio.")
 
     def _panel_ingresos(bid):
 
@@ -10470,57 +10883,7 @@ try:
             )
 
 
-            with st.container(border=True):
-
-                st.markdown("### Nuevo barbero")
-
-                with st.form("crear_barbero_admin"):
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-
-                        nu = st.text_input("Usuario Usuario", placeholder="Ej: Andrea")
-
-                    with col2:
-
-                        np = st.text_input("Contrase?a Contraseña", type="password")
-
-                    if st.form_submit_button("[OK] Crear Barbero", use_container_width=True):
-
-                        with st.spinner("Creando barbero..."):
-
-                            if registrar(nu, np, "BARBERO", barberia_id=barberia_id):
-
-                                st.success("[OK] Barbero creado exitosamente")
-
-                                st.rerun()
-
-
-            render_divider()
-
-
-            render_subsection_title("Barberos registrados")
-
-            with st.spinner("Cargando barberos..."):
-
-                barberos_data = listar_usuarios_barberos(barberia_id)
-
-            if barberos_data:
-
-                st.dataframe(
-
-                    [{"Usuario Usuario": r[0], "Rol Rol": r[1]} for r in barberos_data],
-
-                    use_container_width=True,
-
-                    hide_index=True,
-
-                )
-
-            else:
-
-                render_alert("No hay barberos registrados aún", alert_type="info")
+            render_equipo_barberos(barberia_id)
 
         elif seccion == "Configuración":
 
@@ -10537,15 +10900,12 @@ try:
 
             render_panel_header(
                 "Servicios",
-                "Administra la presentación visual de tus servicios dentro del panel.",
+                "Crea, edita y elimina los servicios que ofrece tu barbería.",
                 eyebrow="Catálogo",
                 meta=barberia_name,
             )
 
-            render_panel_empty_state(
-                "Gestión de servicios pendiente",
-                "La base visual está lista para mover aquí la administración de servicios sin tocar todavía la lógica existente.",
-            )
+            render_gestion_servicios(barberia_id)
 
         elif seccion == "Clientes":
 
@@ -10864,25 +11224,7 @@ try:
 
             if bid_ctx:
 
-                with st.spinner("Cargando barberos..."):
-
-                    barberos_data = listar_usuarios_barberos(bid_ctx)
-
-                if barberos_data:
-
-                    st.dataframe(
-
-                        [{"Usuario Usuario": r[0], "Rol Rol": r[1]} for r in barberos_data],
-
-                        use_container_width=True,
-
-                        hide_index=True,
-
-                    )
-
-                else:
-
-                    st.info("No hay barberos registrados")
+                render_equipo_barberos(bid_ctx)
 
             else:
 
@@ -10903,15 +11245,18 @@ try:
 
             render_panel_header(
                 "Servicios",
-                "Vista preparada para administrar servicios por barbería.",
+                "Administra los servicios de la barbería activa en contexto.",
                 eyebrow="Catálogo",
                 meta="Contexto activo",
             )
 
-            render_panel_empty_state(
-                "Gestión global de servicios pendiente",
-                "Esta pantalla no modifica datos todavía; queda lista para una fase funcional posterior.",
-            )
+            if bid_ctx:
+
+                render_gestion_servicios(bid_ctx)
+
+            else:
+
+                render_alert("Selecciona una barbería en la barra lateral para gestionar sus servicios.", alert_type="info")
 
         elif seccion == "Clientes":
 
