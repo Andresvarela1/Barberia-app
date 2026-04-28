@@ -256,3 +256,50 @@ def test_app_py_no_duplicate_availability_helpers():
         assert fn not in source, (
             f"app.py still defines {fn!r} — it should be imported from app_core.services.availability_service"
         )
+
+
+# ---------------------------------------------------------------------------
+# app_core/services/payment_service
+# ---------------------------------------------------------------------------
+
+def test_app_core_services_payment_service_importable():
+    """payment_service.py must expose the 2 extracted payment functions."""
+    _add_repo_root_to_path()
+
+    spec = importlib.util.spec_from_file_location(
+        "app_core.services.payment_service",
+        REPO_ROOT / "app_core" / "services" / "payment_service.py",
+    )
+    assert spec is not None, "Could not locate app_core/services/payment_service.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "marcar_reserva_pagada",
+        "crear_pago_mercadopago",
+    ]
+    for name in expected:
+        assert hasattr(module, name), (
+            f"app_core.services.payment_service is missing: {name}"
+        )
+
+
+def test_app_py_imports_from_payment_service():
+    """app.py must import from app_core.services.payment_service."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.services.payment_service import" in source, (
+        "app.py does not import from app_core.services.payment_service"
+    )
+
+
+def test_app_py_no_duplicate_payment_helpers():
+    """app.py must not define the extracted payment functions itself."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    duplicated = [
+        "def marcar_reserva_pagada",
+        "def crear_pago_mercadopago",
+    ]
+    for fn in duplicated:
+        assert fn not in source, (
+            f"app.py still defines {fn!r} — it should be imported from app_core.services.payment_service"
+        )
