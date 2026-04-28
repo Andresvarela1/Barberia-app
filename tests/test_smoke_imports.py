@@ -207,3 +207,52 @@ def test_app_py_no_duplicate_booking_helpers():
         assert fn not in source, (
             f"app.py still defines {fn!r} — it should be imported from app_core.services.booking_service"
         )
+
+
+# ---------------------------------------------------------------------------
+# app_core/services/availability_service
+# ---------------------------------------------------------------------------
+
+def test_app_core_services_availability_service_importable():
+    """availability_service.py must expose all 3 extracted availability helpers."""
+    _add_repo_root_to_path()
+
+    spec = importlib.util.spec_from_file_location(
+        "app_core.services.availability_service",
+        REPO_ROOT / "app_core" / "services" / "availability_service.py",
+    )
+    assert spec is not None, "Could not locate app_core/services/availability_service.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "listar_usuarios_barberos",
+        "obtener_barberos_disponibles",
+        "obtener_horarios_disponibles",
+    ]
+    for name in expected:
+        assert hasattr(module, name), (
+            f"app_core.services.availability_service is missing: {name}"
+        )
+
+
+def test_app_py_imports_from_availability_service():
+    """app.py must import from app_core.services.availability_service."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.services.availability_service import" in source, (
+        "app.py does not import from app_core.services.availability_service"
+    )
+
+
+def test_app_py_no_duplicate_availability_helpers():
+    """app.py must not define the 3 extracted availability functions itself."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    duplicated = [
+        "def listar_usuarios_barberos",
+        "def obtener_barberos_disponibles",
+        "def obtener_horarios_disponibles",
+    ]
+    for fn in duplicated:
+        assert fn not in source, (
+            f"app.py still defines {fn!r} — it should be imported from app_core.services.availability_service"
+        )
