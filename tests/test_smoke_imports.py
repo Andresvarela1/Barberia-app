@@ -55,3 +55,41 @@ def test_app_py_imports_from_app_core():
     assert "from app_core.db.connection import" in source, (
         "app.py does not import from app_core.db.connection"
     )
+
+
+def test_app_core_security_tenant_access_importable():
+    """app_core.security.tenant_access must expose all 10 access helpers."""
+    _add_repo_root_to_path()
+
+    spec = importlib.util.spec_from_file_location(
+        "app_core.security.tenant_access",
+        REPO_ROOT / "app_core" / "security" / "tenant_access.py",
+    )
+    assert spec is not None, "Could not locate app_core/security/tenant_access.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "normalizar_rol",
+        "session_barberia_for_write",
+        "effective_barberia_id",
+        "get_current_barberia_id",
+        "enforce_access",
+        "get_user_barberia_id",
+        "get_user_role",
+        "can_access_barberia",
+        "enforce_barberia_access",
+        "get_user_id",
+    ]
+    for name in expected:
+        assert hasattr(module, name), (
+            f"app_core.security.tenant_access is missing: {name}"
+        )
+
+
+def test_app_py_imports_from_tenant_access():
+    """app.py must import from app_core.security.tenant_access."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.security.tenant_access import" in source, (
+        "app.py does not import from app_core.security.tenant_access"
+    )
