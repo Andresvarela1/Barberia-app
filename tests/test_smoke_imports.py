@@ -146,3 +146,64 @@ def test_app_py_no_duplicate_db_helpers():
         assert fn not in source, (
             f"app.py still defines {fn!r} — it should be imported from app_core.db.safe_queries"
         )
+
+
+# ---------------------------------------------------------------------------
+# app_core/services/booking_service
+# ---------------------------------------------------------------------------
+
+def test_app_core_services_booking_service_importable():
+    """booking_service.py must exist and expose all 9 extracted functions."""
+    _add_repo_root_to_path()
+
+    spec = importlib.util.spec_from_file_location(
+        "app_core.services.booking_service",
+        REPO_ROOT / "app_core" / "services" / "booking_service.py",
+    )
+    assert spec is not None, "Could not locate app_core/services/booking_service.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "normalizar_reserva",
+        "normalizar_datetime",
+        "_guardar_reserva_tx",
+        "guardar_reserva",
+        "actualizar_reserva",
+        "eliminar_reserva",
+        "insertar_reserva_con_fecha_hora",
+        "obtener_reserva_por_id",
+        "obtener_reserva",
+    ]
+    for name in expected:
+        assert hasattr(module, name), (
+            f"app_core.services.booking_service is missing: {name}"
+        )
+
+
+def test_app_py_imports_from_booking_service():
+    """app.py must import from app_core.services.booking_service."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.services.booking_service import" in source, (
+        "app.py does not import from app_core.services.booking_service"
+    )
+
+
+def test_app_py_no_duplicate_booking_helpers():
+    """app.py must not define any of the 9 extracted booking functions itself."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    duplicated = [
+        "def normalizar_reserva",
+        "def normalizar_datetime",
+        "def _guardar_reserva_tx",
+        "def guardar_reserva",
+        "def actualizar_reserva",
+        "def eliminar_reserva",
+        "def insertar_reserva_con_fecha_hora",
+        "def obtener_reserva_por_id",
+        "def obtener_reserva(",
+    ]
+    for fn in duplicated:
+        assert fn not in source, (
+            f"app.py still defines {fn!r} — it should be imported from app_core.services.booking_service"
+        )
