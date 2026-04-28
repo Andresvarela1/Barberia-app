@@ -1,0 +1,57 @@
+"""Smoke tests: verify that extracted modules import correctly and app.py parses."""
+
+import ast
+import importlib
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _add_repo_root_to_path():
+    root_str = str(REPO_ROOT)
+    if root_str not in sys.path:
+        sys.path.insert(0, root_str)
+
+
+def test_app_core_db_connection_importable():
+    """app_core.db.connection must be importable and expose the five DB helpers."""
+    _add_repo_root_to_path()
+
+    # Use importlib so the test is independent of top-level side-effects in app.py
+    spec = importlib.util.spec_from_file_location(
+        "app_core.db.connection",
+        REPO_ROOT / "app_core" / "db" / "connection.py",
+    )
+    assert spec is not None, "Could not locate app_core/db/connection.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "get_database_url",
+        "_masked_postgres_url",
+        "create_fresh_connection",
+        "get_connection",
+        "is_db_available",
+    ]
+    for name in expected:
+        assert hasattr(module, name), f"app_core.db.connection is missing: {name}"
+
+
+def test_app_py_parses_as_valid_python():
+    """app.py must parse without syntax errors."""
+    # Use utf-8-sig to silently strip the UTF-8 BOM if present
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    try:
+        ast.parse(source)
+    except SyntaxError as exc:
+        raise AssertionError(f"app.py has a syntax error: {exc}") from exc
+
+
+def test_app_py_imports_from_app_core():
+    """app.py must contain an import from app_core.db.connection."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.db.connection import" in source, (
+        "app.py does not import from app_core.db.connection"
+    )
