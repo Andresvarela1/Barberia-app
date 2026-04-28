@@ -93,3 +93,56 @@ def test_app_py_imports_from_tenant_access():
     assert "from app_core.security.tenant_access import" in source, (
         "app.py does not import from app_core.security.tenant_access"
     )
+
+
+def test_app_core_db_safe_queries_importable():
+    """app_core.db.safe_queries must expose all 7 query helpers."""
+    _add_repo_root_to_path()
+
+    spec = importlib.util.spec_from_file_location(
+        "app_core.db.safe_queries",
+        REPO_ROOT / "app_core" / "db" / "safe_queries.py",
+    )
+    assert spec is not None, "Could not locate app_core/db/safe_queries.py"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = [
+        "execute_query",
+        "fetch_one",
+        "fetch_all",
+        "execute_write",
+        "safe_fetch_one",
+        "safe_fetch_all",
+        "safe_execute",
+    ]
+    for name in expected:
+        assert hasattr(module, name), (
+            f"app_core.db.safe_queries is missing: {name}"
+        )
+
+
+def test_app_py_imports_from_safe_queries():
+    """app.py must import from app_core.db.safe_queries."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    assert "from app_core.db.safe_queries import" in source, (
+        "app.py does not import from app_core.db.safe_queries"
+    )
+
+
+def test_app_py_no_duplicate_db_helpers():
+    """app.py must not define the extracted DB helpers itself."""
+    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8-sig")
+    duplicated = [
+        "def execute_query",
+        "def fetch_one",
+        "def fetch_all",
+        "def execute_write",
+        "def safe_fetch_one",
+        "def safe_fetch_all",
+        "def safe_execute",
+    ]
+    for fn in duplicated:
+        assert fn not in source, (
+            f"app.py still defines {fn!r} — it should be imported from app_core.db.safe_queries"
+        )
