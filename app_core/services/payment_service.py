@@ -44,13 +44,13 @@ def marcar_reserva_pagada(reserva_id):
 
     uid = user[1]
 
-    if rol_u == "BARBERO" and prev[2] != uid:
+    if rol_u == "BARBERO" and prev.get("barbero") != uid:
 
         st.error("Sin permiso.")
 
         return False
 
-    if rol_u == "ADMIN" and prev[7] != st.session_state.get("barberia_id"):
+    if rol_u == "ADMIN" and prev.get("barberia_id") != st.session_state.get("barberia_id"):
 
         st.error("Sin permiso.")
 
@@ -66,7 +66,7 @@ def marcar_reserva_pagada(reserva_id):
 
         # ALL roles must update with barberia_id filter - NO EXCEPTIONS!
 
-        barberia_id_from_reserva = prev.get("barberia_id") or prev[7]
+        barberia_id_from_reserva = prev.get("barberia_id")
 
 
         # CRITICAL: Enforce barberia context for SUPER_ADMIN too

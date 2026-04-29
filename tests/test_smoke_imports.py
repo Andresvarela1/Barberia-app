@@ -303,3 +303,28 @@ def test_app_py_no_duplicate_payment_helpers():
         assert fn not in source, (
             f"app.py still defines {fn!r} — it should be imported from app_core.services.payment_service"
         )
+
+
+def test_marcar_reserva_pagada_uses_dict_access_only():
+    """marcar_reserva_pagada must use only dict-key access on the reservation.
+
+    obtener_reserva_por_id() always returns a dict. Any tuple-index access
+    (e.g. prev[2], prev[7]) would silently succeed on a dict (integer key lookup)
+    rather than raising, but would always return None — a latent permission bypass.
+    This test guards against reintroducing that mixed access.
+    """
+    import re
+    source = (REPO_ROOT / "app_core" / "services" / "payment_service.py").read_text(encoding="utf-8")
+
+    # Extract only the body of marcar_reserva_pagada (stop at the next top-level def)
+    fn_start = source.find("def marcar_reserva_pagada(")
+    assert fn_start != -1, "marcar_reserva_pagada not found in payment_service.py"
+    next_def = source.find("\ndef ", fn_start + 1)
+    fn_body = source[fn_start:next_def] if next_def != -1 else source[fn_start:]
+
+    # Detect tuple-index access pattern on `prev`: prev[<integer>]
+    bad_accesses = re.findall(r"\bprev\s*\[\s*\d+\s*\]", fn_body)
+    assert not bad_accesses, (
+        f"marcar_reserva_pagada uses tuple-index access on dict 'prev': {bad_accesses}. "
+        "Use dict key access (prev.get(...)) instead."
+    )
