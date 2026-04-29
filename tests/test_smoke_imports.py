@@ -328,3 +328,49 @@ def test_marcar_reserva_pagada_uses_dict_access_only():
         f"marcar_reserva_pagada uses tuple-index access on dict 'prev': {bad_accesses}. "
         "Use dict key access (prev.get(...)) instead."
     )
+
+
+# ---------------------------------------------------------------------------
+# app_core.integrations.mercadopago_service
+# ---------------------------------------------------------------------------
+
+def test_app_core_integrations_mercadopago_service_importable():
+    """app_core.integrations.mercadopago_service must be importable and expose the three helpers."""
+    _add_repo_root_to_path()
+    mod = importlib.import_module("app_core.integrations.mercadopago_service")
+    for name in ("get_sdk", "validate_monto", "extract_init_point"):
+        assert hasattr(mod, name), (
+            f"app_core.integrations.mercadopago_service is missing '{name}'"
+        )
+
+
+def test_payment_service_uses_integration_helpers():
+    """payment_service.py must import from the integration module, not inline the SDK."""
+    source = (REPO_ROOT / "app_core" / "services" / "payment_service.py").read_text(encoding="utf-8")
+    assert "from app_core.integrations.mercadopago_service import" in source, (
+        "payment_service.py does not import from app_core.integrations.mercadopago_service"
+    )
+    # Inline SDK init must be gone
+    assert "mercadopago.SDK(" not in source, (
+        "payment_service.py still contains an inline mercadopago.SDK() call — "
+        "delegate to get_sdk() from the integration module"
+    )
+
+
+def test_extract_init_point_logic():
+    """extract_init_point must correctly validate MP preference responses."""
+    _add_repo_root_to_path()
+    from app_core.integrations.mercadopago_service import extract_init_point
+
+    # Good response
+    good = {"status": 201, "response": {"init_point": "https://mp.com/checkout"}}
+    assert extract_init_point(good) == "https://mp.com/checkout"
+
+    # Wrong status
+    assert extract_init_point({"status": 400, "response": {"init_point": "x"}}) is None
+
+    # Missing init_point
+    assert extract_init_point({"status": 201, "response": {}}) is None
+
+    # Not a dict
+    assert extract_init_point("not-a-dict") is None

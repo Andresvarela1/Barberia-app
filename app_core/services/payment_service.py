@@ -8,12 +8,8 @@ import os
 
 import streamlit as st
 
-try:
-    import mercadopago
-except ImportError:
-    mercadopago = None
-
 from app_core.db.safe_queries import execute_write
+from app_core.integrations.mercadopago_service import get_sdk, validate_monto, extract_init_point
 from app_core.services.booking_service import obtener_reserva_por_id
 from app_core.security.tenant_access import normalizar_rol, enforce_access
 
@@ -130,28 +126,13 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
 
     """
 
-    # Validate SDK is available
+    # Initialize SDK (validates token + SDK availability internally)
 
-    if not mercadopago:
+    sdk = get_sdk()
 
-        error_msg = "MercadoPago SDK no está instalado. Ejecuta: pip install mercadopago"
+    if sdk is None:
 
-        logger.error(error_msg)
-
-        if show_errors:
-
-            st.error(error_msg)
-
-        return None
-
-
-    # Load and validate access token
-
-    access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-
-    if not access_token or access_token.strip() == "":
-
-        error_msg = "MERCADOPAGO_ACCESS_TOKEN no configurado. Agrega a .env: MERCADOPAGO_ACCESS_TOKEN=tu_token"
+        error_msg = "No se pudo inicializar MercadoPago SDK. Verifica MERCADOPAGO_ACCESS_TOKEN."
 
         logger.error(error_msg)
 
@@ -162,41 +143,26 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
         return None
 
 
-    # Debug: Show token was loaded (masked)
-
-    token_preview = access_token[:10] + "..." if len(access_token) > 10 else access_token
-
-    logger.info(f"Token Token cargado: {token_preview}")
-
+    # Validate payment amount
 
     try:
 
-        # Initialize SDK
+        monto_float = validate_monto(monto)
 
-        sdk = mercadopago.SDK(access_token)
+    except (ValueError, TypeError) as e:
+
+        error_msg = f"Monto inválido: {monto}. Error: {str(e)}"
+
+        logger.error(error_msg)
+
+        if show_errors:
+
+            st.error(error_msg)
+
+        return None
 
 
-        # Validate payment amount
-
-        try:
-
-            monto_float = float(monto)
-
-            if monto_float <= 0:
-
-                raise ValueError("Monto debe ser mayor a 0")
-
-        except (ValueError, TypeError) as e:
-
-            error_msg = f"Monto inválido: {monto}. Error: {str(e)}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
+    try:
 
 
         # Build preference data
@@ -265,73 +231,13 @@ def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, s
         logger.info(f"Respuesta de MercadoPago: {preference_response}")
 
 
-        # Validate response structure
+        # Validate response and extract init_point
 
-        if not isinstance(preference_response, dict):
+        init_point = extract_init_point(preference_response)
 
-            error_msg = f"Respuesta inválida de MercadoPago: tipo {type(preference_response)}"
+        if init_point is None:
 
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        # Check status code
-
-        response_status = preference_response.get("status")
-
-        if response_status != 201:
-
-            error_msg = f"MercadoPago error (status {response_status}): {preference_response}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        # Extract init_point
-
-        if "response" not in preference_response:
-
-            error_msg = f"No 'response' en respuesta de MercadoPago: {preference_response}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        response_data = preference_response["response"]
-
-        if "init_point" not in response_data:
-
-            error_msg = f"No 'init_point' en response de MercadoPago: {response_data}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        init_point = response_data.get("init_point")
-
-        if not init_point:
-
-            error_msg = "init_point es vacío en respuesta de MercadoPago"
+            error_msg = f"Respuesta inválida de MercadoPago para reserva {reserva_id}: {preference_response}"
 
             logger.error(error_msg)
 
