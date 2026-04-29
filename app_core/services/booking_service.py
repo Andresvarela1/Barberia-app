@@ -4,7 +4,6 @@ Booking service: reservation CRUD and helpers extracted from app.py.
 Imports are identical to what app.py used; business logic is unchanged.
 """
 import logging
-import traceback
 from datetime import datetime, timedelta
 
 import streamlit as st
@@ -516,7 +515,7 @@ def eliminar_reserva(reserva_id):
 
         logger.exception("eliminar_reserva")
 
-        st.error(f"Error eliminando reserva:\n{traceback.format_exc()}")
+        st.error("Error al eliminar la reserva. Por favor, intenta de nuevo.")
 
         return False
 
@@ -684,7 +683,7 @@ def insertar_reserva_con_fecha_hora(
 
         logger.exception("Error al insertar reserva (fecha/hora)")
 
-        st.error(str(e))
+        st.error("Error al guardar la reserva. Por favor, intenta de nuevo.")
 
         return False
 

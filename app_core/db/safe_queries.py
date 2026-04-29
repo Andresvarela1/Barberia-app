@@ -1,7 +1,6 @@
 """Safe query wrappers with multi-tenant validation."""
 
 import logging
-import traceback
 
 import streamlit as st
 
@@ -67,7 +66,7 @@ def execute_query(query, params=None, fetch=None):
 
                 logger.exception("Error en base de datos después de reintentos")
 
-                st.error(f"Error en base de datos:\n{traceback.format_exc()}")
+                st.error("Error de base de datos. Por favor, intenta de nuevo.")
 
                 return None
 

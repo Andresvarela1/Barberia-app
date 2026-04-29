@@ -191,7 +191,7 @@ def render_step_3_datetime_selection(barberia_id):
             logger.info(f"Booking time set: {type(time_obj).__name__} -> {hora_final}")
         except Exception as e:
             logger.error(f"Error setting booking time: {str(e)}")
-            st.error(f"Error al seleccionar hora: {str(e)}")
+            st.error("Error al seleccionar la hora. Por favor, intenta de nuevo.")
             st.stop()
             return
 

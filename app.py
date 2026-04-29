@@ -2041,7 +2041,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     except Exception as e:
 
-        st.error(f"Error al agrupar reservas:\n{traceback.format_exc()}")
+        logger.exception("Error al agrupar reservas")
+
+        st.error("Error al procesar las reservas. Por favor, recarga la página.")
 
         return
 
@@ -2108,7 +2110,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
                 except Exception as e:
 
-                    st.error(f"Error construyendo eventos para {barber_name}:\n{traceback.format_exc()}")
+                    logger.exception("Error construyendo eventos para %s", barber_name)
+
+                    st.error(f"Error al procesar el calendario de {barber_name}. Por favor, recarga la página.")
 
                     continue
 
@@ -2210,7 +2214,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
                 except Exception as e:
 
-                    st.error(f"Error al mostrar calendario para {barber_name}:\n{traceback.format_exc()}")
+                    logger.exception("Error al mostrar calendario para %s", barber_name)
+
+                    st.error(f"Error al mostrar el calendario de {barber_name}. Por favor, recarga la página.")
 
         except Exception as e:
 
@@ -2738,7 +2744,7 @@ def mostrar_calendario_reservas(reservas):
 
         logger.exception("Error displaying reservation calendar")
 
-        st.error(f"Error al mostrar el calendario:\\n{traceback.format_exc()}")
+        st.error("Error al mostrar el calendario. Por favor, recarga la página.")
 
 def manejar_interaccion_calendario(calendar_state):
 
@@ -9024,4 +9030,4 @@ except Exception as e:
 
     logger.exception("Unhandled exception in Streamlit app")
 
-    st.error(f"Error en la aplicación:\n{traceback.format_exc()}")
+    st.error("Error inesperado en la aplicación. Por favor, recarga la página.")

@@ -96,7 +96,7 @@ def marcar_reserva_pagada(reserva_id):
 
         logger.exception("marcar_reserva_pagada")
 
-        st.error(str(e))
+        st.error("Error al registrar el pago. Por favor, intenta de nuevo.")
 
         return False
 
