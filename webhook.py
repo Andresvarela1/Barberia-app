@@ -13,10 +13,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import psycopg2
 from psycopg2 import pool
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -260,12 +256,31 @@ async def shutdown():
 
 
 @app.get("/health", tags=["Health"])
-async def health_check():
-    """Health check endpoint"""
+def health_check():
+    """Health check endpoint with real database connectivity probe."""
+    db_status = "disconnected"
+    if db_pool:
+        conn = None
+        try:
+            conn = db_pool.getconn()
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            db_status = "connected"
+        except Exception:
+            logger.warning("Health check: database ping failed")
+            db_status = "error"
+        finally:
+            if conn:
+                try:
+                    db_pool.putconn(conn)
+                except Exception:
+                    pass
+
+    overall = "healthy" if db_status == "connected" else "degraded"
     return {
-        "status": "healthy",
+        "status": overall,
         "timestamp": datetime.now().isoformat(),
-        "database": "connected" if db_pool else "disconnected"
+        "database": db_status,
     }
 
 
