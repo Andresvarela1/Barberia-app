@@ -8,7 +8,7 @@ import os
 
 import streamlit as st
 
-from app_core.db.safe_queries import execute_write
+from app_core.db.safe_queries import safe_execute
 from app_core.integrations.mercadopago_service import get_sdk, validate_monto, extract_init_point
 from app_core.services.booking_service import obtener_reserva_por_id
 from app_core.security.tenant_access import normalizar_rol, enforce_access
@@ -74,7 +74,7 @@ def marcar_reserva_pagada(reserva_id):
 
         return bool(
 
-            execute_write(
+            safe_execute(
 
                 """
 

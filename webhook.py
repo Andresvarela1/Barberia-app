@@ -13,10 +13,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import psycopg2
 from psycopg2 import pool
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(

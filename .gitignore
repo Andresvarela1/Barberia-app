@@ -32,3 +32,27 @@ qa_screenshots/
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# Session backups created during encoding repair
+backup_before_*/
+*.backup_utf8
+
+# One-shot repair and fix scripts (not part of the application)
+fix_*.py
+repair_*.py
+diagnose.py
+LOGIN_SECTION_FIX.py
+
+# Temporary scan/check scripts
+_scan_*.py
+
+# Manual verification dump files
+end_check*.txt
+insert_check.txt
+middle_check.txt
+step*_header.txt
+*_extract.txt
+*_check.txt
+
+# Runtime startup log (not covered by *.log)
+startup_log.txt

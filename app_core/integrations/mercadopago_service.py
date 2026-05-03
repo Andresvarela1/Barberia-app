@@ -37,12 +37,11 @@ def get_sdk():
     if not access_token:
         logger.error(
             "MERCADOPAGO_ACCESS_TOKEN no configurado. "
-            "Agrega a .env: MERCADOPAGO_ACCESS_TOKEN=tu_token"
+            "Configuralo como variable de entorno del sistema o del despliegue."
         )
         return None
 
-    token_preview = access_token[:10] + "..." if len(access_token) > 10 else access_token
-    logger.info(f"Token cargado: {token_preview}")
+    logger.info("MERCADOPAGO_ACCESS_TOKEN configurado")
     return _mp_sdk.SDK(access_token)
 
 

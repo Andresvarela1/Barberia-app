@@ -11,7 +11,7 @@ FastAPI, uvicorn, and requests have been added to requirements.txt automatically
 
 ## Environment Variables
 
-Add these to your `.env` file:
+Set these environment variables in your shell or deployment:
 
 ```env
 # MercadoPago Configuration
@@ -210,7 +210,7 @@ server {
 ## Troubleshooting
 
 ### Issue: "MERCADOPAGO_ACCESS_TOKEN not configured"
-**Solution**: Add token to `.env` and restart webhook server
+**Solution**: Set the token as an environment variable and restart webhook server
 
 ### Issue: "Could not connect to database"
 **Solution**: Check DATABASE_URL is correct and PostgreSQL is running
@@ -236,7 +236,7 @@ server {
 
 ## Next Steps
 
-1. Add MERCADOPAGO_ACCESS_TOKEN to `.env`
+1. Set MERCADOPAGO_ACCESS_TOKEN as an environment variable
 2. Update database schema (add payment_id, updated_at columns)
 3. Verify external_reference is set in app.py's crear_pago_mercadopago()
 4. Run webhook server: `python webhook.py`

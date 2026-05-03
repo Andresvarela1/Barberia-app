@@ -10,8 +10,6 @@ import os
 
 import traceback
 
-from dotenv import load_dotenv
-
 import bcrypt
 
 import pandas as pd
@@ -136,10 +134,6 @@ except ImportError:
 
     GeocoderUnavailable = None
 
-_dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-
-load_dotenv(dotenv_path=_dotenv_path)
-
 st.set_page_config(
 
     page_title="Barbería Leveling",
@@ -204,496 +198,29 @@ from app_core.db.safe_queries import (
     safe_execute,
 )
 
-def ensure_database_tables():
-
-    """Create application tables if they are missing; commit on success."""
-
-    conn = None
-
-    all_ok = True
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            st.warning("Base de datos no disponible, modo demo activo")
-
-            return
-
-        with conn.cursor() as cur:
-
-            # 1. barberias table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS barberias (
-
-                        id SERIAL PRIMARY KEY,
-
-                        nombre TEXT NOT NULL UNIQUE,
-
-                        slug TEXT UNIQUE
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'barberias' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'barberias': {e}")
-
-                st.error(f"Error creando tabla 'barberias': {e}")
-
-            # 2. usuarios table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS usuarios (
-
-                        id SERIAL PRIMARY KEY,
-
-                        usuario TEXT NOT NULL,
-
-                        password TEXT NOT NULL,
-
-                        rol TEXT NOT NULL,
-
-                        telefono TEXT,
-
-                        cortes_acumulados INTEGER NOT NULL DEFAULT 0,
-
-                        barberia_id INTEGER,
-
-                        CONSTRAINT fk_usuarios_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE RESTRICT
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'usuarios' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'usuarios': {e}")
-
-                st.error(f"Error creando tabla 'usuarios': {e}")
-
-            # Add UNIQUE constraint on usuario if not exists - safe approach
-
-            try:
-
-                # Check if constraint exists using safer query
-
-                cur.execute(
-
-                    """
-
-                    SELECT conname 
-
-                    FROM pg_constraint 
-
-                    WHERE conname = 'usuarios_usuario_unique' 
-
-                    AND conrelid = 'public.usuarios'::regclass
-
-                    LIMIT 1;
-
-                    """
-
-                )
-
-                constraint_exists = cur.fetchone()
-
-
-                if not constraint_exists:
-
-                    # Use IF NOT EXISTS syntax for PostgreSQL 9.1+ or handle gracefully
-
-                    try:
-
-                        cur.execute(
-
-                            "ALTER TABLE usuarios ADD CONSTRAINT usuarios_usuario_unique UNIQUE (usuario);"
-
-                        )
-
-                        logger.info(" Restricción UNIQUE en 'usuario' añadida")
-
-                    except Exception as constraint_error:
-
-                        # If constraint already exists (race condition), ignore safely
-
-                        if "already exists" in str(constraint_error).lower() or "duplicate" in str(constraint_error).lower():
-
-                            logger.info(" Restricción UNIQUE en 'usuario' ya existe (race condition handled)")
-
-                        else:
-
-                            raise constraint_error
-
-                else:
-
-                    logger.info(" Restricción UNIQUE en 'usuario' ya existe")
-
-
-                conn.commit()
-
-            except Exception as e:
-
-                conn.rollback()
-
-                # Don't fail the entire table creation for a constraint issue
-
-                logger.warning(f"Advertencia creando restricción UNIQUE (continuando): {e}")
-
-                # Only show error to user if it's a critical issue
-
-                if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
-
-                    st.warning(f"Restricción UNIQUE no pudo crearse (app continuará): {e}")
-
-            # Index on usuarios
-
-            try:
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_barberia ON usuarios(barberia_id);")
-
-                conn.commit()
-
-                logger.info(" Índice 'idx_usuarios_barberia' creado o ya existe")
-
-                logger.info("[OK] Índice 'idx_usuarios_barberia' creado o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
-
-                st.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
-
-            # 3. reservas table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS reservas (
-
-                        id SERIAL PRIMARY KEY,
-
-                        nombre TEXT NOT NULL,
-
-                        barbero TEXT NOT NULL,
-
-                        servicio TEXT NOT NULL,
-
-                        precio INTEGER NOT NULL,
-
-                        inicio TIMESTAMP NOT NULL,
-
-                        fin TIMESTAMP NOT NULL,
-
-                        barberia_id INTEGER NOT NULL,
-
-                        CONSTRAINT fk_reservas_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE RESTRICT
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'reservas' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'reservas': {e}")
-
-                st.error(f"Error creando tabla 'reservas': {e}")
-
-            # 4. servicios table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS servicios (
-
-                        id SERIAL PRIMARY KEY,
-
-                        barberia_id INTEGER NOT NULL,
-
-                        nombre TEXT NOT NULL,
-
-                        duracion_minutos INTEGER NOT NULL,
-
-                        precio INTEGER NOT NULL,
-
-                        descripcion TEXT,
-
-                        icono TEXT DEFAULT 'Servicio',
-
-                        CONSTRAINT fk_servicios_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE CASCADE,
-
-                        UNIQUE(barberia_id, nombre)
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'servicios' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'servicios': {e}")
-
-                st.error(f"Error creando tabla 'servicios': {e}")
-
-            # Index on servicios
-
-            try:
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_servicios_barberia ON servicios(barberia_id);")
-
-                conn.commit()
-
-                logger.info("[OK] Índice 'idx_servicios_barberia' creado o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índice 'idx_servicios_barberia': {e}")
-
-                st.error(f"Error creando índice 'idx_servicios_barberia': {e}")
-
-            # Optional columns for barberias
-
-            try:
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS telefono TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS email TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS ciudad TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS direccion TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS latitud NUMERIC(10, 6);")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS longitud NUMERIC(10, 6);")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS logo_url TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS color_primario TEXT DEFAULT '#667eea';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS hora_apertura TIME DEFAULT '09:00:00';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS hora_cierre TIME DEFAULT '18:00:00';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activa';")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'barberias' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a barberias: {e}")
-
-            # Optional columns for usuarios
-
-            try:
-
-                cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nombre TEXT;")
-
-                cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS apellido TEXT;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'usuarios' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a usuarios: {e}")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_pagado ON reservas(pagado);")
-
-                conn.commit()
-
-                logger.info("[OK] Índices de 'reservas' creados o ya existen")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índices de 'reservas': {e}")
-
-            # Optional columns
-
-            try:
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente TEXT;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS fecha DATE;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora TIME;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS barbero_id INTEGER;")
-
-                cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas opcionales en 'reservas' añadidas o actualizadas")
-
-                logger.info("[OK] payment_id column ensured")
-
-                logger.info("[OK] updated_at column ensured")
-
-                logger.info("[OK] barbero_id column ensured")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error alterando tabla 'reservas': {e}")
-
-
-            # Ensure servicios has all required columns for multi-tenant
-
-            try:
-
-                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS icono TEXT DEFAULT 'Servicio';")
-
-                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS descripcion TEXT;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'servicios' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a servicios: {e}")
-
-        if all_ok:
-
-            logger.info("[OK] Todas las tablas y restricciones creadas correctamente")
-
-        else:
-
-            logger.warning("[AVISO] Algunas operaciones de base de datos fallaron")
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("Error al asegurar tablas de base de datos")
-
-    finally:
-
-        # Don't close connection - keep it in session state
-
-        pass
+# ------------------ BOOTSTRAP (DDL + seed) ------------------
+from app_core.bootstrap import (
+    ensure_database_tables,
+    inicializar_barberia,
+    seed_default_data,
+)
+
+# ------------------ AUTH ------------------
+from app_core.auth import (
+    normalizar_texto,
+    es_hash_bcrypt,
+    hash_password,
+    verificar_password,
+    login,
+    registrar,
+    registrar_barberia,
+)
+
+# NOTE: ensure_database_tables, inicializar_barberia, seed_default_data,
+#       normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
+#       login, registrar, registrar_barberia
+#       have been extracted to app_core/bootstrap.py and app_core/auth.py.
+#       The definitions below have been removed; they are now imported above.
 
 # ------------------ DATOS ------------------
 
@@ -761,534 +288,10 @@ from app_core.services.payment_service import (
 
 from app_core.public_booking.flow import flujo_reserva_publica
 
-# ------------------ FUNCIONES ------------------
-
-def normalizar_texto(valor):
-
-    return valor.strip() if isinstance(valor, str) else ""
-
-def es_hash_bcrypt(valor):
-
-    return isinstance(valor, str) and valor.startswith(("$2a$", "$2b$", "$2y$"))
-
-def hash_password(password):
-
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-def verificar_password(password, password_guardada):
-
-    """Verifica contraseña contra hash bcrypt o plain text."""
-
-    if not password_guardada:
-
-        logger.warning("[ERROR] No hay contraseña guardada")
-
-        return False
-
-    if es_hash_bcrypt(password_guardada):
-
-        try:
-
-            # El hash está en formato bcrypt
-
-            resultado = bcrypt.checkpw(
-
-                password.encode("utf-8"),
-
-                password_guardada.encode("utf-8"),
-
-            )
-
-            logger.info(f"[OK] Verificación bcrypt: {resultado}")
-
-            return resultado
-
-        except ValueError as e:
-
-            logger.exception("[ERROR] Error en hash bcrypt: %s", str(e))
-
-            return False
-
-    else:
-
-        # Fallback: comparar como plain text (para contraseñas antiguas)
-
-        resultado = password == password_guardada
-
-        logger.warning(f"[AVISO] Usando comparación plain text (legacy): {resultado}")
-
-        return resultado
-
-def login(usuario, password):
-
-    """Autentica usuario contra la base de datos."""
-
-    usuario = normalizar_texto(usuario)
-
-    password = normalizar_texto(password)
-
-    if not usuario or not password:
-
-        logger.warning(f"[ERROR] Usuario o contraseña vacío. Usuario: '{usuario}'")
-
-        return None
-
-    if not st.session_state.get("db_available", True):
-
-        logger.warning("[ERROR] Base de datos no disponible")
-
-        return None
-
-    # Buscar usuario en base de datos - uses safe wrapper for audit trail
-
-    user = safe_fetch_one(
-
-        """
-
-        SELECT id, usuario, password, rol, telefono, barberia_id, cortes_acumulados
-
-        FROM usuarios
-
-        WHERE usuario=%s
-
-        """,
-
-        (usuario,),
-
-    )
-
-
-    if not user:
-
-        logger.warning(f"[ERROR] Usuario no encontrado: '{usuario}'")
-
-        return None
-
-
-    logger.info(f"[OK] Usuario encontrado: {user[1]} (ID: {user[0]})")
-
-    logger.info(f"Verificando Hash format: {user[2][:20]}... (bcrypt: {es_hash_bcrypt(user[2])})")
-
-
-    # Verificar contraseña
-
-    if not verificar_password(password, user[2]):
-
-        logger.warning(f"[ERROR] Contraseña incorrecta para usuario: {usuario}")
-
-        return None
-
-
-    logger.info(f"[OK] Contraseña verificada para: {usuario}")
-
-
-    # Normalizar rol para asegurar que siempre sea válido
-
-    rol_normalizado = normalizar_rol(user[3])
-
-    if rol_normalizado != user[3]:
-
-        logger.info(f"Procesando Normalizando rol de '{user[3]}' a '{rol_normalizado}' para: {usuario}")
-
-        # Actualizar rol en la base de datos si es diferente
-
-        if execute_write(
-
-            "UPDATE usuarios SET rol=%s WHERE id=%s",
-
-            (rol_normalizado, user[0]),
-
-        ):
-
-            user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
-
-            logger.info(f"[OK] Rol actualizado en BD para: {usuario}")
-
-        else:
-
-            logger.warning(f"[AVISO] No se pudo actualizar rol en BD, usando rol normalizado localmente")
-
-            user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
-
-    # Si la contraseña es plain text, rehashearla con bcrypt
-
-    if not es_hash_bcrypt(user[2]):
-
-        logger.info(f"Procesando Rehasheando contraseña para: {usuario}")
-
-        nuevo_hash = hash_password(password)
-
-        if execute_write(
-
-            "UPDATE usuarios SET password=%s WHERE id=%s",
-
-            (nuevo_hash, user[0]),
-
-        ):
-
-            logger.info(f"[OK] Contraseña rehashada para: {usuario}")
-
-            user = (user[0], user[1], nuevo_hash, user[3], user[4], user[5], user[6])
-
-        else:
-
-            logger.warning(f"[AVISO] No se pudo rehasear contraseña para: {usuario}")
-
-    logger.info(f"[OK] Login exitoso para: {usuario} con rol: {user[3]}")
-
-    return user
-
-@st.cache_data(ttl=300)
-
-def inicializar_barberia():
-
-    if not get_database_url():
-
-        return None
-
-    row = fetch_one("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
-
-    if row and row[0]:
-
-        return row[0]
-
-    row = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-
-    if row and row[0]:
-
-        return row[0]
-
-    created = execute_write(
-
-        "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
-
-        ("Barbería Principal",),
-
-        fetch_one_result=True,
-
-    )
-
-    if not created or not created[0]:
-
-        logger.error(
-
-            "No se pudo inicializar la barbería por defecto. "
-
-            "Verifica la conexión/credenciales y que exista la tabla 'barberias'."
-
-        )
-
-        return None
-
-    return created[0]
-
-def registrar(usuario, password, rol, telefono=None, barberia_id=None):
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos: el registro no está disponible en modo demo.")
-
-        return False
-
-    if barberia_id is None:
-
-        barberia_id = st.session_state["barberia_id"]
-
-    if not barberia_id:
-
-        st.error("No hay barbería configurada para registrar usuarios.")
-
-        return False
-
-    password_hash = hash_password(password)
-
-    rol_db = normalizar_rol(rol) if rol else ""
-
-    try:
-
-        result = execute_write(
-
-            "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id) VALUES (%s, %s, %s, %s, %s)",
-
-            (usuario, password_hash, rol_db, telefono, barberia_id),
-
-        )
-
-        return bool(result)
-
-    except Exception as e:
-
-        logger.exception("registrar")
-
-        st.error(str(e))
-
-        return False
-
-def registrar_barberia(nombre_barberia, admin_usuario, admin_password):
-
-    """Crea barbería y usuario ADMIN dueño (multi-tenant)."""
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos.")
-
-        return False
-
-    nombre_barberia = normalizar_texto(nombre_barberia)
-
-    admin_usuario = normalizar_texto(admin_usuario)
-
-    admin_password = normalizar_texto(admin_password)
-
-    if not nombre_barberia or not admin_usuario or not admin_password:
-
-        st.error("Completa nombre de barbería, usuario y contraseña.")
-
-        return False
-
-    conn = None
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            return False
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-
-                "INSERT INTO barberias (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING RETURNING id",
-
-                (nombre_barberia,),
-
-            )
-
-            row = cur.fetchone()
-
-            if row and row[0]:
-
-                bid = row[0]
-
-            else:
-
-                cur.execute("SELECT id FROM barberias WHERE nombre = %s", (nombre_barberia,))
-
-                bid = cur.fetchone()[0]
-
-            cur.execute("SELECT id FROM usuarios WHERE usuario = %s", (admin_usuario,))
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Ese usuario administrador ya existe.")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados)
-
-                VALUES (%s, %s, %s, %s, %s, 0)
-
-                """,
-
-                (admin_usuario, hash_password(admin_password), "ADMIN", None, bid),
-
-            )
-
-        conn.commit()
-
-        st.success("Barbería registrada. Ya puedes iniciar sesión como administrador.")
-
-        return True
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("registrar_barberia")
-
-        st.error(str(e))
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
-
-def seed_default_data():
-
-    """Datos iniciales: super admin, barbería Leveling, barberos (solo si faltan)."""
-
-    if not get_database_url():
-
-        logger.warning("[AVISO] DATABASE_URL no configurada - seed_default_data ignorado")
-
-        return False
-
-    conn = None
-
-    try:
-
-        conn = get_connection(notify_missing_url=False)
-
-        if conn is None:
-
-            logger.warning("[AVISO] No se pudo conectar a la BD - seed_default_data ignorado")
-
-            return False
-
-        with conn.cursor() as cur:
-
-            # 1. Crear barbería Leveling si no existe
-
-            logger.info("Verificando Verificando si barbería 'Barberia Leveling' existe...")
-
-            cur.execute("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
-
-            barberia_row = cur.fetchone()
-
-            if barberia_row:
-
-                bid = barberia_row[0]
-
-                logger.info(f"[OK] Barbería Leveling ya existe (ID: {bid})")
-
-            else:
-
-                logger.info("[AVISO] Barbería Leveling NO existe - creando...")
-
-                cur.execute(
-
-                    "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
-
-                    ("Barberia Leveling",),
-
-                )
-
-                barberia_row = cur.fetchone()
-
-                if barberia_row and barberia_row[0]:
-
-                    bid = barberia_row[0]
-
-                    logger.info(f"[OK] Barbería Leveling creada con ID: {bid}")
-
-                else:
-
-                    raise Exception("No se pudo crear la barbería por defecto")
-
-            # 2. Crear SUPER_ADMIN si no existe
-
-            logger.info("Verificando Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...")
-
-            cur.execute("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
-
-            super_admin_row = cur.fetchone()
-
-            if super_admin_row:
-
-                logger.info(f"[OK] SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: {super_admin_row[0]})")
-
-            else:
-
-                logger.info("[AVISO] SUPER_ADMIN 'JoanBeatsAD' NO existe - creando...")
-
-                password_hash = hash_password("suguha09")
-
-                cur.execute(
-
-                    "INSERT INTO usuarios (usuario, password, rol, barberia_id) VALUES (%s, %s, %s, %s)",
-
-                    ("JoanBeatsAD", password_hash, "SUPER_ADMIN", None),
-
-                )
-
-                logger.info("[OK] INSERT SUPER_ADMIN ejecutado")
-
-            # 3. Crear barberos si no existen
-
-            logger.info("Verificando Verificando barberos...")
-
-            pwd_barb = hash_password("barbero123")
-
-            for bu in ("Yor", "Andres", "Andrea", "Maikel"):
-
-                cur.execute("SELECT id FROM usuarios WHERE usuario = %s", (bu,))
-
-                if cur.fetchone():
-
-                    logger.info(f"[OK] Barbero '{bu}' ya existe")
-
-                    continue
-
-                cur.execute(
-
-                    "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados) VALUES (%s, %s, %s, %s, %s, %s)",
-
-                    (bu, pwd_barb, "BARBERO", None, bid, 0),
-
-                )
-
-                logger.info(f"[OK] Barbero '{bu}' creado")
-
-        conn.commit()
-
-        logger.info("[OK] Commit exitoso - verificando SUPER_ADMIN...")
-
-        try:
-
-            user_check = fetch_one("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
-
-            if user_check:
-
-                logger.info("[OK] SUPER_ADMIN listo en la base de datos")
-
-                return True
-
-            # st.sidebar.error("SUPER_ADMIN no se pudo crear")
-
-            logger.error("SUPER_ADMIN no se pudo crear")
-
-            return False
-
-        except Exception as e:
-
-            # st.sidebar.error(f"Seed error: {str(e)}")
-
-            logger.error(f"Seed error: {str(e)}")
-
-            return False
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("[ERROR] Error en seed_default_data")
-
-        # st.sidebar.error(f"Seed error: {str(e)}")
-
-        logger.error(f"Seed error: {str(e)}")
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
+# ------------------ FUNCIONES (moved to app_core) ------------------
+# normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
+# login, registrar, registrar_barberia  →  app_core/auth.py
+# ensure_database_tables, inicializar_barberia, seed_default_data  →  app_core/bootstrap.py
 
 # ---------------------------------------------------------------------------
 # Migration guard: only run DDL (CREATE/ALTER/INDEX) when explicitly enabled.
@@ -1433,21 +436,9 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
     st.markdown("### Pagar reservas pendientes")
 
 
-    # DEBUG: Show token status (temporary, for troubleshooting)
+    if not os.getenv("MERCADOPAGO_ACCESS_TOKEN"):
 
-    access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-
-    token_status = "[OK] Cargado" if access_token else "[ERROR] No configurado"
-
-    with st.expander(f"Debug - Token: {token_status}"):
-
-        if access_token:
-
-            st.info(f"Token cargado: {access_token[:10]}...")
-
-        else:
-
-            st.error("MERCADOPAGO_ACCESS_TOKEN no está en .env")
+        st.warning("MERCADOPAGO_ACCESS_TOKEN no está configurado en el entorno.")
 
 
     for r in unpaid:
@@ -1579,9 +570,23 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
     st.markdown("---")
 
-def obtener_telefono_usuario(usuario):
+def obtener_telefono_usuario(usuario, barberia_id=None):
 
-    row = fetch_one("SELECT telefono FROM usuarios WHERE usuario=%s", (usuario,))
+    if barberia_id is None:
+
+        barberia_id = effective_barberia_id()
+
+    if not barberia_id:
+
+        return None
+
+    row = safe_fetch_one(
+
+        "SELECT telefono FROM usuarios WHERE usuario=%s AND barberia_id=%s",
+
+        (usuario, barberia_id),
+
+    )
 
     return row[0] if row and row[0] else None
 
@@ -1593,7 +598,7 @@ def get_default_barberia_id():
 
 def registrar_fidelizacion(usuario, barberia_id):
 
-    row = execute_write(
+    row = safe_execute(
 
         """
 
@@ -1623,7 +628,7 @@ def procesar_beneficio_fidelizacion(usuario, barberia_id):
 
         return
 
-    execute_write(
+    safe_execute(
 
         """
 
@@ -1639,7 +644,7 @@ def procesar_beneficio_fidelizacion(usuario, barberia_id):
 
     )
 
-    telefono_cliente = obtener_telefono_usuario(usuario)
+    telefono_cliente = obtener_telefono_usuario(usuario, barberia_id)
 
     if telefono_cliente:
 
@@ -1715,7 +720,7 @@ def obtener_reservas_raw(barbero_filtro=None):
 
         sql = """
 
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto, barbero_id
 
             FROM reservas
 
@@ -1778,6 +783,8 @@ def obtener_reservas_raw(barbero_filtro=None):
 
                 "monto": r[9] if len(r) > 9 else r[4],
 
+                "barbero_id": r[10] if len(r) > 10 else None,
+
             })
 
         return reservas_dict
@@ -1804,7 +811,9 @@ def construir_eventos_calendario(reservas):
 
             cliente = r.get("nombre", "Desconocido")
 
-            barbero_id = r.get("barbero", "unknown")
+            barbero_id = r.get("barbero_id") or r.get("barbero", "unknown")
+
+            barbero_nombre = r.get("barbero", "unknown")
 
             servicio = r.get("servicio", "")
 
@@ -1827,6 +836,8 @@ def construir_eventos_calendario(reservas):
                 cliente = r[1]
 
                 barbero_id = r[2]
+
+                barbero_nombre = r[2]
 
                 servicio = r[3]
 
@@ -1908,7 +919,9 @@ def construir_eventos_calendario(reservas):
 
                 "nombre": cliente,
 
-                "barbero": barbero_id,
+                "barbero": barbero_nombre,
+
+                "barbero_id": barbero_id,
 
                 "servicio": servicio,
 
@@ -2256,7 +1269,7 @@ def listar_reservas_filtradas(barberia_id_arg=None, rol_tag=None, usuario_login=
 
     cols = (
 
-        "id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto"
+        "id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto, barbero_id"
 
     )
 
@@ -2822,6 +1835,8 @@ def manejar_interaccion_calendario(calendar_state):
 
                         normalizar_datetime(evento.get("end")),
 
+                        barbero_id=reserva.get("barbero_id"),
+
                     )
 
                 st.success("Reserva actualizada")
@@ -2956,15 +1971,21 @@ def render_gestion_agenda(barbero_actual=None):
 
     reservas = obtener_reservas_raw(barbero_actual)
 
+    barber_labels = {}
+
     if barbero_actual:
 
         barbero_options = [barbero_actual]
+
+        barber_labels = {barbero_actual: str(barbero_actual)}
 
     else:
 
         db_barbers = listar_usuarios_barberos(bid_eff) if bid_eff else []
 
-        barbero_options = [r[0] for r in db_barbers] if db_barbers else list(barberos.keys())
+        barber_labels = {r[0]: r[1] for r in db_barbers} if db_barbers else {}
+
+        barbero_options = list(barber_labels.keys()) if barber_labels else list(barberos.keys())
 
     servicio_options = list(servicios.keys()) + ["Bloqueo"]
 
@@ -2978,7 +1999,12 @@ def render_gestion_agenda(barbero_actual=None):
 
             nombre_nuevo = st.text_input("Cliente", value=nombre_default)
 
-            barbero_nuevo = st.selectbox("Barbero", barbero_options, key="agenda_barbero_nuevo")
+            barbero_nuevo = st.selectbox(
+                "Barbero",
+                barbero_options,
+                key="agenda_barbero_nuevo",
+                format_func=lambda ref: barber_labels.get(ref, str(ref)),
+            )
 
             inicio_nuevo = st.datetime_input("Inicio", key="agenda_inicio_nuevo")
 
@@ -2998,7 +2024,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                     nombre_final,
 
-                    barbero_nuevo,
+                    barber_labels.get(barbero_nuevo, str(barbero_nuevo)),
 
                     servicio_nuevo,
 
@@ -3007,6 +2033,8 @@ def render_gestion_agenda(barbero_actual=None):
                     inicio_nuevo,
 
                     fin_nuevo,
+
+                    barbero_id=barbero_nuevo if barbero_nuevo in barber_labels else None,
 
                 ):
 
@@ -3056,13 +2084,25 @@ def render_gestion_agenda(barbero_actual=None):
 
         servicio_idx = servicio_options.index(reserva.get("servicio")) if reserva.get("servicio") in servicio_options else 0
 
-        barbero_idx = barbero_options.index(reserva.get("barbero")) if reserva.get("barbero") in barbero_options else 0
+        barbero_actual_ref = (
+            reserva.get("barbero_id")
+            if reserva.get("barbero_id") in barbero_options
+            else reserva.get("barbero")
+        )
+
+        barbero_idx = barbero_options.index(barbero_actual_ref) if barbero_actual_ref in barbero_options else 0
 
         nombre_editado = st.text_input("Cliente", value=reserva.get("nombre", ""))
 
         servicio_editado = st.selectbox("Servicio", servicio_options, index=servicio_idx, key="agenda_servicio_editado")
 
-        barbero_editado = st.selectbox("Barbero", barbero_options, index=barbero_idx, key="agenda_barbero_editado")
+        barbero_editado = st.selectbox(
+            "Barbero",
+            barbero_options,
+            index=barbero_idx,
+            key="agenda_barbero_editado",
+            format_func=lambda ref: barber_labels.get(ref, str(ref)),
+        )
 
         inicio_editado = st.datetime_input("Inicio", value=reserva.get("inicio"), key="agenda_inicio_editado")
 
@@ -3088,7 +2128,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                 nombre_final,
 
-                barbero_editado,
+                barber_labels.get(barbero_editado, str(barbero_editado)),
 
                 servicio_editado,
 
@@ -3097,6 +2137,8 @@ def render_gestion_agenda(barbero_actual=None):
                 inicio_editado,
 
                 fin_editado,
+
+                barbero_id=barbero_editado if barbero_editado in barber_labels else None,
 
             ):
 
@@ -3130,356 +2172,14 @@ def render_modo_sin_db_banner():
 
 # ================= PUBLIC BOOKING FLOW (NO LOGIN) =================
 
-# ================= MÉTRICAS HELPERS =================
-
-def calcular_metricas_header(barberia_id=None):
-
-    """Calculate quick dashboard header metrics for today.
-
-
-    SECURITY: Always uses current barberia context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Single query for all today's metrics - SAFE wrapper ensures barberia_id filter
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_hoy,
-
-                COUNT(CASE WHEN pagado = TRUE THEN 1 END) as pagadas_hoy,
-
-                COUNT(CASE WHEN pagado = FALSE THEN 1 END) as pendientes_hoy
-
-            FROM reservas 
-
-            WHERE barberia_id = %s AND fecha = %s
-
-            """,
-
-            (barberia_id, hoy),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2]
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas header")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_cliente(barberia_id=None, usuario=None):
-
-    """Fast cached client metrics with optimized queries.
-
-
-    SECURITY: Always uses current context and validates user access.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not usuario or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        hoy = datetime.now().date()
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas
-
-            FROM reservas 
-
-            WHERE barberia_id = %s 
-
-              AND (cliente = %s OR nombre = %s)
-
-            """,
-
-            (hoy, barberia_id, usuario, usuario),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], 0
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas cliente")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_barbero(barberia_id=None, barbero_id=None):
-
-    """Fast cached barber metrics with optimized queries.
-
-
-    SECURITY: Always uses current context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not barbero_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        hoy = datetime.now().date()
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
-
-                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos
-
-            FROM reservas 
-
-            WHERE barberia_id = %s AND barbero_id = %s
-
-            """,
-
-            (hoy, barberia_id, barbero_id),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2]
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas barbero")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_admin(barberia_id=None):
-
-    """Fast cached admin metrics with optimized queries.
-
-
-    SECURITY: Always uses current context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
-
-                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos,
-
-                (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO') as num_barberos
-
-            FROM reservas 
-
-            WHERE barberia_id = %s
-
-            """,
-
-            (hoy, barberia_id, barberia_id),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2], metrics[3]
-
-        return 0, 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas admin")
-
-        return 0, 0, 0, 0
-
-@st.cache_data(ttl=60)
-
-def calcular_metricas_super_admin(barberia_id=None):
-
-    """Fast cached super admin metrics - respects context (single barberia or global).
-
-
-    SECURITY: Uses current barberia context if set, otherwise respects super_admin_all_barberias flag.
-
-    """
-
-    if not st.session_state.get("db_available", True):
-
-        return 0, 0, 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Check if SUPER_ADMIN is viewing all barberias or specific context
-
-        viewing_all = st.session_state.get("super_admin_all_barberias", False)
-
-
-        if viewing_all:
-
-            # GLOBAL metrics - no barberia_id filter (SUPER_ADMIN chose to view all)
-
-            # This is authorized for SUPER_ADMIN role, uses safe_fetch_one which exempts global queries
-
-            metrics = safe_fetch_one(
-
-                """
-
-                SELECT 
-
-                    (SELECT COUNT(*) FROM barberias) as num_barberias,
-
-                    (SELECT COUNT(*) FROM usuarios) as num_usuarios,
-
-                    (SELECT COUNT(*) FROM reservas) as num_reservas,
-
-                    COALESCE((SELECT SUM(monto) FROM reservas WHERE pagado = TRUE), 0) as total_ingresos,
-
-                    (SELECT COUNT(*) FROM reservas WHERE DATE(inicio) = %s) as hoy_count
-
-                """,
-
-                (hoy,),
-
-            )
-
-        else:
-
-            # CONTEXT metrics - filter by barberia_id (SUPER_ADMIN selected a specific barberia)
-
-            # SECURITY: Use get_current_barberia_id() instead of parameter
-
-            barberia_id = get_current_barberia_id()
-
-            if not barberia_id:
-
-                return 0, 0, 0, 0, 0
-
-
-            metrics = safe_fetch_one(
-
-                """
-
-                SELECT 
-
-                    (SELECT COUNT(*) FROM barberias WHERE id = %s) as num_barberias,
-
-                    (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s) as num_usuarios,
-
-                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s) as num_reservas,
-
-                    COALESCE((SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE), 0) as total_ingresos,
-
-                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s AND DATE(inicio) = %s) as hoy_count
-
-                """,
-
-                (barberia_id, barberia_id, barberia_id, barberia_id, barberia_id, hoy),
-
-            )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
-
-        return 0, 0, 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas super admin")
-
-        return 0, 0, 0, 0, 0
-
+# ================= MÉTRICAS HELPERS (moved to app_core/metrics.py) =================
+from app_core.metrics import (
+    calcular_metricas_header,
+    calcular_metricas_cliente,
+    calcular_metricas_barbero,
+    calcular_metricas_admin,
+    calcular_metricas_super_admin,
+)
 def render_dashboard_cards(col_count, cards_data):
 
     """Renderiza cards de métricas con layout flexible."""
@@ -3492,228 +2192,15 @@ def render_dashboard_cards(col_count, cards_data):
 
             st.metric(card["label"], card["value"], card.get("delta", None))
 
-# ================= MULTI-BARBERIA PUBLIC ACCESS =================
 
-def obtener_barberia_por_slug(slug):
-
-    """Get barberia by slug for public booking."""
-
-    if not slug:
-
-        return None
-
-    try:
-
-        result = fetch_one(
-
-            """SELECT id, nombre, slug, telefono, email, ciudad, direccion, 
-
-                      latitud, longitud, color_primario, logo_url, 
-
-                      hora_apertura, hora_cierre, estado 
-
-               FROM barberias WHERE slug = %s""",
-
-            (slug,),
-
-        )
-
-        if result:
-
-            return {
-
-                "id": result[0],
-
-                "nombre": result[1],
-
-                "slug": result[2],
-
-                "telefono": result[3],
-
-                "email": result[4],
-
-                "ciudad": result[5],
-
-                "direccion": result[6],
-
-                "latitud": result[7],
-
-                "longitud": result[8],
-
-                "color_primario": result[9],
-
-                "logo_url": result[10],
-
-                "hora_apertura": result[11],
-
-                "hora_cierre": result[12],
-
-                "estado": result[13],
-
-            }
-
-        return None
-
-    except Exception as e:
-
-        logger.exception(f"Error getting barberia by slug: {str(e)}")
-
-        return None
-
-def obtener_servicios(barberia_id=None):
-
-    """Load services from database for a barberia.
-
-
-    SECURITY: Always uses current barberia context - prevents service leakage between barberias.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id:
-
-        return []
-
-    try:
-
-        results = safe_fetch_all(
-
-            """SELECT id, nombre, duracion_minutos, precio, descripcion, icono 
-
-               FROM servicios 
-
-               WHERE barberia_id = %s 
-
-               ORDER BY id ASC""",
-
-            (barberia_id,),
-
-        )
-
-        servicios_list = []
-
-        for row in results:
-
-            servicios_list.append({
-
-                "id": row[0],
-
-                "nombre": row[1],
-
-                "duracion": row[2],
-
-                "precio": row[3],
-
-                "descripcion": row[4],
-
-                "icono": row[5] or "Servicio",
-
-            })
-
-        # If no services in DB, return empty list (UI will show message)
-
-        return servicios_list
-
-    except Exception as e:
-
-        logger.exception(f"Error loading services for barberia {barberia_id}: {e}")
-
-        return []
-
-
-def crear_servicio(barberia_id, nombre, duracion, precio, descripcion, icono):
-
-    """Insert a new service for a barberia. Returns True on success."""
-
-    current = get_current_barberia_id()
-
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in crear_servicio")
-
-    try:
-
-        execute_write(
-
-            """INSERT INTO servicios (barberia_id, nombre, duracion_minutos, precio, descripcion, icono)
-               VALUES (%s, %s, %s, %s, %s, %s)
-               ON CONFLICT (barberia_id, nombre) DO NOTHING""",
-
-            (barberia_id, nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip()),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error creating service: {e}")
-
-        return False
-
-
-def actualizar_servicio(servicio_id, barberia_id, nombre, duracion, precio, descripcion, icono):
-
-    """Update an existing service. Enforces barberia_id ownership."""
-
-    current = get_current_barberia_id()
-
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in actualizar_servicio")
-
-    try:
-
-        execute_write(
-
-            """UPDATE servicios
-               SET nombre = %s, duracion_minutos = %s, precio = %s, descripcion = %s, icono = %s
-               WHERE id = %s AND barberia_id = %s""",
-
-            (nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip(), int(servicio_id), int(barberia_id)),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error updating service {servicio_id}: {e}")
-
-        return False
-
-
-def eliminar_servicio(servicio_id, barberia_id):
-
-    """Delete a service. Enforces barberia_id ownership."""
-
-    current = get_current_barberia_id()
-
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in eliminar_servicio")
-
-    try:
-
-        execute_write(
-
-            "DELETE FROM servicios WHERE id = %s AND barberia_id = %s",
-
-            (int(servicio_id), int(barberia_id)),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error deleting service {servicio_id}: {e}")
-
-        return False
-
+# ================= MULTI-BARBERIA PUBLIC ACCESS (moved to app_core/services/servicios_service.py) =================
+from app_core.services.servicios_service import (
+    obtener_barberia_por_slug,
+    obtener_servicios,
+    crear_servicio,
+    actualizar_servicio,
+    eliminar_servicio,
+)
 # ================= BARBER SHOP REGISTRATION FLOW (PRODUCTION) =================
 
 # --------- GEOCODING FUNCTIONS ---------
@@ -3985,7 +2472,7 @@ def create_admin_user_in_db(barberia_id, slug, telefono):
 
     try:
 
-        execute_write(
+        safe_execute(
 
             """
 
@@ -4019,7 +2506,7 @@ def create_services_in_db(barberia_id, services):
 
         for service in services:
 
-            execute_write(
+            safe_execute(
 
                 """
 
@@ -4076,7 +2563,7 @@ def create_barbers_in_db(barberia_id, barbers):
             nombre_completo = f"{barber['nombre']} {barber['apellido']}"
 
 
-            execute_write(
+            safe_execute(
 
                 """
 
@@ -5910,7 +4397,7 @@ def render_modal_booking(barberia):
 
                 try:
 
-                    reserva_id = execute_write(
+                    reserva_id = safe_execute(
 
                         """INSERT INTO reservas 
 
@@ -7480,7 +5967,7 @@ h3 { color: #f5f0e8 !important; }
 
                     try:
 
-                        execute_write(
+                        safe_execute(
 
                             "DELETE FROM usuarios WHERE id = %s AND barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'",
 
@@ -7660,7 +6147,7 @@ h3 { color: #f5f0e8 !important; }
 
             return
 
-        total_row = fetch_one(
+        total_row = safe_fetch_one(
 
             "SELECT SUM(precio) FROM reservas WHERE barberia_id = %s",
 

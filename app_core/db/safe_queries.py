@@ -11,286 +11,207 @@ logger = logging.getLogger("barberia_app")
 
 
 def execute_query(query, params=None, fetch=None):
-
     """Execute query with safe connection handling."""
 
     max_retries = 2
 
     for attempt in range(max_retries):
-
         conn = None
 
         try:
-
             conn = get_connection()
 
             if conn is None:
-
                 return None
 
-
             with conn.cursor() as cur:
-
                 cur.execute(query, params)
 
                 if fetch == "one":
-
                     data = cur.fetchone()
-
                 elif fetch == "all":
-
                     data = cur.fetchall()
-
                 else:
-
                     data = True
 
             conn.commit()
-
             return data
 
-        except Exception as e:
-
+        except Exception:
             if conn:
-
                 try:
-
                     conn.rollback()
-
-                except:
-
-                    pass  # Connection might be closed
-
+                except Exception:
+                    pass
 
             if attempt == max_retries - 1:
-
-                logger.exception("Error en base de datos después de reintentos")
-
+                logger.exception("Error en base de datos despues de reintentos")
                 st.error("Error de base de datos. Por favor, intenta de nuevo.")
-
                 return None
 
-            else:
+            logger.warning(
+                "[AVISO] Error en base de datos, reintentando... (intento %d)",
+                attempt + 1,
+            )
 
-                logger.warning("[AVISO] Error en base de datos, reintentando... (intento %d)", attempt + 1)
-
-                # Force connection recreation on next attempt
-
-                if "db_connection" in st.session_state:
-
-                    try:
-
-                        st.session_state.db_connection.close()
-
-                    except:
-
-                        pass
-
-                    st.session_state.db_connection = None
-
-        finally:
-
-            # Don't close connection - keep it in session state
-
-            pass
+            if "db_connection" in st.session_state:
+                try:
+                    st.session_state.db_connection.close()
+                except Exception:
+                    pass
+                st.session_state.db_connection = None
 
 
 def fetch_one(query, params=None):
-
     return execute_query(query, params, fetch="one")
 
 
 def fetch_all(query, params=None):
-
     return execute_query(query, params, fetch="all") or []
 
 
 def execute_write(query, params=None, fetch_one_result=False):
-
     return execute_query(query, params, fetch="one" if fetch_one_result else None)
 
 
 # ================= STEP 1: SAFE QUERY WRAPPERS WITH BARBERIA_ID ENFORCEMENT =================
 
+LOGIN_READ_PATTERNS = (
+    "from usuarios where usuario",
+    "from usuarios where lower(usuario)",
+    "select count(*) from usuarios where usuario",
+)
+
+SYSTEM_WRITE_PATTERNS = (
+    "insert into barberias",
+    "create table",
+    "alter table",
+    "create index",
+    "drop index",
+)
+
+TENANT_TABLE_PATTERNS = (
+    "from reservas",
+    "join reservas",
+    "from usuarios",
+    "join usuarios",
+    "from servicios",
+    "join servicios",
+)
+
+
+def _normalize_query(query):
+    return " ".join(str(query).lower().split())
+
+
+def _current_role():
+    role = st.session_state.get("rol") or st.session_state.get("user_role")
+    return str(role or "").strip().upper()
+
+
+def _is_super_admin_global():
+    return (
+        _current_role() == "SUPER_ADMIN"
+        and bool(st.session_state.get("super_admin_all_barberias", False))
+    )
+
+
+def _mentions_tenant_table(query_lower):
+    return any(pattern in query_lower for pattern in TENANT_TABLE_PATTERNS)
+
+
+def _is_system_read(query_lower):
+    if "pg_advisory_xact_lock" in query_lower or "hashtext" in query_lower:
+        return True
+    return "from barberias" in query_lower and not _mentions_tenant_table(query_lower)
+
+
+def _is_login_read(query_lower):
+    return any(pattern in query_lower for pattern in LOGIN_READ_PATTERNS)
+
+
+def _has_barberia_where_scope(query_lower):
+    where_pos = query_lower.find(" where ")
+    if where_pos == -1:
+        return False
+    return "barberia_id" in query_lower[where_pos:]
+
+
+def _has_barberia_column(query_lower):
+    return "barberia_id" in query_lower
+
+
+def _security_error(message, query):
+    error_msg = f"SECURITY VIOLATION: {message}\nQuery: {str(query)[:100]}..."
+    logger.error(error_msg)
+    raise Exception(error_msg)
+
+
+def _validate_safe_read(query, *, fetch_many):
+    query_lower = _normalize_query(query)
+
+    if _is_system_read(query_lower) or _is_login_read(query_lower):
+        return
+
+    if _is_super_admin_global():
+        return
+
+    if not _has_barberia_where_scope(query_lower):
+        label = "fetch_all" if fetch_many else "fetch_one"
+        _security_error(f"{label} missing barberia_id WHERE filter", query)
+
+
 def safe_fetch_one(query, params=()):
+    """Read one row, enforcing tenant scope unless the query is explicitly global."""
 
-    """CRITICAL: Query wrapper that ENFORCES barberia_id presence.
-
-
-    Rule: Every query MUST include 'barberia_id' filter or it raises exception.
-
-    This makes data leakage mathematically impossible.
-
-    """
-
-    query_lower = query.lower()
-
-
-    # Skip validation for system queries that don't need barberia_id
-
-    system_queries = [
-
-        "SELECT id FROM barberias",
-
-        "SELECT COUNT(*) FROM barberias",
-
-        "SELECT * FROM barberias WHERE estado",
-
-        "FROM barberias WHERE slug",
-
-        "hashtext",  # pg_advisory_xact_lock calls
-
-        "SELECT nombre FROM barberias",
-
-        "SELECT id, nombre FROM barberias",
-
-        "INSERT INTO barberias",
-
-        "SELECT COUNT(*) FROM usuarios WHERE usuario",  # Login query (before barberia context)
-
-        "SELECT * FROM usuarios WHERE usuario",
-
-        "SELECT COUNT(*) FROM usuarios) as num_usuarios",  # Super admin global metrics
-
-        "SELECT COUNT(*) FROM reservas) as num_reservas",  # Super admin global metrics
-
-        "SELECT SUM(monto) FROM reservas WHERE pagado",  # Super admin global metrics
-
-    ]
-
-
-    # If it's a safe system query, allow it
-
-    if any(safe in query_lower for safe in system_queries):
-
-        return fetch_one(query, params)
-
-
-    # Otherwise: MUST include barberia_id filter
-
-    if "barberia_id" not in query_lower:
-
-        error_msg = f"🚨 SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
-
-        logger.error(error_msg)
-
-        raise Exception(error_msg)
-
-
+    _validate_safe_read(query, fetch_many=False)
     return fetch_one(query, params)
 
 
 def safe_fetch_all(query, params=()):
+    """Read many rows, enforcing tenant scope unless the query is explicitly global."""
 
-    """CRITICAL: Query wrapper that ENFORCES barberia_id presence.
-
-
-    Rule: Every query MUST include 'barberia_id' filter or it raises exception.
-
-    This makes data leakage mathematically impossible.
-
-
-    Exception: SUPER_ADMIN with super_admin_all_barberias=True is allowed global queries.
-
-    """
-
-    query_lower = query.lower()
-
-
-    # Skip validation for system queries
-
-    system_queries = [
-
-        "SELECT id FROM barberias",
-
-        "SELECT id, nombre FROM barberias",
-
-        "SELECT COUNT(*) FROM barberias",
-
-        "FROM barberias WHERE estado",
-
-        "SELECT COUNT(*) FROM usuarios WHERE usuario",
-
-        "ORDER BY nombre",  # Barberia dropdown list
-
-    ]
-
-
-    if any(safe in query_lower for safe in system_queries):
-
-        return fetch_all(query, params)
-
-
-    # SUPER_ADMIN global view is allowed
-
-    rol = st.session_state.get("rol")
-
-    super_all = rol == "SUPER_ADMIN" and st.session_state.get("super_admin_all_barberias", False)
-
-    if super_all and "WHERE 1=1" in query:  # Indicates global query pattern
-
-        return fetch_all(query, params)
-
-
-    # Otherwise: MUST include barberia_id filter
-
-    if "barberia_id" not in query_lower:
-
-        error_msg = f"🚨 SECURITY VIOLATION: Query missing barberia_id filter!\nQuery: {query[:100]}..."
-
-        logger.error(error_msg)
-
-        raise Exception(error_msg)
-
-
+    _validate_safe_read(query, fetch_many=True)
     return fetch_all(query, params)
 
 
-def safe_execute(query, params=(), fetch_one_result=False):
+def _validate_safe_write(query, *, allow_system=False, system_reason=None):
+    query_lower = _normalize_query(query)
 
-    """CRITICAL: Write operation wrapper that ENFORCES barberia_id presence.
+    if allow_system:
+        logger.info(
+            "System write allowed by explicit reason: %s",
+            system_reason or "unspecified",
+        )
+        return
 
+    if any(pattern in query_lower for pattern in SYSTEM_WRITE_PATTERNS):
+        return
 
-    Rule: Every INSERT/UPDATE/DELETE MUST include 'barberia_id' or it raises exception.
+    is_insert = "insert into" in query_lower
+    is_update = query_lower.startswith("update ") or " update " in query_lower
+    is_delete = "delete from" in query_lower
 
-    """
+    if is_insert and not _has_barberia_column(query_lower):
+        _security_error("insert missing barberia_id column", query)
 
-    query_lower = query.lower()
-
-
-    # System operations that don't need barberia_id
-
-    system_ops = [
-
-        "INSERT INTO barberias",
-
-        "INSERT INTO usuarios WHERE barberia_id",
-
-        "CREATE TABLE",
-
-        "ALTER TABLE",
-
-        "INSERT INTO servicios",
-
-    ]
+    if (is_update or is_delete) and not _has_barberia_where_scope(query_lower):
+        _security_error("write missing barberia_id WHERE filter", query)
 
 
-    if any(safe in query_lower for safe in system_ops):
+def safe_execute(
+    query,
+    params=(),
+    fetch_one_result=False,
+    *,
+    allow_system=False,
+    system_reason=None,
+):
+    """Write wrapper that enforces tenant scope for sensitive mutations."""
 
-        return execute_write(query, params, fetch_one_result)
-
-
-    # For user operations: MUST include barberia_id
-
-    if "INSERT INTO" in query_lower or "UPDATE" in query_lower or "DELETE FROM" in query_lower:
-
-        if "barberia_id" not in query_lower:
-
-            error_msg = f"🚨 SECURITY VIOLATION: Write operation missing barberia_id!\nQuery: {query[:100]}..."
-
-            logger.error(error_msg)
-
-            raise Exception(error_msg)
-
-
+    _validate_safe_write(
+        query,
+        allow_system=allow_system,
+        system_reason=system_reason,
+    )
     return execute_write(query, params, fetch_one_result)
