@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import streamlit as st
 
-from app_core.db.safe_queries import fetch_all
+from app_core.db.safe_queries import safe_fetch_all
 from app_core.public_booking.state import (
     go_to_booking_step,
     reset_booking_flow,
@@ -83,7 +83,7 @@ def render_step_2_barber_selection(barberia_id):
     if not barberos:
         st.info("Mostrando todos los barberos disponibles...")
         try:
-            barberos = fetch_all(
+            barberos = safe_fetch_all(
                 """
                 SELECT id, usuario AS nombre FROM usuarios
                 WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'
@@ -191,7 +191,7 @@ def render_step_3_datetime_selection(barberia_id):
             logger.info(f"Booking time set: {type(time_obj).__name__} -> {hora_final}")
         except Exception as e:
             logger.error(f"Error setting booking time: {str(e)}")
-            st.error(f"Error al seleccionar hora: {str(e)}")
+            st.error("Error al seleccionar la hora. Por favor, intenta de nuevo.")
             st.stop()
             return
 
@@ -300,12 +300,12 @@ def render_step_5_review(
                         barberia_id,
                         normalizar_texto(data.get('nombre', '')),
                         data.get('barbero_id'),
-                        data.get('barbero_nombre'),
                         data.get('servicio'),
                         data.get('fecha'),
                         data.get('hora'),
                         data.get('precio'),
                         data.get('duracion'),
+                        barbero_nombre=data.get('barbero_nombre'),
                     )
 
                     if reserva_id:

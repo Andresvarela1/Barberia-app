@@ -3,16 +3,10 @@
 import logging
 import os
 import socket
-from pathlib import Path
 from urllib.parse import urlparse
 
 import psycopg2
 import streamlit as st
-from dotenv import load_dotenv
-
-
-_dotenv_path = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(dotenv_path=_dotenv_path)
 
 logger = logging.getLogger("barberia_app")
 

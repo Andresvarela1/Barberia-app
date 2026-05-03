@@ -42,7 +42,7 @@ pip install -r requirements.txt
 
 ## Variables De Entorno
 
-El proyecto carga variables desde `.env` cuando existe.
+El proyecto lee secretos desde variables de entorno del sistema o del despliegue; no requiere un `.env` versionado en el repo.
 
 Variables principales:
 
@@ -143,7 +143,6 @@ barberia_app/
 ├── design_system.py
 ├── schema.sql
 ├── requirements.txt
-├── .env
 ├── components/
 │   ├── __init__.py
 │   └── ui_loader.py
@@ -172,7 +171,7 @@ El webhook separado entra por:
 ## Flujo Recomendado De Desarrollo
 
 1. Activa el entorno virtual.
-2. Configura `.env` con una base PostgreSQL/Supabase de desarrollo.
+2. Configura variables de entorno con una base PostgreSQL/Supabase de desarrollo.
 3. Aplica `schema.sql` o deja que la app complete parte de la inicialización.
 4. Corre `streamlit run app.py`.
 5. Si trabajas pagos, corre también `webhook.py`.

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from app_core.db.safe_queries import safe_fetch_all
+from app_core.services.booking_service import resolver_barbero_agenda
 from app_core.security.tenant_access import (
     enforce_barberia_access,
     get_current_barberia_id,
@@ -152,6 +153,18 @@ def obtener_horarios_disponibles(barberia_id=None, barbero_id=None, fecha=None, 
 
         from datetime import time as time_type
 
+        identidad_barbero = resolver_barbero_agenda(barberia_id, barbero_id=barbero_id)
+
+        if not identidad_barbero:
+
+            logger.warning(
+                "obtener_horarios_disponibles: invalid barber %s for barberia %s",
+                barbero_id,
+                barberia_id,
+            )
+
+            return []
+
 
         # Get all reservations for this barber on this date
 
@@ -161,13 +174,28 @@ def obtener_horarios_disponibles(barberia_id=None, barbero_id=None, fecha=None, 
 
             SELECT inicio, fin FROM reservas
 
-            WHERE barberia_id = %s AND barbero_id = %s AND DATE(inicio) = %s
+            WHERE barberia_id = %s
+
+              AND DATE(inicio) = %s
+
+              AND (
+
+                    barbero_id = %s
+
+                    OR (barbero_id IS NULL AND barbero = %s)
+
+              )
 
             ORDER BY inicio
 
             """,
 
-            (barberia_id, barbero_id, fecha)
+            (
+                barberia_id,
+                fecha,
+                identidad_barbero["barbero_id"],
+                identidad_barbero["barbero"],
+            )
 
         )
 
