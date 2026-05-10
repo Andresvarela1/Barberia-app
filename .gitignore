@@ -46,13 +46,17 @@ LOGIN_SECTION_FIX.py
 # Temporary scan/check scripts
 _scan_*.py
 
-# Manual verification dump files
+# Manual verification dump files and temporary text extracts
 end_check*.txt
+booking_section_extract.txt
 insert_check.txt
 middle_check.txt
-step*_header.txt
-*_extract.txt
-*_check.txt
-
-# Runtime startup log (not covered by *.log)
+step2_header.txt
+IMPLEMENTATION_LOG.txt
 startup_log.txt
+log.txt
+log_new.txt
+debug_execution.log
+
+# Empty/ephemeral data files
+reservas.json

@@ -44,13 +44,9 @@ from design_system import (
 
     render_card,
 
-    render_section_title,
-
     render_subsection_title,
 
     render_badge,
-
-    render_stat_box,
 
     render_alert,
 
@@ -63,6 +59,8 @@ from design_system import (
     render_time_chips,
 
     render_metric_grid,
+
+    render_metric_card,
 
     render_status_legend,
 
@@ -95,6 +93,14 @@ from design_system import (
     render_panel_header,
 
     render_panel_empty_state,
+
+    render_section_block,
+
+    render_sidebar_section,
+
+    render_cta_section,
+
+    render_appointment_block,
 
     render_public_landing_hero,
 
@@ -189,10 +195,6 @@ from app_core.db.connection import (
 )
 
 from app_core.db.safe_queries import (
-    execute_query,
-    fetch_one,
-    fetch_all,
-    execute_write,
     safe_fetch_one,
     safe_fetch_all,
     safe_execute,
@@ -209,7 +211,6 @@ from app_core.bootstrap import (
 from app_core.auth import (
     normalizar_texto,
     es_hash_bcrypt,
-    hash_password,
     verificar_password,
     login,
     registrar,
@@ -277,7 +278,7 @@ from app_core.services.availability_service import (
     obtener_horarios_disponibles,
 )
 from app_core.services.booking_service import (
-    normalizar_reserva, normalizar_datetime, _guardar_reserva_tx,
+    normalizar_reserva, normalizar_datetime,
     guardar_reserva, actualizar_reserva, eliminar_reserva,
     insertar_reserva_con_fecha_hora, obtener_reserva_por_id, obtener_reserva,
 )
@@ -287,6 +288,16 @@ from app_core.services.payment_service import (
 )
 
 from app_core.public_booking.flow import flujo_reserva_publica
+
+from app_core.services.barberias_service import (
+    get_default_barberia_id,
+    check_barberia_name_exists,
+    create_barberia_in_db,
+    create_admin_user_in_db,
+    create_services_in_db,
+    create_barbers_in_db,
+    obtener_todas_barberias,
+)
 
 # ------------------ FUNCIONES (moved to app_core) ------------------
 # normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
@@ -464,12 +475,15 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
         with col1:
 
-            st.caption(f"{fecha_label} {hora_label} · {servicio}")
+            render_public_note(
+                f"{fecha_label} {hora_label} · {servicio}",
+                note_type="info",
+            )
 
 
         with col2:
 
-            st.metric("Monto", f"${monto}")
+            render_metric_card("Monto", f"${monto}", icon="$", color=Colors.SUCCESS, size="small")
 
 
         with col3:
@@ -552,12 +566,9 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
                         st.rerun()
 
 
-                st.caption(
-
-                    " Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. "
-
-                    "La confirmación puede tomar algunos minutos."
-
+                render_public_note(
+                    "Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. La confirmación puede tomar algunos minutos.",
+                    note_type="info",
                 )
 
             else:
@@ -589,12 +600,6 @@ def obtener_telefono_usuario(usuario, barberia_id=None):
     )
 
     return row[0] if row and row[0] else None
-
-def get_default_barberia_id():
-
-    row = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-
-    return row[0] if row else None
 
 def registrar_fidelizacion(usuario, barberia_id):
 
@@ -2182,7 +2187,7 @@ from app_core.metrics import (
 )
 def render_dashboard_cards(col_count, cards_data):
 
-    """Renderiza cards de métricas con layout flexible."""
+    """Renderiza métricas con el sistema premium unificado."""
 
     cols = st.columns(col_count)
 
@@ -2190,7 +2195,87 @@ def render_dashboard_cards(col_count, cards_data):
 
         with col:
 
-            st.metric(card["label"], card["value"], card.get("delta", None))
+            render_metric_card(
+                card["label"],
+                card["value"],
+                delta=card.get("delta", None),
+                icon=card.get("icon", "•"),
+                color=card.get("color", Colors.PRIMARY),
+                size=card.get("size", "medium"),
+            )
+
+
+def render_internal_section_header(title, subtitle, eyebrow=None, meta=None):
+
+    """Normaliza encabezados internos entre roles."""
+
+    render_panel_header(title, subtitle, eyebrow=eyebrow, meta=meta)
+
+
+def render_upcoming_appointments_summary(title, reservas, limit=5):
+
+    """Renderiza próximas citas con un bloque premium reutilizable."""
+
+    if not reservas:
+        render_panel_empty_state(
+            title,
+            "No hay citas próximas para mostrar en este momento.",
+        )
+        return
+
+    render_subsection_title(title)
+
+    for reserva in reservas[:limit]:
+        hora_val = reserva[4] if isinstance(reserva, tuple) else reserva.get("hora")
+        cliente_val = (reserva[5] or reserva[6]) if isinstance(reserva, tuple) else (reserva.get("cliente") or reserva.get("nombre"))
+        servicio_val = reserva[2] if isinstance(reserva, tuple) else reserva.get("servicio")
+        barbero_val = reserva[1] if isinstance(reserva, tuple) else reserva.get("barbero")
+
+        hora_str = hora_val.strftime("%H:%M") if hasattr(hora_val, "strftime") else str(hora_val or "--:--")
+        persona_label = cliente_val or barbero_val or "Agenda"
+        if cliente_val and barbero_val and cliente_val != barbero_val:
+            persona_label = f"{cliente_val} · {barbero_val}"
+
+        render_appointment_block(
+            hora_str,
+            servicio_val or "Servicio",
+            persona_label,
+            30,
+            status="scheduled",
+        )
+
+
+def render_income_summary_card(total, title="Ingresos totales"):
+
+    render_metric_card(
+        title,
+        f"${total}",
+        icon="$",
+        color=Colors.SUCCESS,
+        size="medium",
+    )
+
+
+def render_income_breakdown(barberos_list, get_income_fn):
+
+    items = []
+
+    for barbero_id_val, barbero_name in barberos_list:
+        ingreso = get_income_fn(barbero_id_val)
+        items.append(
+            f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:{Spacing.SM} 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:{Colors.TEXT}; font-weight:600;">{barbero_name}</span>
+                <span style="color:{Colors.SUCCESS}; font-weight:700;">${ingreso}</span>
+            </div>
+            """
+        )
+
+    render_card(
+        "".join(items) if items else "<p style='margin:0;'>Sin datos disponibles.</p>",
+        title="Desglose por barbero",
+        class_name="premium-card",
+    )
 
 
 # ================= MULTI-BARBERIA PUBLIC ACCESS (moved to app_core/services/servicios_service.py) =================
@@ -2354,257 +2439,6 @@ def validate_barbers(barbers):
 
 
     return [], valid_barbers
-
-def check_barberia_name_exists(nombre):
-
-    """Check if barber shop name already exists."""
-
-    try:
-
-        existing = fetch_one(
-
-            "SELECT id FROM barberias WHERE LOWER(nombre) = LOWER(%s) LIMIT 1",
-
-            (nombre,)
-
-        )
-
-        return existing is not None
-
-    except Exception as e:
-
-        logger.warning(f"Error checking barberia name: {str(e)}")
-
-        return False
-
-# --------- DATABASE FUNCTIONS ---------
-
-def create_barberia_in_db(data):
-
-    """Create barberia record in database. Returns barberia_id or None."""
-
-    # Generate slug: lowercase, replace spaces with hyphens, handle special chars
-
-    nombre = data["nombre"].lower()
-
-    slug = nombre.replace(" ", "-").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("?", "u").replace("ñ", "n")
-
-    slug = "".join(c for c in slug if c.isalnum() or c in "-_")  # Remove special chars
-
-
-    try:
-
-        result = execute_write(
-
-            """
-
-            INSERT INTO barberias 
-
-            (nombre, slug, telefono, email, ciudad, direccion, latitud, longitud,
-
-             color_primario, hora_apertura, hora_cierre, logo_url, estado)
-
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-
-            RETURNING id
-
-            """,
-
-            (
-
-                data["nombre"],
-
-                slug,
-
-                data["telefono"],
-
-                data["email"],
-
-                data["ciudad"],
-
-                data.get("direccion") or None,
-
-                data.get("latitud"),
-
-                data.get("longitud"),
-
-                data["color_primario"],
-
-                data["hora_apertura"],
-
-                data["hora_cierre"],
-
-                data["logo_url"] or None,
-
-                "activa"
-
-            ),
-
-            fetch_one_result=True
-
-        )
-
-
-        if result and result[0]:
-
-            logger.info(f"[OK] Barbería creada: {data['nombre']} (ID: {result[0]}, Slug: {slug})")
-
-            return result[0]
-
-        return None
-
-    except Exception as e:
-
-        logger.exception(f"Error creating barberia: {str(e)}")
-
-        return None
-
-def create_admin_user_in_db(barberia_id, slug, telefono):
-
-    """Create admin user. Returns (username, password) or (None, None)."""
-
-    admin_user = f"admin_{slug}"
-
-    admin_password = "admin123"
-
-    admin_hash = hash_password(admin_password)
-
-
-    try:
-
-        safe_execute(
-
-            """
-
-            INSERT INTO usuarios (usuario, password, rol, barberia_id, telefono)
-
-            VALUES (%s, %s, %s, %s, %s)
-
-            """,
-
-            (admin_user, admin_hash, "ADMIN", barberia_id, telefono)
-
-        )
-
-        logger.info(f"[OK] Admin user creado: {admin_user}")
-
-        return admin_user, admin_password
-
-    except Exception as e:
-
-        logger.exception(f"Error creating admin user: {str(e)}")
-
-        return None, None
-
-def create_services_in_db(barberia_id, services):
-
-    """Create services. Returns count of created services."""
-
-    count = 0
-
-    try:
-
-        for service in services:
-
-            safe_execute(
-
-                """
-
-                INSERT INTO servicios 
-
-                (barberia_id, nombre, duracion_minutos, precio, icono)
-
-                VALUES (%s, %s, %s, %s, %s)
-
-                """,
-
-                (
-
-                    barberia_id,
-
-                    service["nombre"],
-
-                    service["duracion"],
-
-                    int(service["precio"]),
-
-                    "Servicio"
-
-                )
-
-            )
-
-            count += 1
-
-        logger.info(f"[OK] Servicios creados: {count}")
-
-        return count
-
-    except Exception as e:
-
-        logger.exception(f"Error creating services: {str(e)}")
-
-        return 0
-
-def create_barbers_in_db(barberia_id, barbers):
-
-    """Create barber users. Returns dict of username:password pairs."""
-
-    barber_passwords = {}
-
-    try:
-
-        for barber in barbers:
-
-            barber_password = f"barber_{barber['usuario'][:3]}123"
-
-            barber_hash = hash_password(barber_password)
-
-            nombre_completo = f"{barber['nombre']} {barber['apellido']}"
-
-
-            safe_execute(
-
-                """
-
-                INSERT INTO usuarios (usuario, password, rol, barberia_id, telefono, nombre, apellido)
-
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-
-                """,
-
-                (
-
-                    barber["usuario"],
-
-                    barber_hash,
-
-                    "BARBERO",
-
-                    barberia_id,
-
-                    None,
-
-                    barber["nombre"],
-
-                    barber["apellido"]
-
-                )
-
-            )
-
-            barber_passwords[barber["usuario"]] = barber_password
-
-
-        logger.info(f"[OK] Barberos creados: {len(barber_passwords)}")
-
-        return barber_passwords
-
-    except Exception as e:
-
-        logger.exception(f"Error creating barbers: {str(e)}")
-
-        return {}
 
 # --------- UI RENDER FUNCTIONS ---------
 
@@ -3257,7 +3091,10 @@ def render_success_screen():
 
             st.code(f"{usuario}: {password}", language="text")
 
-        st.caption("📍 Cada barbero debe cambiar su contraseña al primer acceso")
+        render_public_note(
+            "Cada barbero debe cambiar su contraseña al primer acceso.",
+            note_type="info",
+        )
 
 
     # Next steps
@@ -4461,82 +4298,6 @@ def render_modal_booking(barberia):
 
     st.markdown('</div></div>', unsafe_allow_html=True)
 
-def obtener_todas_barberias(ciudad=None, servicio=None):
-
-    """Fetch all public barberias with optional filters."""
-
-    try:
-
-        query = "SELECT id, nombre, slug, telefono, email, ciudad, direccion, latitud, longitud, color_primario, logo_url, hora_apertura, hora_cierre, estado FROM barberias WHERE estado = %s"
-
-        params = ["active"]
-
-
-        if ciudad and ciudad.strip():
-
-            query += " AND LOWER(ciudad) LIKE LOWER(%s)"
-
-            params.append(f"%{ciudad.strip()}%")
-
-
-        # TODO: Implement servicio filter by joining with servicios table
-
-        # if servicio and servicio.strip():
-
-        #     query += " AND id IN (SELECT DISTINCT barberia_id FROM servicios WHERE LOWER(nombre) LIKE LOWER(%s))"
-
-        #     params.append(f"%{servicio.strip()}%")
-
-
-        query += " ORDER BY nombre ASC"
-
-
-        results = fetch_all(query, tuple(params))
-
-        barberias_list = []
-
-        for row in results:
-
-            barberias_list.append({
-
-                "id": row[0],
-
-                "nombre": row[1],
-
-                "slug": row[2],
-
-                "telefono": row[3],
-
-                "email": row[4],
-
-                "ciudad": row[5],
-
-                "direccion": row[6],
-
-                "latitud": float(row[7]) if row[7] else None,
-
-                "longitud": float(row[8]) if row[8] else None,
-
-                "color_primario": row[9],
-
-                "logo_url": row[10],
-
-                "hora_apertura": row[11],
-
-                "hora_cierre": row[12],
-
-                "estado": row[13],
-
-            })
-
-        return barberias_list
-
-    except Exception as e:
-
-        logger.exception(f"Error fetching barberias: {e}")
-
-        return []
-
 def render_barberia_card(barberia, index):
 
     """Render a marketplace card for a single barberia."""
@@ -4552,19 +4313,19 @@ def render_barberia_card(barberia, index):
 
         .barberia-card-{index} {{
 
-            background: white;
+            background: linear-gradient(135deg, #101114 0%, #16181d 100%);
 
-            border: 1px solid #e0e0e0;
+            border: 1px solid rgba(197,159,85,0.18);
 
-            border-radius: 12px;
+            border-radius: 16px;
 
-            padding: 16px;
+            padding: 18px;
 
-            margin-bottom: 12px;
+            margin-bottom: 14px;
 
             transition: all 0.3s ease;
 
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 
         }}
 
@@ -4573,9 +4334,9 @@ def render_barberia_card(barberia, index):
 
             transform: translateY(-4px);
 
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 22px 48px rgba(0, 0, 0, 0.36);
 
-            border-color: #667eea;
+            border-color: rgba(197,159,85,0.42);
 
         }}
 
@@ -4599,7 +4360,7 @@ def render_barberia_card(barberia, index):
 
             font-weight: 600;
 
-            color: #1a1a1a;
+            color: #f5f0e8;
 
             margin: 0;
 
@@ -4608,9 +4369,9 @@ def render_barberia_card(barberia, index):
 
         .card-rating-{index} {{
 
-            background: #ffd700;
+            background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%);
 
-            color: #333;
+            color: #080808;
 
             padding: 4px 8px;
 
@@ -4625,7 +4386,7 @@ def render_barberia_card(barberia, index):
 
         .card-meta-{index} {{
 
-            color: #666;
+            color: rgba(245,240,232,0.78);
 
             font-size: 14px;
 
@@ -4644,7 +4405,7 @@ def render_barberia_card(barberia, index):
 
             gap: 8px;
 
-            color: #555;
+            color: rgba(245,240,232,0.86);
 
             font-size: 13px;
 
@@ -4659,9 +4420,9 @@ def render_barberia_card(barberia, index):
 
             padding: 10px;
 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%);
 
-            color: white;
+            color: #080808;
 
             border: none;
 
@@ -4682,7 +4443,7 @@ def render_barberia_card(barberia, index):
 
             transform: scale(1.02);
 
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 12px 28px rgba(197,160,40,0.32);
 
         }}
 
@@ -4693,7 +4454,7 @@ def render_barberia_card(barberia, index):
 
     # Card HTML - with rating stars (placeholder for future integration)
 
-    rating_stars = "­" * min(5, max(1, 4))  # Placeholder: 4 stars
+    rating_stars = "★" * 4
 
 
     card_html = f"""
@@ -4710,19 +4471,19 @@ def render_barberia_card(barberia, index):
 
         <div class="card-meta-{index}">
 
-            Teléfono: {barberia.get('telefono', 'N/A')}
+            Contacto · {barberia.get('telefono', 'N/A')}
 
         </div>
 
         <div class="card-address-{index}">
 
-            Dirección: {barberia.get('direccion', 'Dirección no disponible')}
+            Ubicación · {barberia.get('direccion', 'Dirección no disponible')}
 
         </div>
 
         <div class="card-meta-{index}">
 
-            Ciudad: {barberia.get('ciudad', 'N/A')}
+            Ciudad · {barberia.get('ciudad', 'N/A')}
 
         </div>
 
@@ -4813,9 +4574,10 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_left:
 
-        st.markdown(f"### Resultados ({len(barberias)} barberías)")
-
-        st.markdown("")
+        render_section_block(
+            "Barberías disponibles",
+            f"{len(barberias)} opciones para revisar y agendar.",
+        )
 
 
         for idx, barberia in enumerate(barberias):
@@ -4827,9 +4589,10 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_right:
 
-        st.markdown("### Mapa")
-
-        st.markdown("")
+        render_section_block(
+            "Mapa",
+            "Ubicaciones disponibles para esta búsqueda.",
+        )
 
 
         # Prepare map data (Streamlit's st.map expects lat/lon in dataframe)
@@ -4927,18 +4690,14 @@ def render_home_screen():
 
     # ===== MAIN OPTIONS SECTION =====
 
-    st.markdown("---")
-
-    st.markdown("")
-
-
     col_center = st.columns([1, 2, 1])
 
     with col_center[1]:
 
-        st.markdown("<h2 style='text-align: center;'>¿Qué deseas hacer?</h2>", unsafe_allow_html=True)
-
-        st.markdown("")
+        render_section_block(
+            "Elige tu siguiente paso",
+            "Accede a tu panel, crea tu barbería o agenda una nueva cita.",
+        )
 
 
         col1, col2, col3 = st.columns(3, gap="large")
@@ -5207,46 +4966,33 @@ def render_landing_publico(barberia):
 
     else:
 
-        st.info("Los servicios se mostrarán aquí una vez configurados")
-
-
-    render_public_section_heading(
-        "Agenda tu próxima cita",
-        "También puedes comenzar sin elegir servicio y decidir en el primer paso.",
-    )
-
-
-    col_btn_1, col_btn_2, col_btn_3 = st.columns([1, 2, 1])
-
-    with col_btn_2:
-
-        st.markdown('<div class="public-cta">', unsafe_allow_html=True)
-
-        cta_clicked = st.button(
-
-            "Agendar mi cita",
-
-            key="barberia_cta_button",
-
-            use_container_width=True,
-
-            help="Comienza tu reserva ahora",
-
+        render_alert(
+            "Los servicios se mostrarán aquí una vez configurados.",
+            alert_type="info",
+            title="Catálogo en preparación",
         )
 
-        st.markdown('</div>', unsafe_allow_html=True)
 
+    cta_clicked = render_cta_section(
+        "Agenda tu próxima cita",
+        "También puedes comenzar sin elegir servicio y decidir en el primer paso.",
+        button_text="Agendar mi cita",
+        button_key="barberia_cta_button",
+        icon="Agenda",
+    )
 
-        if cta_clicked:
+    if cta_clicked:
 
-            st.session_state[landing_key] = False
+        st.session_state[landing_key] = False
 
-            st.session_state.booking_step = 1  # Go to service selection
+        st.session_state.booking_step = 1  # Go to service selection
 
-            st.rerun()
+        st.rerun()
 
-
-    st.caption("Barbería profesional · Barberos expertos · Reserva online")
+    render_public_note(
+        "Barbería profesional · Barberos expertos · Reserva online",
+        note_type="info",
+    )
 
 def render_booking_publico(barberia_slug):
 
@@ -5488,7 +5234,7 @@ h3 { color: #f5f0e8 !important; }
 
                                 with st.spinner("Cargando barberías..."):
 
-                                    fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
+                                    fb = safe_fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
 
                                 st.session_state.barberia_context_id = fb[0] if fb else None
 
@@ -5650,10 +5396,6 @@ h3 { color: #f5f0e8 !important; }
 
         st.markdown("## Barbería Leveling")
 
-        st.markdown(f"**{usuario or 'Invitado'}**")
-
-        st.caption(f"Rol: {nr.replace('_', ' ')}")
-
         barberia_name = "Principal"
 
         if barberia_id:
@@ -5662,7 +5404,7 @@ h3 { color: #f5f0e8 !important; }
 
                 with st.spinner("Cargando barbería..."):
 
-                    b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
+                    b_name_row = safe_fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
 
                 st.session_state.barberia_name = b_name_row[0] if b_name_row else "Principal"
 
@@ -5670,13 +5412,24 @@ h3 { color: #f5f0e8 !important; }
 
             barberia_name = st.session_state.barberia_name
 
-        st.markdown(f"**Barbería:** {barberia_name}")
+        render_sidebar_section(
+            "Cuenta",
+            [
+                (usuario or "Invitado", "usuario", "Cuenta"),
+                (nr.replace("_", " "), "rol", "Rol"),
+                (barberia_name, "barberia", "Barberia"),
+            ],
+        )
 
         st.markdown("---")
 
         if nr == "SUPER_ADMIN":
 
-            st.markdown("### Contexto")
+            render_sidebar_section(
+                "Contexto",
+                [("Gestión multi-barbería", "contexto", "Contexto")],
+                active_item="contexto",
+            )
 
             try:
 
@@ -5684,7 +5437,7 @@ h3 { color: #f5f0e8 !important; }
 
                     with st.spinner("Cargando barberías..."):
 
-                        b_list = fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
+                        b_list = safe_fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
 
                     st.session_state.barberias_list = b_list
 
@@ -6161,7 +5914,7 @@ h3 { color: #f5f0e8 !important; }
 
             total = 0
 
-        st.metric("Total generado", f"${total if total else 0}")
+        render_income_summary_card(total if total else 0, "Total generado")
 
     # ================= CLIENTE =================
 
@@ -6175,7 +5928,12 @@ h3 { color: #f5f0e8 !important; }
 
         if seccion == "Dashboard":
 
-            render_section_title("Mi panel", subtitle="Visualiza tus reservas y métricas")
+            render_internal_section_header(
+                "Mi panel",
+                "Visualiza tus reservas y métricas.",
+                eyebrow="Cliente",
+                meta=barberia_name,
+            )
 
 
             if not db_ok:
@@ -6196,9 +5954,9 @@ h3 { color: #f5f0e8 !important; }
                 # Dashboard metrics with new design system
 
                 render_metric_grid([
-                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
-                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
-                    ("Pendientes", pendientes_hoy, "Espera", Colors.WARNING),
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
                 ], columns=3)
 
 
@@ -6208,10 +5966,10 @@ h3 { color: #f5f0e8 !important; }
                 render_subsection_title("Resumen de actividad")
 
                 render_metric_grid([
-                    ("Total", total_reservas, "📊", Colors.SECONDARY),
-                    ("Hoy", hoy_reservas, "📆", Colors.PRIMARY),
-                    ("Ingresos", "$0", "Ingresos", Colors.SUCCESS),
-                    ("Barberos", num_barberos_cached, "Tijeras", Colors.WARNING),
+                    ("Total", total_reservas, "Total", Colors.SECONDARY),
+                    ("Hoy", hoy_reservas, "Agenda", Colors.PRIMARY),
+                    ("Ingresos", "$0", "$", Colors.SUCCESS),
+                    ("Barberos", num_barberos_cached, "Equipo", Colors.WARNING),
                 ], columns=4)
 
 
@@ -6232,7 +5990,12 @@ h3 { color: #f5f0e8 !important; }
 
         elif seccion == "Agenda":
 
-            render_section_title("Mi agenda", subtitle="Gestiona tus citas")
+            render_internal_section_header(
+                "Mi agenda",
+                "Gestiona tus citas.",
+                eyebrow="Cliente",
+                meta=barberia_name,
+            )
 
             tab_calendario, tab_crear, tab_lista = st.tabs([
 
@@ -6404,7 +6167,10 @@ h3 { color: #f5f0e8 !important; }
 
                                 # Barber (pre-selected and read-only display)
 
-                                st.caption(f"**Barbero:** {st.session_state.cliente_barbero_sel_premium}")
+                                render_public_note(
+                                    f"Barbero seleccionado: {st.session_state.cliente_barbero_sel_premium}",
+                                    note_type="info",
+                                )
 
 
                                 col2 = st.columns(1)[0]
@@ -6425,7 +6191,10 @@ h3 { color: #f5f0e8 !important; }
                                     hora_sel = st.time_input("Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sel")
 
 
-                                st.caption(f"Cliente: **{usuario}**")
+                                render_public_note(
+                                    f"Cliente: {usuario}",
+                                    note_type="info",
+                                )
 
                                 enviar = st.form_submit_button("Reservar", use_container_width=True)
 
@@ -6552,19 +6321,11 @@ h3 { color: #f5f0e8 !important; }
 
                 # Dashboard metrics
 
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "Espera", Colors.WARNING)
+                render_metric_grid([
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
+                ], columns=3)
 
 
                 render_divider()
@@ -6572,19 +6333,11 @@ h3 { color: #f5f0e8 !important; }
 
                 render_subsection_title("Rendimiento")
 
-                col_x, col_y, col_z = st.columns(3, gap="large")
-
-                with col_x:
-
-                    render_stat_box("Cortes", total_reservas, "Servicio", Colors.PRIMARY)
-
-                with col_y:
-
-                    render_stat_box("Hoy", hoy_reservas, "Hoy", Colors.SECONDARY)
-
-                with col_z:
-
-                    render_stat_box("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS)
+                render_metric_grid([
+                    ("Cortes", total_reservas, "Servicio", Colors.PRIMARY),
+                    ("Hoy", hoy_reservas, "Agenda", Colors.SECONDARY),
+                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
+                ], columns=3)
 
 
                 render_divider()
@@ -6601,36 +6354,7 @@ h3 { color: #f5f0e8 !important; }
 
                 if hoy_reservas_list:
 
-                    render_subsection_title("Próximas citas (hoy)")
-
-                    for r in hoy_reservas_list[:5]:
-
-                        hora_str = r[4].strftime("%H:%M") if hasattr(r[4], "strftime") else str(r[4])
-
-                        cliente_str = r[5] or r[6]
-
-                        servicio_str = r[2]
-
-                        st.markdown(f"""
-
-                        <div style="
-
-                            background-color: {Colors.CARD};
-
-                            border-left: 4px solid {Colors.PRIMARY};
-
-                            padding: {Spacing.MD};
-
-                            border-radius: {BorderRadius.MD};
-
-                            margin-bottom: {Spacing.SM};
-
-                        ">
-
-                            <strong style="color: {Colors.PRIMARY};">Hora: {hora_str}</strong> - <span style="color: {Colors.TEXT};">{cliente_str}</span> ({servicio_str})
-                        </div>
-
-                        """, unsafe_allow_html=True)
+                    render_upcoming_appointments_summary("Próximas citas (hoy)", hoy_reservas_list)
 
         elif seccion == "Agenda":
 
@@ -6755,7 +6479,10 @@ h3 { color: #f5f0e8 !important; }
 
                             st.markdown("---")
 
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
+                            render_public_note(
+                                "Vista semanal del calendario con navegación por flechas.",
+                                note_type="info",
+                            )
 
                     else:
 
@@ -6763,7 +6490,12 @@ h3 { color: #f5f0e8 !important; }
 
         elif seccion == "Barberos":
 
-            render_section_title("Equipo", subtitle="Gestión de barberos")
+            render_internal_section_header(
+                "Equipo",
+                "Gestión de barberos.",
+                eyebrow="Barbero",
+                meta=barberia_name,
+            )
 
             render_alert("Solo el administrador de la barbería puede gestionar el equipo de barberos", alert_type="info")
 
@@ -6814,9 +6546,9 @@ h3 { color: #f5f0e8 !important; }
                 # Dashboard metrics
 
                 render_metric_grid([
-                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
-                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
-                    ("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING),
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
                 ], columns=3)
 
 
@@ -6827,9 +6559,9 @@ h3 { color: #f5f0e8 !important; }
 
                 render_metric_grid([
                     ("Total Reservas", total_reservas, "Listado", Colors.SECONDARY),
-                    ("Hoy", hoy_reservas, "Hoy", Colors.PRIMARY),
+                    ("Hoy", hoy_reservas, "Agenda", Colors.PRIMARY),
                     ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
-                    ("Barberos", num_barberos, "Servicio", Colors.WARNING),
+                    ("Barberos", num_barberos, "Equipo", Colors.WARNING),
                 ], columns=4)
 
 
@@ -6862,15 +6594,7 @@ h3 { color: #f5f0e8 !important; }
 
                 if hoy_reservas_list:
 
-                    st.markdown("### ð Próximas Citas (Hoy)")
-
-                    for r in hoy_reservas_list[:5]:
-
-                        hora_str = r[4].strftime("%H:%M") if hasattr(r[4], "strftime") else str(r[4])
-
-                        cliente_str = r[5] or r[6]
-
-                        st.caption(f"ð {hora_str} - {cliente_str} con {r[1]} ({r[2]})")
+                    render_upcoming_appointments_summary("Próximas citas (hoy)", hoy_reservas_list)
 
         elif seccion == "Agenda":
 
@@ -7030,7 +6754,10 @@ h3 { color: #f5f0e8 !important; }
 
                             st.markdown("---")
 
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
+                            render_public_note(
+                                "Vista semanal del calendario con navegación por flechas.",
+                                note_type="info",
+                            )
 
                     else:
 
@@ -7057,30 +6784,23 @@ h3 { color: #f5f0e8 !important; }
 
                         total = total_row[0] if total_row and total_row[0] else 0
 
-                    st.metric("Ingresos totales (pagado)", f"${total}")
+                    render_income_summary_card(total, "Ingresos totales (pagado)")
 
 
                     st.markdown("---")
 
-                    st.markdown("#### Desglose por barbero")
-
                     with st.spinner("Cargando desglose..."):
 
                         barberos_list = listar_usuarios_barberos(barberia_id)
-
-                        for barbero_id_val, barbero_name in barberos_list:
-
-                            barbero_ingresos = safe_fetch_one(
-
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
-
-                                (barberia_id, barbero_id_val),
-
-                            )
-
-                            ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
-
-                            st.caption(f"{barbero_name}: ${ingreso}")
+                        render_income_breakdown(
+                            barberos_list,
+                            lambda barbero_id_val: (
+                                (safe_fetch_one(
+                                    "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                                    (barberia_id, barbero_id_val),
+                                ) or [0])[0] or 0
+                            ),
+                        )
 
         elif seccion == "Barberos":
 
@@ -7187,19 +6907,11 @@ h3 { color: #f5f0e8 !important; }
 
                 # Dashboard metrics
 
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING)
+                render_metric_grid([
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
+                ], columns=3)
 
 
                 render_divider()
@@ -7209,9 +6921,9 @@ h3 { color: #f5f0e8 !important; }
 
                 render_metric_grid([
                     ("Barberías", num_barberias, "Barberias", Colors.PRIMARY),
-                    ("Usuarios", num_usuarios, "Rol", Colors.SECONDARY),
+                    ("Usuarios", num_usuarios, "Usuarios", Colors.SECONDARY),
                     ("Total", num_reservas, "Listado", Colors.PRIMARY),
-                    ("Hoy", hoy_count, "Hoy", Colors.SECONDARY),
+                    ("Hoy", hoy_count, "Agenda", Colors.SECONDARY),
                     ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
                 ], columns=5)
 
@@ -7367,7 +7079,10 @@ h3 { color: #f5f0e8 !important; }
 
                             st.markdown("---")
 
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
+                            render_public_note(
+                                "Vista semanal del calendario con navegación por flechas.",
+                                note_type="info",
+                            )
 
                     else:
 
@@ -7393,30 +7108,23 @@ h3 { color: #f5f0e8 !important; }
 
                         total = total_row[0] if total_row and total_row[0] else 0
 
-                    st.metric("Ingresos totales (pagado)", f"${total}")
+                    render_income_summary_card(total, "Ingresos totales (pagado)")
 
 
                     st.markdown("---")
 
-                    st.markdown("#### Desglose por barbero")
-
                     with st.spinner("Cargando desglose..."):
 
                         barberos_list = listar_usuarios_barberos(bid_ctx)
-
-                        for barbero_id_val, barbero_name in barberos_list:
-
-                            barbero_ingresos = safe_fetch_one(
-
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
-
-                                (bid_ctx, barbero_id_val),
-
-                            )
-
-                            ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
-
-                            st.caption(f"{barbero_name}: ${ingreso}")
+                        render_income_breakdown(
+                            barberos_list,
+                            lambda barbero_id_val: (
+                                (safe_fetch_one(
+                                    "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                                    (bid_ctx, barbero_id_val),
+                                ) or [0])[0] or 0
+                            ),
+                        )
 
                 else:
 

@@ -1931,7 +1931,7 @@ def render_stat_box(label, value, icon="📊", color=Colors.PRIMARY):
 
 
 def render_metric_grid(metrics, columns=None, gap="large"):
-    """Render a row of stat boxes using the existing metric card style."""
+    """Render a row of consistent metric cards."""
     if not metrics:
         return
 
@@ -1948,7 +1948,7 @@ def render_metric_grid(metrics, columns=None, gap="large"):
             label, value, icon, color = metric
 
         with cols[index % column_count]:
-            render_stat_box(label, value, icon, color)
+            render_metric_card(label, value, icon=icon, color=color)
 
 
 def render_alert(message, alert_type="info", title=None):

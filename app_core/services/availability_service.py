@@ -5,8 +5,11 @@ from datetime import datetime, timedelta
 
 import streamlit as st
 
-from app_core.db.safe_queries import safe_fetch_all
-from app_core.services.booking_service import resolver_barbero_agenda
+from app_core.services.booking_service import (
+    _rangos_se_solapan,
+    obtener_rangos_reservados,
+    resolver_barbero_agenda,
+)
 from app_core.security.tenant_access import (
     enforce_barberia_access,
     get_current_barberia_id,
@@ -166,37 +169,26 @@ def obtener_horarios_disponibles(barberia_id=None, barbero_id=None, fecha=None, 
             return []
 
 
-        # Get all reservations for this barber on this date
-
-        reservas = safe_fetch_all(
-
-            """
-
-            SELECT inicio, fin FROM reservas
-
-            WHERE barberia_id = %s
-
-              AND DATE(inicio) = %s
-
-              AND (
-
-                    barbero_id = %s
-
-                    OR (barbero_id IS NULL AND barbero = %s)
-
-              )
-
-            ORDER BY inicio
-
-            """,
-
-            (
-                barberia_id,
-                fecha,
-                identidad_barbero["barbero_id"],
-                identidad_barbero["barbero"],
+        try:
+            duracion_valor = int(duracion_minutos)
+        except (TypeError, ValueError):
+            logger.warning(
+                "obtener_horarios_disponibles: invalid duration %s",
+                duracion_minutos,
             )
+            return []
 
+        if duracion_valor <= 0:
+            logger.warning(
+                "obtener_horarios_disponibles: non-positive duration %s",
+                duracion_minutos,
+            )
+            return []
+
+        reservas = obtener_rangos_reservados(
+            barberia_id,
+            fecha=fecha,
+            barbero_id=identidad_barbero["barbero_id"],
         )
 
 
@@ -214,7 +206,7 @@ def obtener_horarios_disponibles(barberia_id=None, barbero_id=None, fecha=None, 
 
         while slot_time < fin_dia:
 
-            slot_end = slot_time + timedelta(minutes=duracion_minutos)
+            slot_end = slot_time + timedelta(minutes=duracion_valor)
 
 
             # Check if this slot conflicts with any reservation
@@ -225,7 +217,7 @@ def obtener_horarios_disponibles(barberia_id=None, barbero_id=None, fecha=None, 
 
                 # Check for overlap
 
-                if slot_time < res_fin and slot_end > res_inicio:
+                if _rangos_se_solapan(slot_time, slot_end, res_inicio, res_fin):
 
                     disponible = False
 

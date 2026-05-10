@@ -83,7 +83,6 @@ LOGIN_READ_PATTERNS = (
 )
 
 SYSTEM_WRITE_PATTERNS = (
-    "insert into barberias",
     "create table",
     "alter table",
     "create index",
@@ -142,7 +141,7 @@ def _has_barberia_column(query_lower):
 
 
 def _security_error(message, query):
-    error_msg = f"SECURITY VIOLATION: {message}\nQuery: {str(query)[:100]}..."
+    error_msg = f"SECURITY VIOLATION: {message}"
     logger.error(error_msg)
     raise Exception(error_msg)
 
