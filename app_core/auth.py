@@ -12,9 +12,14 @@ import streamlit as st
 
 from app_core.db.connection import get_connection
 from app_core.db.safe_queries import safe_fetch_one, safe_execute
+from app_core.tenancy import apply_login_session_context
 from app_core.security.tenant_access import normalizar_rol
 
 logger = logging.getLogger("barberia_app")
+
+PUBLIC_VIEWS = {"home", "login", "registro", "reserva"}
+AUTHENTICATED_ENTRY_VIEWS = {"dashboard", "dashboard_admin", "dashboard_barbero"}
+KNOWN_SCREEN_KEYS = PUBLIC_VIEWS | AUTHENTICATED_ENTRY_VIEWS
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +131,211 @@ def login(usuario, password):
 
     logger.info(f"[OK] Login exitoso para: {usuario} con rol: {user[3]}")
     return user
+
+
+def _target_view_for_role(user_role):
+    normalized_role = normalizar_rol(user_role)
+    if normalized_role == "SUPER_ADMIN":
+        return "dashboard_admin"
+    if normalized_role == "BARBERO":
+        return "dashboard_barbero"
+    return "dashboard"
+
+
+def normalize_authenticated_session_state(default_barberia_id):
+    """Normalize authenticated session defaults and dashboard target view."""
+
+    user = st.session_state.get("user")
+    if not user:
+        return None
+
+    user_role = st.session_state.get("user_role") or st.session_state.get("rol")
+    normalized_role = normalizar_rol(user_role)
+    target_view = _target_view_for_role(normalized_role)
+
+    st.session_state["rol"] = normalized_role
+    st.session_state["user_role"] = normalized_role
+    st.session_state["public_mode"] = False
+    st.session_state["reserva_seleccionada_id"] = st.session_state.get("reserva_seleccionada_id")
+    st.session_state["mostrar_detalles_reserva"] = bool(
+        st.session_state.get("mostrar_detalles_reserva", False)
+    )
+    st.session_state.setdefault("user_id", user[0] if len(user) > 0 else None)
+    st.session_state.setdefault("super_admin_all_barberias", False)
+
+    if normalized_role == "SUPER_ADMIN":
+        if "barberia_id" not in st.session_state:
+            st.session_state["barberia_id"] = None
+    else:
+        assigned_barberia_id = user[5] if len(user) > 5 else None
+        current_barberia_id = assigned_barberia_id or default_barberia_id
+        if not st.session_state.get("barberia_id"):
+            st.session_state["barberia_id"] = current_barberia_id
+        if not st.session_state.get("barberia_context_id"):
+            st.session_state["barberia_context_id"] = st.session_state["barberia_id"]
+        st.session_state["super_admin_all_barberias"] = False
+
+    if st.session_state.get("view") in PUBLIC_VIEWS or not st.session_state.get("view"):
+        st.session_state["view"] = target_view
+
+    return {
+        "user": user,
+        "role": normalized_role,
+        "target_view": target_view,
+    }
+
+
+def resolve_authenticated_entry(default_barberia_id):
+    """Resolve the initial destination for an already authenticated user."""
+
+    incoming_view = st.session_state.get("view")
+    normalized = normalize_authenticated_session_state(default_barberia_id)
+    if not normalized:
+        return None
+
+    target_view = normalized["target_view"]
+    corrected_view = False
+
+    if st.session_state.get("view") not in AUTHENTICATED_ENTRY_VIEWS:
+        st.session_state["view"] = target_view
+        corrected_view = incoming_view not in (None, target_view)
+    elif incoming_view not in AUTHENTICATED_ENTRY_VIEWS and incoming_view != target_view:
+        corrected_view = True
+
+    return {
+        **normalized,
+        "view": st.session_state.get("view"),
+        "should_rerun": corrected_view,
+    }
+
+
+def resolve_view_access(default_barberia_id, current_view=None):
+    """Resolve whether the current session can stay on the requested view."""
+
+    resolved_view = current_view or st.session_state.get("view") or "home"
+
+    if st.session_state.get("user"):
+        entry = resolve_authenticated_entry(default_barberia_id)
+        if not entry:
+            return {
+                "is_allowed": False,
+                "resolved_view": "home",
+                "should_rerun": True,
+                "should_stop": False,
+            }
+
+        return {
+            "is_allowed": entry["view"] in AUTHENTICATED_ENTRY_VIEWS,
+            "resolved_view": entry["view"],
+            "should_rerun": bool(entry.get("should_rerun")),
+            "should_stop": False,
+        }
+
+    if resolved_view in AUTHENTICATED_ENTRY_VIEWS:
+        st.session_state["view"] = "home"
+        return {
+            "is_allowed": False,
+            "resolved_view": "home",
+            "should_rerun": True,
+            "should_stop": False,
+        }
+
+    if resolved_view not in PUBLIC_VIEWS:
+        st.session_state["view"] = "home"
+        return {
+            "is_allowed": False,
+            "resolved_view": "home",
+            "should_rerun": True,
+            "should_stop": False,
+        }
+
+    return {
+        "is_allowed": True,
+        "resolved_view": resolved_view,
+        "should_rerun": False,
+        "should_stop": True,
+    }
+
+
+def resolve_render_view(default_barberia_id, current_view=None):
+    """Resolve the final view that app.py should render right now."""
+
+    access = resolve_view_access(default_barberia_id, current_view=current_view)
+    resolved_view = access["resolved_view"] if access else (current_view or "home")
+
+    return {
+        "resolved_view": resolved_view,
+        "should_rerun": bool(access and access.get("should_rerun")),
+        "should_stop": bool(access and access.get("should_stop")),
+        "is_authenticated": bool(st.session_state.get("user")),
+    }
+
+
+def resolve_screen_dispatch(default_barberia_id, current_view=None):
+    """Resolve the screen key app.py should dispatch to."""
+
+    render_decision = resolve_render_view(
+        default_barberia_id,
+        current_view=current_view,
+    )
+    resolved_view = render_decision["resolved_view"]
+    screen_key = resolved_view if resolved_view in KNOWN_SCREEN_KEYS else "home"
+    screen_group = (
+        "public"
+        if screen_key in PUBLIC_VIEWS
+        else "authenticated"
+        if screen_key in AUTHENTICATED_ENTRY_VIEWS
+        else "public"
+    )
+
+    return {
+        **render_decision,
+        "screen_key": screen_key,
+        "screen_group": screen_group,
+        "resolved_view": resolved_view,
+    }
+
+
+def login_and_prepare_session(usuario, password, default_barberia_id):
+    """Authenticate user and populate session context for the app."""
+
+    user = login(usuario, password)
+    if not user:
+        return None
+
+    apply_login_session_context(user, default_barberia_id)
+    return resolve_authenticated_entry(default_barberia_id)
+
+
+def logout_and_reset_session(default_barberia_id):
+    """Reset authenticated session state without breaking app defaults."""
+
+    st.session_state["user"] = None
+    st.session_state["user_id"] = None
+    st.session_state["rol"] = "CLIENTE"
+    st.session_state["user_role"] = "CLIENTE"
+    st.session_state["barberia_id"] = default_barberia_id
+    st.session_state["barberia_context_id"] = default_barberia_id
+    st.session_state["super_admin_all_barberias"] = False
+    st.session_state["public_mode"] = False
+    st.session_state["view"] = "home"
+    st.session_state["reserva_seleccionada_id"] = None
+    st.session_state["mostrar_detalles_reserva"] = False
+
+    for key in (
+        "barberia_name",
+        "cached_barberia_id",
+        "barberias_list",
+        "super_sel_barb",
+        "chk_super_all",
+    ):
+        st.session_state.pop(key, None)
+
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("nav_"):
+            st.session_state.pop(key, None)
+
+    return True
 
 
 # ---------------------------------------------------------------------------

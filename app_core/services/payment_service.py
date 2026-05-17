@@ -80,7 +80,9 @@ def marcar_reserva_pagada(reserva_id):
 
                 UPDATE reservas
 
-                SET pagado = TRUE, monto = COALESCE(monto, precio)
+                SET pagado = TRUE,
+                    monto = COALESCE(monto, precio),
+                    updated_at = CURRENT_TIMESTAMP
 
                 WHERE id = %s AND barberia_id = %s
 

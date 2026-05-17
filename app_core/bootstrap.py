@@ -131,11 +131,22 @@ def ensure_database_tables():
                         id SERIAL PRIMARY KEY,
                         nombre TEXT NOT NULL,
                         barbero TEXT NOT NULL,
+                        barbero_id INTEGER,
                         servicio TEXT NOT NULL,
                         precio INTEGER NOT NULL,
                         inicio TIMESTAMP NOT NULL,
                         fin TIMESTAMP NOT NULL,
                         barberia_id INTEGER NOT NULL,
+                        cliente TEXT,
+                        telefono TEXT,
+                        email TEXT,
+                        fecha DATE,
+                        hora TIME,
+                        estado TEXT NOT NULL DEFAULT 'activo',
+                        pagado BOOLEAN NOT NULL DEFAULT FALSE,
+                        monto INTEGER,
+                        payment_id TEXT,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         CONSTRAINT fk_reservas_barberia
                             FOREIGN KEY (barberia_id)
                             REFERENCES barberias(id)
@@ -219,6 +230,37 @@ def ensure_database_tables():
             except Exception as e:
                 conn.rollback()
                 logger.warning(f"[AVISO] Error añadiendo columnas a usuarios: {e}")
+
+            # Optional columns for reservas
+            try:
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente TEXT;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS telefono TEXT;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email TEXT;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS fecha DATE;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora TIME;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;")
+                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS barbero_id INTEGER;")
+                cur.execute("UPDATE reservas SET cliente = COALESCE(cliente, nombre) WHERE cliente IS NULL;")
+                cur.execute("UPDATE reservas SET fecha = DATE(inicio) WHERE fecha IS NULL AND inicio IS NOT NULL;")
+                cur.execute("UPDATE reservas SET hora = CAST(inicio AS TIME) WHERE hora IS NULL AND inicio IS NOT NULL;")
+                cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
+                cur.execute("UPDATE reservas SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;")
+                conn.commit()
+                logger.info("[OK] Columnas opcionales en 'reservas' añadidas o actualizadas")
+                logger.info("[OK] payment_id column ensured")
+                logger.info("[OK] updated_at column ensured")
+                logger.info("[OK] barbero_id column ensured")
+            except Exception as e:
+                conn.rollback()
+                all_ok = False
+                logger.error(f"Error alterando tabla 'reservas': {e}")
+
+            # Indexes for reservas
+            try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);")
@@ -229,28 +271,6 @@ def ensure_database_tables():
                 conn.rollback()
                 all_ok = False
                 logger.error(f"Error creando índices de 'reservas': {e}")
-
-            # Optional columns for reservas
-            try:
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente TEXT;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS fecha DATE;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora TIME;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS barbero_id INTEGER;")
-                cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
-                conn.commit()
-                logger.info("[OK] Columnas opcionales en 'reservas' añadidas o actualizadas")
-                logger.info("[OK] payment_id column ensured")
-                logger.info("[OK] updated_at column ensured")
-                logger.info("[OK] barbero_id column ensured")
-            except Exception as e:
-                conn.rollback()
-                all_ok = False
-                logger.error(f"Error alterando tabla 'reservas': {e}")
 
             # Ensure servicios has all required columns for multi-tenant
             try:
