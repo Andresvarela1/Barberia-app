@@ -227,6 +227,108 @@ class BookingServiceTests(TestCase):
             (55, 1),
         )
 
+    def test_normalizar_estado_reserva_mapea_activo_a_pendiente(self):
+        self.assertEqual(
+            booking_service.normalizar_estado_reserva("activo"),
+            "pendiente",
+        )
+        self.assertEqual(
+            booking_service.normalizar_estado_reserva("no-show"),
+            "no_show",
+        )
+
+    def test_actualizar_reserva_preserva_estado_previo_si_no_se_indica(self):
+        self.fake_streamlit.session_state.update(
+            {
+                "db_available": True,
+                "user": (5, "admin_user", "x", "ADMIN"),
+                "barberia_id": 1,
+            }
+        )
+        captured = {}
+
+        def _capture_persist(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with patch.object(
+            booking_service,
+            "obtener_reserva_por_id",
+            return_value={
+                "id": 99,
+                "nombre": "juan",
+                "barbero": "nico",
+                "barbero_id": 7,
+                "servicio": "Corte",
+                "precio": 15000,
+                "inicio": datetime(2026, 5, 4, 10, 0),
+                "fin": datetime(2026, 5, 4, 10, 30),
+                "barberia_id": 1,
+                "cliente": "juan",
+                "estado": "confirmada",
+            },
+        ), patch.object(
+            booking_service,
+            "resolver_barbero_agenda",
+            return_value={"barbero_id": 7, "barbero": "nico"},
+        ), patch.object(
+            booking_service,
+            "_persistir_reserva_tx",
+            side_effect=_capture_persist,
+        ):
+            ok = booking_service.actualizar_reserva(
+                99,
+                "juan",
+                "nico",
+                "Corte",
+                15000,
+                datetime(2026, 5, 4, 11, 0),
+                datetime(2026, 5, 4, 11, 30),
+                barbero_id=7,
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual(captured["payload"]["estado"], "confirmada")
+
+    def test_actualizar_estado_reserva_valido(self):
+        self.fake_streamlit.session_state.update(
+            {
+                "db_available": True,
+                "user": (5, "admin_user", "x", "ADMIN"),
+                "barberia_id": 1,
+            }
+        )
+
+        with patch.object(
+            booking_service,
+            "obtener_reserva_por_id",
+            return_value={
+                "id": 55,
+                "nombre": "juan",
+                "cliente": "juan",
+                "barbero": "nico",
+                "barbero_id": 7,
+                "barberia_id": 1,
+                "estado": "pendiente",
+            },
+        ), patch.object(
+            booking_service,
+            "safe_execute",
+            return_value=True,
+        ) as execute_mock:
+            ok = booking_service.actualizar_estado_reserva(55, "cancelada")
+
+        self.assertTrue(ok)
+        execute_mock.assert_called_once_with(
+            """
+                UPDATE reservas
+                SET estado = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND barberia_id = %s
+                """,
+            ("cancelada", 55, 1),
+        )
+
     def test_insertar_reserva_con_fecha_hora_maneja_rechazo_db(self):
         self.fake_streamlit.session_state["db_available"] = True
 

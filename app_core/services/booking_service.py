@@ -25,6 +25,15 @@ RESERVA_SOLAPADA_PGCODE = "23P01"
 MSG_CONFLICTO_CREAR = "Horario ocupado para ese barbero en ese rango."
 MSG_CONFLICTO_EDITAR = "Ese cambio genera solapamiento con otra reserva."
 MSG_CONFLICTO_DB = "Ese horario se acaba de ocupar. Elige otro horario."
+ESTADO_RESERVA_DEFAULT = "pendiente"
+ESTADOS_RESERVA_VALIDOS = {
+    "activo",
+    "pendiente",
+    "confirmada",
+    "cancelada",
+    "completada",
+    "no_show",
+}
 
 
 def normalizar_reserva(r):
@@ -59,6 +68,22 @@ def normalizar_reserva(r):
     }
 
 
+def normalizar_estado_reserva(estado):
+    estado_normalizado = str(estado or "").strip().lower()
+
+    if estado_normalizado in {"", "activo"}:
+        return ESTADO_RESERVA_DEFAULT
+
+    if estado_normalizado in {"no-show", "no show", "noshow"}:
+        return "no_show"
+
+    if estado_normalizado not in ESTADOS_RESERVA_VALIDOS:
+        st.error("El estado de la reserva no es valido.")
+        return None
+
+    return estado_normalizado
+
+
 def normalizar_datetime(valor):
     if isinstance(valor, datetime):
         return valor.replace(tzinfo=None)
@@ -88,9 +113,10 @@ def _reserva_desde_fila(result):
         "fin": result[6],
         "barberia_id": result[7],
         "cliente": result[8],
-        "pagado": result[9] if len(result) > 9 else False,
-        "monto": result[10] if len(result) > 10 else result[4],
-        "barbero_id": result[11] if len(result) > 11 else None,
+        "estado": result[9] if len(result) > 9 else None,
+        "pagado": result[10] if len(result) > 10 else False,
+        "monto": result[11] if len(result) > 11 else result[4],
+        "barbero_id": result[12] if len(result) > 12 else None,
     }
 
 
@@ -197,6 +223,7 @@ def _construir_payload_reserva(
     fin,
     barbero=None,
     barbero_id=None,
+    estado=None,
 ):
     if not barberia_id:
         st.error("No hay barberia activa para la reserva.")
@@ -227,6 +254,10 @@ def _construir_payload_reserva(
         st.error("El precio de la reserva no es valido.")
         return None
 
+    estado_valor = normalizar_estado_reserva(estado)
+    if estado_valor is None:
+        return None
+
     return {
         "barberia_id": int(barberia_id),
         "nombre": nombre,
@@ -239,6 +270,7 @@ def _construir_payload_reserva(
         "hora": inicio.time(),
         "barbero_id": identidad_barbero["barbero_id"],
         "barbero": identidad_barbero["barbero"],
+        "estado": estado_valor,
     }
 
 
@@ -296,6 +328,7 @@ def _actualizar_reserva_en_bd(cur, reserva_id, barberia_id, payload):
             fin = %s,
             fecha = %s,
             hora = %s,
+            estado = %s,
             monto = %s,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = %s AND barberia_id = %s
@@ -311,6 +344,7 @@ def _actualizar_reserva_en_bd(cur, reserva_id, barberia_id, payload):
             payload["fin"],
             payload["fecha"],
             payload["hora"],
+            payload["estado"],
             payload["precio"],
             reserva_id,
             barberia_id,
@@ -527,7 +561,7 @@ def _insertar_reserva(cur, payload):
             payload["cliente"],
             payload["fecha"],
             payload["hora"],
-            "activo",
+            payload["estado"],
             payload["precio"],
         ),
     )
@@ -546,7 +580,7 @@ def obtener_reserva_por_id(reserva_id):
         result = safe_fetch_one(
             """
             SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id,
-                   cliente, pagado, monto, barbero_id
+                   cliente, estado, pagado, monto, barbero_id
             FROM reservas
             WHERE id = %s AND barberia_id = %s
             """,
@@ -569,7 +603,7 @@ def obtener_reserva(reserva_id, barberia_id):
         result = safe_fetch_one(
             """
             SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id,
-                   cliente, pagado, monto, barbero_id
+                   cliente, estado, pagado, monto, barbero_id
             FROM reservas
             WHERE id = %s AND barberia_id = %s
             """,
@@ -600,6 +634,7 @@ def _guardar_reserva_tx(
         fin=fin,
         barbero=barbero,
         barbero_id=barbero_id,
+        estado=ESTADO_RESERVA_DEFAULT,
     )
     if not payload:
         return False
@@ -642,6 +677,7 @@ def actualizar_reserva(
     inicio,
     fin,
     barbero_id=None,
+    estado=None,
 ):
     if not _ensure_db_available(
         "No hay base de datos: no se pueden actualizar reservas en modo demo."
@@ -670,6 +706,7 @@ def actualizar_reserva(
         fin=fin,
         barbero=barbero,
         barbero_id=barbero_id,
+        estado=estado if estado is not None else prev.get("estado"),
     )
     if not payload:
         return False
@@ -681,6 +718,46 @@ def actualizar_reserva(
         reserva_id=reserva_id,
         previous_reserva=prev,
     )
+
+
+def actualizar_estado_reserva(reserva_id, estado):
+    if not _ensure_db_available(
+        "No hay base de datos: no se pueden actualizar reservas en modo demo."
+    ):
+        return False
+
+    estado_normalizado = normalizar_estado_reserva(estado)
+    if estado_normalizado is None:
+        return False
+
+    user = st.session_state.get("user")
+
+    prev = obtener_reserva_por_id(reserva_id)
+    if not prev:
+        st.error("Reserva no encontrada.")
+        return False
+
+    permission_error = _validar_permiso_reserva(prev, user)
+    if permission_error:
+        st.error(permission_error)
+        return False
+
+    try:
+        return bool(
+            safe_execute(
+                """
+                UPDATE reservas
+                SET estado = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND barberia_id = %s
+                """,
+                (estado_normalizado, reserva_id, prev.get("barberia_id")),
+            )
+        )
+    except Exception:
+        logger.exception("actualizar_estado_reserva")
+        st.error("No se pudo actualizar el estado de la reserva.")
+        return False
 
 
 def eliminar_reserva(reserva_id):
@@ -758,6 +835,7 @@ def insertar_reserva_con_fecha_hora(
         fin=fin,
         barbero=barbero_nombre or barbero_ref,
         barbero_id=barbero_ref,
+        estado=ESTADO_RESERVA_DEFAULT,
     )
     if not payload:
         return False

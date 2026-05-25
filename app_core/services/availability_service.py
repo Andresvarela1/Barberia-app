@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import streamlit as st
 
+from app_core.db import safe_fetch_all
 from app_core.services.booking_service import (
     _rangos_se_solapan,
     obtener_rangos_reservados,

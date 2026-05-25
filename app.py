@@ -212,6 +212,16 @@ from app_core.auth import (
     registrar,
     registrar_barberia,
 )
+from app_core.agenda import (
+    render_admin_agenda_list_tab,
+    render_super_admin_agenda_list_tab,
+)
+from app_core.features.services import render_services_section
+from app_core.features.barberos import render_barberos_section
+from app_core.features.dashboard import (
+    render_admin_dashboard_section,
+    render_super_admin_dashboard_section,
+)
 
 # NOTE: ensure_database_tables, inicializar_barberia, seed_default_data,
 #       normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
@@ -255,6 +265,14 @@ _ROL_LEGACY = {
 
 }
 
+_RESERVA_ESTADO_META = {
+    "pendiente": {"label": "Pendiente", "color": "#f59e0b"},
+    "confirmada": {"label": "Confirmada", "color": "#3b82f6"},
+    "cancelada": {"label": "Cancelada", "color": "#ef4444"},
+    "completada": {"label": "Completada", "color": "#16a34a"},
+    "no_show": {"label": "No show", "color": "#f97316"},
+}
+
 from app_core.tenancy import (
     apply_public_barberia_context,
     can_access_barberia,
@@ -282,6 +300,7 @@ from app_core.services.booking_service import (
     normalizar_reserva, normalizar_datetime,
     guardar_reserva, actualizar_reserva, eliminar_reserva,
     insertar_reserva_con_fecha_hora, obtener_reserva_por_id, obtener_reserva,
+    actualizar_estado_reserva,
 )
 from app_core.services.payment_service import (
     marcar_reserva_pagada,
@@ -726,7 +745,7 @@ def obtener_reservas_raw(barbero_filtro=None):
 
         sql = """
 
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto, barbero_id
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, estado, pagado, monto, barbero_id
 
             FROM reservas
 
@@ -785,11 +804,13 @@ def obtener_reservas_raw(barbero_filtro=None):
 
                 "barberia_id": r[7],
 
-                "pagado": r[8] if len(r) > 8 else False,
+                "estado": r[8] if len(r) > 8 else None,
 
-                "monto": r[9] if len(r) > 9 else r[4],
+                "pagado": r[9] if len(r) > 9 else False,
 
-                "barbero_id": r[10] if len(r) > 10 else None,
+                "monto": r[10] if len(r) > 10 else r[4],
+
+                "barbero_id": r[11] if len(r) > 11 else None,
 
             })
 
@@ -862,6 +883,8 @@ def construir_eventos_calendario(reservas):
                 continue
 
 
+        estado_visual = _calendar_estado_visual(r if isinstance(r, dict) else {"estado": r[9] if len(r) > 9 else None})
+
         # Crear título en formato moderno
 
         if es_bloqueo:
@@ -871,6 +894,8 @@ def construir_eventos_calendario(reservas):
         else:
 
             titulo = f"{cliente} - {servicio}"
+            if estado_visual:
+                titulo = f"{estado_visual['title_prefix']} | {titulo}"
 
 
         # Color by payment status: Green for paid, Orange for pending
@@ -880,6 +905,12 @@ def construir_eventos_calendario(reservas):
             color = "#666666"
 
             border_color = "#4b5563"
+
+        elif estado_visual:
+
+            color = estado_visual["color"]
+
+            border_color = estado_visual["border_color"]
 
         elif pagado:
 
@@ -935,6 +966,8 @@ def construir_eventos_calendario(reservas):
 
                 "pagado": pagado,
 
+                "estado": r.get("estado") if isinstance(r, dict) else (r[9] if len(r) > 9 else None),
+
                 "bloqueo": es_bloqueo,
 
                 "inicio": inicio_iso,
@@ -946,6 +979,90 @@ def construir_eventos_calendario(reservas):
         })
 
     return eventos
+
+
+def _build_reserva_estado_ui(reserva):
+
+    estado_raw = str(reserva.get("estado") or "").strip().lower()
+    estado_normalizado = _normalizar_estado_operativo_ui(estado_raw)
+
+    meta = _RESERVA_ESTADO_META.get(
+        estado_normalizado or "pendiente",
+        _RESERVA_ESTADO_META["pendiente"],
+    )
+
+    return {
+        "key": estado_normalizado or "pendiente",
+        "label": meta["label"],
+        "color": meta["color"],
+        "payment_label": "Pagada" if reserva.get("pagado", False) else "Pendiente de pago",
+    }
+
+
+def _normalizar_estado_operativo_ui(estado):
+
+    estado_raw = str(estado or "").strip().lower()
+
+    if estado_raw in {"", "activo"}:
+        return "pendiente"
+
+    if estado_raw in {"no-show", "no show", "noshow"}:
+        return "no_show"
+
+    if estado_raw in _RESERVA_ESTADO_META:
+        return estado_raw
+
+    return "pendiente"
+
+
+def _format_reserva_estado_label(estado):
+
+    estado_ui = _build_reserva_estado_ui({"estado": estado, "pagado": False})
+
+    meta = _RESERVA_ESTADO_META.get(
+        estado_ui["key"] or "pendiente",
+        _RESERVA_ESTADO_META["pendiente"],
+    )
+
+    return meta["label"]
+
+
+def _build_reserva_payment_ui(reserva):
+
+    pagado = bool(reserva.get("pagado", False))
+
+    return {
+        "label": "Pagada" if pagado else "Pendiente de pago",
+        "color": "#16a34a" if pagado else "#f59e0b",
+    }
+
+
+def _calendar_estado_visual(reserva):
+
+    estado_key = _normalizar_estado_operativo_ui(reserva.get("estado"))
+
+    if estado_key == "cancelada":
+        return {
+            "title_prefix": "Cancelada",
+            "color": "#6b7280",
+            "border_color": "#4b5563",
+        }
+
+    if estado_key == "completada":
+        return {
+            "title_prefix": "Completada",
+            "color": "#0f766e",
+            "border_color": "#0d9488",
+        }
+
+    if estado_key == "no_show":
+        return {
+            "title_prefix": "No show",
+            "color": "#c2410c",
+            "border_color": "#ea580c",
+        }
+
+    return None
 
 def mostrar_detalles_reserva(reserva_id):
 
@@ -972,11 +1089,8 @@ def mostrar_detalles_reserva(reserva_id):
 
     fecha_str = inicio.strftime("%d/%m/%Y") if hasattr(inicio, "strftime") else ""
 
-    pagado = reserva.get("pagado", False)
-
-    estado = "[OK] Pagado" if pagado else "Pendiente"
-
-    estado_color = "#16a34a" if pagado else "#f59e0b"
+    estado_ui = _build_reserva_estado_ui(reserva)
+    payment_ui = _build_reserva_payment_ui(reserva)
 
     monto = reserva.get('monto', 0)
 
@@ -987,8 +1101,22 @@ def mostrar_detalles_reserva(reserva_id):
         inicio_str,
         fecha_str,
         monto,
-        estado,
-        estado_color,
+        estado_ui["label"],
+        estado_ui["color"],
+    )
+
+    st.markdown(
+        f"""
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <span style="display:inline-block;background:{estado_ui['color']}20;color:{estado_ui['color']};padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid {estado_ui['color']};">
+                Estado: {estado_ui['label']}
+            </span>
+            <span style="display:inline-block;background:{payment_ui['color']}20;color:{payment_ui['color']};padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid {payment_ui['color']};">
+                Pago: {payment_ui['label']}
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -1086,6 +1214,8 @@ def render_calendario_multi_barbero(reservas, read_only=False):
     with col_legend:
 
         render_status_legend(compact=True)
+
+    st.caption("Cancelada, completada y no show usan colores propios en el calendario.")
 
 
     st.markdown("---")
@@ -1469,13 +1599,16 @@ def mostrar_reservas_dataframe(rows):
 
             monto = r.get("monto") or r.get("precio") or 0
 
-            estado = bool(r.get("pagado", False))
+            estado_ui = _build_reserva_estado_ui(r)
+            payment_ui = _build_reserva_payment_ui(r)
 
-            estado_label = "Pagado" if estado else "Pendiente"
+            estado_color = estado_ui["color"]
 
-            estado_color = "#16a34a" if estado else "#f59e0b"
+            estado_bg = f"{estado_color}20"
 
-            estado_bg = "rgba(22, 163, 74, 0.1)" if estado else "rgba(245, 158, 11, 0.1)"
+            pago_color = payment_ui["color"]
+
+            pago_bg = f"{pago_color}20"
 
             # Single-line HTML avoids Markdown blank-line re-entry that causes
             # 4-space-indented inner tags to be rendered as <pre><code> blocks.
@@ -1486,14 +1619,19 @@ def mostrar_reservas_dataframe(rows):
                 f'box-shadow:0 2px 8px rgba(0,0,0,0.15);'
                 f'border:1px solid rgba(255,255,255,0.1);">'
                 f'<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px;">'
-                f'<h4 style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">{cliente}</h4>'
+                f'<div><h4 style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">{cliente}</h4>'
+                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
                 f'<span style="background-color:{estado_bg};color:{estado_color};padding:4px 12px;'
                 f'border-radius:20px;font-size:12px;font-weight:600;border:1px solid {estado_color};">'
-                f'{estado_label}</span></div>'
+                f'Estado: {estado_ui["label"]}</span>'
+                f'<span style="background-color:{pago_bg};color:{pago_color};padding:4px 12px;'
+                f'border-radius:20px;font-size:12px;font-weight:600;border:1px solid {pago_color};">'
+                f'Pago: {payment_ui["label"]}</span></div></div>'
+                f'<span style="color:#94a3b8;font-size:12px;font-weight:600;">#{r.get("id")}</span></div>'
                 f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px;">'
                 f'<div style="display:flex;align-items:center;gap:8px;"><span>Hora</span><span style="color:#e0e0e0;"><strong>{hora_label}</strong></span></div>'
-                f'<div style="display:flex;align-items:center;gap:8px;"><span>Tijeras</span><span style="color:#e0e0e0;"><strong>{servicio}</strong></span></div>'
-                f'<div style="display:flex;align-items:center;gap:8px;"><span>·</span><span style="color:#e0e0e0;"><strong>{barbero}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Servicio</span><span style="color:#e0e0e0;"><strong>{servicio}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Barbero</span><span style="color:#e0e0e0;"><strong>{barbero}</strong></span></div>'
                 f'<div style="display:flex;align-items:center;gap:8px;"><span>Monto</span><span style="color:#e0e0e0;"><strong>${monto}</strong></span></div>'
                 f'</div></div>'
             )
@@ -1559,7 +1697,7 @@ def ui_marcar_pagado_reservas(rows, key_prefix):
 
             if marcar_reserva_pagada(rid):
 
-                st.success("Pago registrado")
+                st.success(f"Pago registrado para la reserva #{rid}.")
 
                 st.rerun()
 
@@ -1601,7 +1739,7 @@ def ui_eliminar_reserva_lista(rows, key_prefix):
 
             if eliminar_reserva(rid):
 
-                st.success("Reserva eliminada")
+                st.success(f"Reserva #{rid} eliminada.")
 
                 st.rerun()
 
@@ -1845,7 +1983,7 @@ def manejar_interaccion_calendario(calendar_state):
 
                     )
 
-                st.success("Reserva actualizada")
+                st.success(f"Reserva #{reserva.get('id')} reprogramada correctamente.")
 
                 st.rerun()
 
@@ -1874,6 +2012,8 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
     with col_legend:
 
         render_status_legend()
+
+    st.caption("Cancelada, completada y no show usan colores propios en el calendario.")
 
 
     st.markdown("---")
@@ -1914,12 +2054,12 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
         # RENDER HTML OUTSIDE OF COLUMN CONTEXT - FULL WIDTH
 
-        mostrar_detalles_reserva(reserva_id)
+        reserva_detalle = mostrar_detalles_reserva(reserva_id)
 
 
         # Action buttons below
 
-        col_btn_left, col_btn_right = st.columns([1, 1])
+        col_btn_left, col_btn_center, col_btn_right = st.columns([1, 1, 1])
 
 
         with col_btn_left:
@@ -1928,7 +2068,28 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
                 if marcar_reserva_pagada(reserva_id):
 
-                    st.success("Pago registrado")
+                    st.success(f"Pago registrado para la reserva #{reserva_id}.")
+
+                    st.session_state.mostrar_detalles_reserva = False
+
+                    st.rerun()
+
+
+        with col_btn_center:
+
+            estado_detalle = _build_reserva_estado_ui(reserva_detalle) if reserva_detalle else None
+            puede_cancelar = estado_detalle and estado_detalle["key"] not in {"cancelada", "completada", "no_show"}
+
+            if st.button(
+                "Cancelar reserva",
+                key="btn_cancelar_action",
+                use_container_width=True,
+                disabled=not puede_cancelar,
+            ):
+
+                if actualizar_estado_reserva(reserva_id, "cancelada"):
+
+                    st.success(f"Reserva #{reserva_id} cancelada correctamente.")
 
                     st.session_state.mostrar_detalles_reserva = False
 
@@ -1959,9 +2120,9 @@ def render_gestion_agenda(barbero_actual=None):
 
     super_all = rol_g == "SUPER_ADMIN" and st.session_state.get("super_admin_all_barberias")
 
-    if not super_all and not bid_eff:
+    if not bid_eff:
 
-        st.warning("Selecciona una barbería o asocia tu sesión a una barbería.")
+        st.warning("Selecciona una barbería activa para crear o editar reservas.")
 
         return
 
@@ -1976,6 +2137,14 @@ def render_gestion_agenda(barbero_actual=None):
         return
 
     reservas = obtener_reservas_raw(barbero_actual)
+    service_catalog, using_fallback_catalog = _load_agenda_service_catalog(bid_eff)
+
+    if using_fallback_catalog:
+        render_alert(
+            "La barbería activa no tiene servicios configurados. Se usan opciones de respaldo para no bloquear la operación.",
+            alert_type="warning",
+            title="Catálogo vacío",
+        )
 
     barber_labels = {}
 
@@ -1993,7 +2162,7 @@ def render_gestion_agenda(barbero_actual=None):
 
         barbero_options = list(barber_labels.keys()) if barber_labels else list(barberos.keys())
 
-    servicio_options = list(servicios.keys()) + ["Bloqueo"]
+    servicio_options = list(service_catalog.keys()) + ["Bloqueo"]
 
     with st.expander("Crear reserva o bloqueo", expanded=False):
 
@@ -2018,7 +2187,7 @@ def render_gestion_agenda(barbero_actual=None):
 
             if st.form_submit_button("Crear"):
 
-                precio_nuevo = 0 if servicio_nuevo == "Bloqueo" else servicios[servicio_nuevo]["precio"]
+                precio_nuevo = 0 if servicio_nuevo == "Bloqueo" else service_catalog[servicio_nuevo]["precio"]
 
                 nombre_final = "BLOQUEADO" if servicio_nuevo == "Bloqueo" else normalizar_texto(nombre_nuevo)
 
@@ -2044,11 +2213,11 @@ def render_gestion_agenda(barbero_actual=None):
 
                 ):
 
-                    st.success("Reserva creada")
+                    st.success("Reserva creada correctamente.")
 
                     st.rerun()
 
-    st.subheader("Editar o eliminar reserva")
+    st.subheader("Editar, cancelar o eliminar reserva")
 
     if not reservas:
 
@@ -2088,7 +2257,15 @@ def render_gestion_agenda(barbero_actual=None):
 
     with st.form("editar_reserva_calendario"):
 
-        servicio_idx = servicio_options.index(reserva.get("servicio")) if reserva.get("servicio") in servicio_options else 0
+        servicio_actual = reserva.get("servicio")
+        if servicio_actual and servicio_actual not in service_catalog and servicio_actual != "Bloqueo":
+            service_catalog[servicio_actual] = {
+                "precio": int(reserva.get("precio") or 0),
+                "duracion": 30,
+            }
+            servicio_options = list(service_catalog.keys()) + ["Bloqueo"]
+
+        servicio_idx = servicio_options.index(servicio_actual) if servicio_actual in servicio_options else 0
 
         barbero_actual_ref = (
             reserva.get("barbero_id")
@@ -2097,6 +2274,9 @@ def render_gestion_agenda(barbero_actual=None):
         )
 
         barbero_idx = barbero_options.index(barbero_actual_ref) if barbero_actual_ref in barbero_options else 0
+        estado_actual = _normalizar_estado_operativo_ui(reserva.get("estado"))
+        estado_options = ["pendiente", "confirmada", "completada", "no_show", "cancelada"]
+        estado_idx = estado_options.index(estado_actual) if estado_actual in estado_options else 0
 
         nombre_editado = st.text_input("Cliente", value=reserva.get("nombre", ""))
 
@@ -2114,13 +2294,23 @@ def render_gestion_agenda(barbero_actual=None):
 
         fin_editado = st.datetime_input("Fin", value=reserva.get("fin"), key="agenda_fin_editado")
 
+        estado_editado = st.selectbox(
+            "Estado",
+            estado_options,
+            index=estado_idx,
+            key="agenda_estado_editado",
+            format_func=_format_reserva_estado_label,
+        )
+
         actualizar = st.form_submit_button("Guardar cambios")
+
+        cancelar = st.form_submit_button("Cancelar reserva")
 
         eliminar = st.form_submit_button("Eliminar reserva")
 
         if actualizar:
 
-            precio_editado = 0 if servicio_editado == "Bloqueo" else servicios[servicio_editado]["precio"]
+            precio_editado = 0 if servicio_editado == "Bloqueo" else service_catalog[servicio_editado]["precio"]
 
             nombre_final = "BLOQUEADO" if servicio_editado == "Bloqueo" else normalizar_texto(nombre_editado)
 
@@ -2146,9 +2336,41 @@ def render_gestion_agenda(barbero_actual=None):
 
                 barbero_id=barbero_editado if barbero_editado in barber_labels else None,
 
+                estado=estado_editado,
+
             ):
 
-                st.success("Reserva actualizada")
+                cambio_programacion = (
+                    inicio_editado != reserva.get("inicio")
+                    or fin_editado != reserva.get("fin")
+                    or barbero_editado != barbero_actual_ref
+                )
+
+                if estado_editado == "cancelada":
+
+                    st.success(f"Reserva #{reserva_id} cancelada correctamente.")
+
+                elif cambio_programacion:
+
+                    st.success(f"Reserva #{reserva_id} reprogramada correctamente.")
+
+                elif estado_editado != estado_actual:
+
+                    st.success(
+                        f"Estado de la reserva #{reserva_id} actualizado a {_format_reserva_estado_label(estado_editado)}."
+                    )
+
+                else:
+
+                    st.success(f"Reserva #{reserva_id} actualizada correctamente.")
+
+                st.rerun()
+
+        if cancelar:
+
+            if actualizar_estado_reserva(reserva_id, "cancelada"):
+
+                st.success(f"Reserva #{reserva_id} cancelada correctamente.")
 
                 st.rerun()
 
@@ -2158,7 +2380,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                 st.session_state.reserva_seleccionada_id = None
 
-                st.success("Reserva eliminada")
+                st.success(f"Reserva #{reserva_id} eliminada.")
 
                 st.rerun()
 
@@ -2183,8 +2405,6 @@ from app_core.metrics import (
     calcular_metricas_header,
     calcular_metricas_cliente,
     calcular_metricas_barbero,
-    calcular_metricas_admin,
-    calcular_metricas_super_admin,
 )
 def render_dashboard_cards(col_count, cards_data):
 
@@ -2279,13 +2499,30 @@ def render_income_breakdown(barberos_list, get_income_fn):
     )
 
 
+def _load_agenda_service_catalog(barberia_id):
+    """Load agenda service options from the active catalog, with a safe fallback."""
+    servicios_db = obtener_servicios(barberia_id) if barberia_id else []
+    catalogo = {}
+
+    for servicio in servicios_db or []:
+        nombre = (servicio.get("nombre") or "").strip()
+        if not nombre:
+            continue
+        catalogo[nombre] = {
+            "precio": int(servicio.get("precio") or 0),
+            "duracion": int(servicio.get("duracion") or 30),
+        }
+
+    if catalogo:
+        return catalogo, False
+
+    return dict(servicios), True
+
+
 # ================= MULTI-BARBERIA PUBLIC ACCESS (moved to app_core/services/servicios_service.py) =================
 from app_core.services.servicios_service import (
     obtener_barberia_por_slug,
     obtener_servicios,
-    crear_servicio,
-    actualizar_servicio,
-    eliminar_servicio,
 )
 # ================= BARBER SHOP REGISTRATION FLOW (PRODUCTION) =================
 
@@ -5178,8 +5415,10 @@ try:
     else:
 
         # Reset barberia_id to default when no slug (to prevent carryover from previous public booking)
-
-        reset_public_barberia_context(default_barberia_id)
+        if st.session_state.get("user"):
+            st.session_state.public_mode = False
+        else:
+            reset_public_barberia_context(default_barberia_id)
 
 
     # ===== LOGIN SCREEN =====
@@ -5254,6 +5493,15 @@ try:
             )
 
         barberia_name = get_cached_barberia_name(barberia_id, default_name="Principal")
+        current_context_label = barberia_name
+        if nr == "SUPER_ADMIN":
+            if st.session_state.get("super_admin_all_barberias"):
+                current_context_label = "Todas las barberias"
+            elif st.session_state.get("barberia_context_id"):
+                current_context_label = get_cached_barberia_name(
+                    st.session_state.get("barberia_context_id"),
+                    default_name=barberia_name,
+                )
 
         with st.sidebar:
 
@@ -5264,19 +5512,13 @@ try:
                 [
                     (usuario or "Invitado", "usuario", "Cuenta"),
                     (nr.replace("_", " "), "rol", "Rol"),
-                    (barberia_name, "barberia", "Barberia"),
+                    (current_context_label if nr == "SUPER_ADMIN" else barberia_name, "barberia", "Barberia"),
                 ],
             )
 
             st.markdown("---")
 
             if nr == "SUPER_ADMIN":
-
-                render_sidebar_section(
-                    "Contexto",
-                    [("Gestión multi-barbería", "contexto", "Contexto")],
-                    active_item="contexto",
-                )
 
                 try:
                     with st.spinner("Cargando barberías..."):
@@ -5285,17 +5527,21 @@ try:
                     if claves:
                         sel_lab = st.selectbox("Barbería activa", claves, index=idx, key="super_sel_barb")
                         st.session_state.barberia_context_id = etiquetas[sel_lab]
+                        current_context_label = sel_lab
                     elif b_list:
                         st.warning("No hay barberías disponibles")
+                        current_context_label = "Sin barberia activa"
                     else:
                         st.warning("No hay barberías registradas en el sistema")
                         st.session_state.barberia_context_id = None
+                        current_context_label = "Sin barberia activa"
 
                 except Exception as e:
 
                     logger.exception("Error loading barberia context for SUPER_ADMIN")
                     st.error(f"Error cargando contexto de barbería: {str(e)}")
                     st.session_state.barberia_context_id = None
+                    current_context_label = "Sin barberia activa"
 
                 try:
 
@@ -5309,6 +5555,23 @@ try:
 
                     logger.exception("Error in SUPER_ADMIN checkbox")
                     st.session_state.super_admin_all_barberias = False
+
+                context_scope_label = (
+                    "Vista global"
+                    if st.session_state.get("super_admin_all_barberias")
+                    else "Vista por barberia"
+                )
+                if st.session_state.get("super_admin_all_barberias"):
+                    current_context_label = "Todas las barberias"
+
+                render_sidebar_section(
+                    "Contexto activo",
+                    [
+                        (current_context_label, "contexto_barberia", "Barberia activa"),
+                        (context_scope_label, "contexto_scope", "Alcance"),
+                    ],
+                    active_item="contexto_barberia",
+                )
 
                 st.markdown("---")
 
@@ -5362,6 +5625,12 @@ try:
                 format_func=lambda item: nav_labels.get(item, item),
             )
 
+            render_sidebar_section(
+                "Vista actual",
+                [(nav_labels.get(seccion, seccion), "vista_actual", "Seccion")],
+                active_item="vista_actual",
+            )
+
             st.markdown("---")
 
             if st.button("Cerrar sesión", use_container_width=True, type="secondary"):
@@ -5374,315 +5643,9 @@ try:
             "nr": nr,
             "barberia_id": barberia_id,
             "bid_ctx": effective_barberia_id(),
-            "barberia_name": barberia_name,
+            "barberia_name": current_context_label if nr == "SUPER_ADMIN" else barberia_name,
             "seccion": seccion,
         }
-
-    def render_equipo_barberos(barberia_id):
-
-        """Render barber team as cards with create and delete actions."""
-
-        if not db_ok or not barberia_id:
-
-            render_alert("Gestión de equipo no disponible sin base de datos", alert_type="info")
-
-            return
-
-        # --- Card CSS ---
-
-        st.markdown("""<style>
-.barbero-card {
-    background: #1a1a1a;
-    border: 1px solid rgba(197,159,85,0.2);
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.barbero-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #c5a028, #8a6e17);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    font-weight: 700;
-    color: #080808;
-    flex-shrink: 0;
-    text-transform: uppercase;
-}
-.barbero-info { flex: 1; }
-.barbero-nombre { font-size: 17px; font-weight: 600; color: #f5f0e8; margin: 0; }
-.barbero-rol { font-size: 13px; color: rgba(197,159,85,0.8); margin: 2px 0 0 0; }
-</style>""", unsafe_allow_html=True)
-
-        # --- Create new barber form ---
-
-        render_subsection_title("Agregar barbero")
-
-        with st.form("form_crear_barbero_equipo", clear_on_submit=True):
-
-            col_u, col_p = st.columns(2)
-
-            with col_u:
-
-                nuevo_usuario = st.text_input("Nombre de usuario", placeholder="Ej: carlos")
-
-            with col_p:
-
-                nueva_password = st.text_input("Contraseña", type="password")
-
-            crear_btn = st.form_submit_button("Agregar al equipo", use_container_width=True, type="primary")
-
-        if crear_btn:
-
-            if not nuevo_usuario or not nuevo_usuario.strip():
-
-                st.error("El nombre de usuario es obligatorio.")
-
-            elif not nueva_password or len(nueva_password) < 4:
-
-                st.error("La contraseña debe tener al menos 4 caracteres.")
-
-            else:
-
-                ok = registrar(nuevo_usuario.strip(), nueva_password, "BARBERO", barberia_id=barberia_id)
-
-                if ok:
-
-                    st.success(f"Barbero '{nuevo_usuario}' añadido al equipo.")
-
-                    st.rerun()
-
-        render_divider()
-
-        # --- Barber cards ---
-
-        render_subsection_title("Equipo registrado")
-
-        with st.spinner("Cargando equipo..."):
-
-            barberos_data = listar_usuarios_barberos(barberia_id)
-
-        if not barberos_data:
-
-            render_panel_empty_state(
-
-                "Sin barberos aún",
-
-                "Usa el formulario de arriba para añadir el primer barbero al equipo.",
-
-            )
-
-            return
-
-        for row in barberos_data:
-
-            bid_barber, bname = row[0], row[1]
-
-            inicial = bname[0].upper() if bname else "B"
-
-            st.markdown(
-
-                f'<div class="barbero-card">'
-
-                f'<div class="barbero-avatar">{inicial}</div>'
-
-                f'<div class="barbero-info">'
-
-                f'<p class="barbero-nombre">{bname}</p>'
-
-                f'<p class="barbero-rol">Barbero</p>'
-
-                f'</div></div>',
-
-                unsafe_allow_html=True,
-
-            )
-
-            col_space, col_del = st.columns([4, 1])
-
-            with col_del:
-
-                if st.button("Eliminar", key=f"del_barbero_{bid_barber}", type="secondary", use_container_width=True):
-
-                    try:
-
-                        safe_execute(
-
-                            "DELETE FROM usuarios WHERE id = %s AND barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'",
-
-                            (int(bid_barber), int(barberia_id)),
-
-                        )
-
-                        st.success(f"Barbero '{bname}' eliminado.")
-
-                        st.rerun()
-
-                    except Exception as _e:
-
-                        logger.exception(f"Error eliminando barbero {bid_barber}")
-
-                        st.error("Error al eliminar el barbero.")
-
-    def render_gestion_servicios(barberia_id):
-
-        """Render CRUD UI for services management in admin/super_admin panels."""
-
-        if not db_ok or not barberia_id:
-
-            render_alert("Gestión de servicios no disponible sin base de datos", alert_type="info")
-
-            return
-
-        # --- Load current services ---
-
-        servicios_actuales = safe_fetch_all(
-
-            "SELECT id, nombre, duracion_minutos, precio, descripcion, icono FROM servicios WHERE barberia_id = %s ORDER BY id ASC",
-
-            (barberia_id,),
-
-        )
-
-        # --- Add new service form ---
-
-        render_subsection_title("Agregar servicio")
-
-        with st.form("form_crear_servicio", clear_on_submit=True):
-
-            col_n, col_d, col_p = st.columns([3, 2, 2])
-
-            with col_n:
-
-                nuevo_nombre = st.text_input("Nombre del servicio", max_chars=80)
-
-            with col_d:
-
-                nueva_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=30, step=5)
-
-            with col_p:
-
-                nuevo_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=0, step=100)
-
-            nueva_descripcion = st.text_input("Descripción (opcional)", max_chars=200)
-
-            nuevo_icono = st.text_input("Icono / etiqueta (opcional)", value="Servicio", max_chars=40)
-
-            guardar = st.form_submit_button("Agregar servicio", use_container_width=True, type="primary")
-
-        if guardar:
-
-            if not nuevo_nombre or not nuevo_nombre.strip():
-
-                st.error("El nombre del servicio es obligatorio.")
-
-            else:
-
-                ok = crear_servicio(barberia_id, nuevo_nombre, nueva_duracion, nuevo_precio, nueva_descripcion or "", nuevo_icono or "Servicio")
-
-                if ok:
-
-                    st.success(f"Servicio '{nuevo_nombre}' creado correctamente.")
-
-                    st.rerun()
-
-                else:
-
-                    st.error("Error al crear el servicio. Verifica que el nombre no esté duplicado.")
-
-        render_divider()
-
-        # --- List + edit/delete ---
-
-        render_subsection_title("Servicios registrados")
-
-        if not servicios_actuales:
-
-            render_panel_empty_state(
-
-                "Sin servicios aún",
-
-                "Agrega un servicio con el formulario de arriba y aparecerá aquí y en el flujo de reservas.",
-
-            )
-
-            return
-
-        for row in servicios_actuales:
-
-            sid, snombre, sduracion, sprecio, sdesc, sicono = row
-
-            with st.expander(f"{sicono or 'Servicio'} — {snombre} | {sduracion} min | ${sprecio}", expanded=False):
-
-                with st.form(f"form_editar_{sid}", clear_on_submit=False):
-
-                    col_en, col_ed, col_ep = st.columns([3, 2, 2])
-
-                    with col_en:
-
-                        edit_nombre = st.text_input("Nombre", value=snombre, max_chars=80, key=f"en_{sid}")
-
-                    with col_ed:
-
-                        edit_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=int(sduracion or 30), step=5, key=f"ed_{sid}")
-
-                    with col_ep:
-
-                        edit_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=int(sprecio or 0), step=100, key=f"ep_{sid}")
-
-                    edit_desc = st.text_input("Descripción", value=sdesc or "", max_chars=200, key=f"edesc_{sid}")
-
-                    edit_icono = st.text_input("Icono / etiqueta", value=sicono or "Servicio", max_chars=40, key=f"eico_{sid}")
-
-                    col_save, col_del = st.columns(2)
-
-                    with col_save:
-
-                        update_btn = st.form_submit_button("Guardar cambios", use_container_width=True, type="primary")
-
-                    with col_del:
-
-                        delete_btn = st.form_submit_button("Eliminar servicio", use_container_width=True, type="secondary")
-
-                if update_btn:
-
-                    if not edit_nombre or not edit_nombre.strip():
-
-                        st.error("El nombre no puede estar vacío.")
-
-                    else:
-
-                        ok = actualizar_servicio(sid, barberia_id, edit_nombre, edit_duracion, edit_precio, edit_desc or "", edit_icono or "Servicio")
-
-                        if ok:
-
-                            st.success("Servicio actualizado.")
-
-                            st.rerun()
-
-                        else:
-
-                            st.error("Error al actualizar el servicio.")
-
-                if delete_btn:
-
-                    ok = eliminar_servicio(sid, barberia_id)
-
-                    if ok:
-
-                        st.success(f"Servicio '{snombre}' eliminado.")
-
-                        st.rerun()
-
-                    else:
-
-                        st.error("Error al eliminar el servicio.")
 
     def _panel_ingresos(bid):
 
@@ -5819,6 +5782,7 @@ try:
                             st.session_state.cliente_barber_loading = False
 
                         st.markdown("#### Elige tu barbero")
+                        render_public_note("Selecciona un profesional para habilitar el formulario de reserva.")
                         barberos_list = [(name, name) for name in barber_opts]
                         cols = st.columns(min(3, len(barberos_list)))
                         barber_clicked = False
@@ -5830,7 +5794,7 @@ try:
                                     barber_name=barber_name,
                                     barber_id=barber_id,
                                     availability="Disponible",
-                                    icon="Tijeras",
+                                    icon="scissors",
                                     is_selected=is_selected
                                 ):
                                     st.session_state.cliente_barbero_sel_premium = barber_name
@@ -5855,10 +5819,7 @@ try:
                             render_divider(color=Colors.BORDER, height="2px", margin=Spacing.MD)
                             with st.form("form_reserva_cliente"):
                                 st.markdown("#### Detalles de la reserva")
-                                render_public_note(
-                                    f"Barbero seleccionado: {st.session_state.cliente_barbero_sel_premium}",
-                                    note_type="info",
-                                )
+                                render_public_note(f"Barbero seleccionado: {st.session_state.cliente_barbero_sel_premium}")
                                 col2 = st.columns(1)[0]
                                 with col2:
                                     servicio_sel = st.selectbox("Servicio", list(servicios.keys()), key="cliente_servicio_sel")
@@ -5867,7 +5828,7 @@ try:
                                     fecha_sel = st.date_input("Fecha", key="cliente_fecha_sel")
                                 with col4:
                                     hora_sel = st.time_input("Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sel")
-                                render_public_note(f"Cliente: {usuario}", note_type="info")
+                                render_public_note(f"Reserva para: {usuario}")
                                 enviar = st.form_submit_button("Reservar", use_container_width=True)
 
                             if enviar:
@@ -5964,7 +5925,7 @@ try:
                 meta=barberia_name,
             )
 
-            tab_cal, tab_crear, tab_lista = st.tabs(["Calendario Calendario", "Editar Crear/Editar", "Listado Listado"])
+            tab_cal, tab_crear, tab_lista = st.tabs(["Calendario", "Crear / Editar", "Listado"])
 
             with tab_cal:
                 if db_ok:
@@ -5981,7 +5942,7 @@ try:
                 st.markdown("### Mis reservas")
                 view_type = st.radio(
                     "Modo de vista",
-                    ["Tarjetas Tarjetas", "Calendario Calendario"],
+                    ["Tarjetas", "Calendario"],
                     horizontal=True,
                     key="barbero_view_type"
                 )
@@ -5993,7 +5954,7 @@ try:
                         rows_bar = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
 
                     if rows_bar:
-                        if view_type == "Tarjetas Tarjetas":
+                        if view_type == "Tarjetas":
                             mostrar_reservas_dataframe(rows_bar)
                             ui_marcar_pagado_reservas(rows_bar, "barbero_panel")
                             ui_eliminar_reserva_lista(rows_bar, "barbero_panel")
@@ -6016,10 +5977,9 @@ try:
                             st.markdown("---")
                             render_public_note(
                                 "Vista semanal del calendario con navegación por flechas.",
-                                note_type="info",
                             )
                     else:
-                        st.info("No hay reservas")
+                        st.info("No hay reservas para mostrar.")
 
         elif seccion == "Barberos":
             render_internal_section_header(
@@ -6039,127 +5999,12 @@ try:
             )
             render_alert("Preferencias y ajustes próximamente", alert_type="info")
 
-    def render_admin_dashboard_section(barberia_id, db_ok, barberia_name):
-        render_panel_header(
-            "Visión general",
-            "Gestiona métricas, agenda y actividad diaria de tu barbería.",
-            eyebrow="Panel administrativo",
-            meta=barberia_name,
-        )
-
-        if not db_ok:
-            render_alert("Métricas no disponibles sin base de datos", alert_type="info")
-            return
-
-        with st.spinner("Cargando métricas..."):
-            total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
-            total_reservas, hoy_reservas, total_ingresos, num_barberos = calcular_metricas_admin(barberia_id)
-
-        render_metric_grid([
-            ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
-            ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
-            ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
-        ], columns=3)
-        render_divider()
-        render_subsection_title("Resumen general")
-        render_metric_grid([
-            ("Total Reservas", total_reservas, "Listado", Colors.SECONDARY),
-            ("Hoy", hoy_reservas, "Agenda", Colors.PRIMARY),
-            ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
-            ("Barberos", num_barberos, "Equipo", Colors.WARNING),
-        ], columns=4)
-        render_divider()
-
-        with st.spinner("Cargando próximas citas..."):
-            todas_reservas = safe_fetch_all(
-                """
-                SELECT id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto
-                FROM reservas
-                WHERE barberia_id = %s
-                ORDER BY inicio DESC
-                """,
-                (barberia_id,),
-            ) or []
-            hoy = datetime.now().date()
-            hoy_reservas_list = [r for r in todas_reservas if r[3] == hoy]
-
-        if hoy_reservas_list:
-            render_upcoming_appointments_summary("Próximas citas (hoy)", hoy_reservas_list)
-
     def render_admin_agenda_calendar_tab(eventos, db_ok):
         if db_ok:
             with st.spinner("Cargando calendario..."):
                 render_calendario_multi_barbero(eventos, read_only=not db_ok)
         else:
             st.warning("Calendario no disponible sin base de datos (modo demo).")
-
-    def render_agenda_calendar_results(rows):
-        reservas_calendar = []
-        for r in rows:
-            fecha = r.get("fecha")
-            hora = r.get("hora")
-            if fecha and hora:
-                try:
-                    start_dt = datetime.combine(fecha, hora)
-                    end_dt = start_dt + timedelta(minutes=30)
-                    monto = r.get("monto") or r.get("precio") or 0
-                    pagado = bool(r.get("pagado", False))
-                    reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
-                except (TypeError, ValueError):
-                    continue
-
-        mostrar_calendario_reservas(reservas_calendar)
-        st.markdown("---")
-        render_public_note(
-            "Vista semanal del calendario con navegación por flechas.",
-            note_type="info",
-        )
-
-    def render_admin_agenda_list_filters(barberia_id):
-        col_view1, col_view2 = st.columns(2)
-        with col_view1:
-            view_type = st.radio(
-                "Modo de vista",
-                ["Tarjetas Tarjetas", "Calendario Calendario"],
-                horizontal=True,
-                key="admin_view_type"
-            )
-
-        filtro_adm = st.selectbox(
-            "Filtrar por barbero",
-            opciones_filtro_barberos_ui(barberia_id),
-            key="tabla_admin_filtro",
-        )
-        return view_type, filtro_adm
-
-    def render_admin_agenda_list_card_actions(rows_adm):
-        mostrar_reservas_dataframe(rows_adm)
-        ui_marcar_pagado_reservas(rows_adm, "admin_panel")
-        ui_eliminar_reserva_lista(rows_adm, "admin_panel")
-
-    def render_admin_agenda_list_results(view_type, rows_adm):
-        if not rows_adm:
-            st.info("No hay reservas")
-            return
-
-        if view_type == "Tarjetas Tarjetas":
-            render_admin_agenda_list_card_actions(rows_adm)
-            return
-
-        render_agenda_calendar_results(rows_adm)
-
-    def render_admin_agenda_list_tab(barberia_id, usuario, db_ok):
-        st.markdown("### Reservas")
-
-        if not db_ok:
-            st.info("Tabla no disponible sin base de datos.")
-            return
-
-        view_type, filtro_adm = render_admin_agenda_list_filters(barberia_id)
-        with st.spinner("Cargando datos..."):
-            rows_adm = listar_reservas_filtradas(barberia_id, "ADMIN", usuario, filtro_barbero=filtro_adm)
-
-        render_admin_agenda_list_results(view_type, rows_adm)
 
     def render_admin_agenda_income_tab(barberia_id, db_ok):
         st.markdown("### Ingresos")
@@ -6203,7 +6048,7 @@ try:
                 logger.exception("Error fetching eventos for ADMIN")
                 eventos = []
 
-        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario Calendario", "Editar Crear/Editar", "Listado Reservas", "$ Ingresos"])
+        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario", "Crear / Editar", "Listado", "Ingresos"])
 
         with tab_cal:
             render_admin_agenda_calendar_tab(eventos, db_ok)
@@ -6212,19 +6057,21 @@ try:
             render_gestion_agenda()
 
         with tab_lista:
-            render_admin_agenda_list_tab(barberia_id, usuario, db_ok)
+            render_admin_agenda_list_tab(
+                barberia_id=barberia_id,
+                usuario=usuario,
+                db_ok=db_ok,
+                opciones_filtro_barberos_ui=opciones_filtro_barberos_ui,
+                listar_reservas_filtradas=listar_reservas_filtradas,
+                mostrar_reservas_dataframe=mostrar_reservas_dataframe,
+                ui_marcar_pagado_reservas=ui_marcar_pagado_reservas,
+                ui_eliminar_reserva_lista=ui_eliminar_reserva_lista,
+                mostrar_calendario_reservas=mostrar_calendario_reservas,
+                render_public_note=render_public_note,
+            )
 
         with tab_ingresos:
             render_admin_agenda_income_tab(barberia_id, db_ok)
-
-    def render_admin_barberos_section(barberia_id, barberia_name):
-        render_panel_header(
-            "Equipo",
-            "Crea y administra los barberos asociados a esta barbería.",
-            eyebrow="Gestión",
-            meta=barberia_name,
-        )
-        render_equipo_barberos(barberia_id)
 
     def render_admin_configuracion_section(barberia_name):
         render_panel_header(
@@ -6234,15 +6081,6 @@ try:
             meta=barberia_name,
         )
         render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
-
-    def render_admin_servicios_section(barberia_id, barberia_name):
-        render_panel_header(
-            "Servicios",
-            "Crea, edita y elimina los servicios que ofrece tu barbería.",
-            eyebrow="Catálogo",
-            meta=barberia_name,
-        )
-        render_gestion_servicios(barberia_id)
 
     def render_admin_clientes_section(barberia_name):
         render_panel_header(
@@ -6286,15 +6124,30 @@ try:
             st.stop()
 
         if seccion == "Dashboard":
-            render_admin_dashboard_section(barberia_id, db_ok, barberia_name)
+            render_admin_dashboard_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
+                barberia_name=barberia_name,
+                render_upcoming_summary=render_upcoming_appointments_summary,
+            )
         elif seccion == "Agenda":
             render_admin_agenda_section(barberia_id, usuario, db_ok, barberia_name)
         elif seccion == "Barberos":
-            render_admin_barberos_section(barberia_id, barberia_name)
+            render_barberos_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="No hay barbería asociada a la sesión.",
+            )
         elif seccion == "Configuración":
             render_admin_configuracion_section(barberia_name)
         elif seccion == "Servicios":
-            render_admin_servicios_section(barberia_id, barberia_name)
+            render_services_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="No hay barbería asociada a la sesión.",
+            )
         elif seccion == "Clientes":
             render_admin_clientes_section(barberia_name)
         elif seccion == "Sitio Web":
@@ -6302,87 +6155,12 @@ try:
         elif seccion == "Complementos":
             render_admin_complementos_section(barberia_name)
 
-    def render_super_admin_dashboard_section(bid_ctx, db_ok):
-        render_panel_header(
-            "Visión global",
-            "Supervisa métricas y operación de todas las barberías.",
-            eyebrow="Super admin",
-            meta="Vista plataforma",
-        )
-
-        if not db_ok:
-            render_alert("Métricas no disponibles sin base de datos", alert_type="info")
-            return
-
-        with st.spinner("Cargando métricas globales..."):
-            total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(bid_ctx) if bid_ctx else (0, 0, 0)
-            num_barberias, num_usuarios, num_reservas, total_ingresos, hoy_count = calcular_metricas_super_admin(bid_ctx)
-
-        render_metric_grid([
-            ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
-            ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
-            ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
-        ], columns=3)
-        render_divider()
-        render_subsection_title("Resumen global")
-        render_metric_grid([
-            ("Barberías", num_barberias, "Barberias", Colors.PRIMARY),
-            ("Usuarios", num_usuarios, "Usuarios", Colors.SECONDARY),
-            ("Total", num_reservas, "Listado", Colors.PRIMARY),
-            ("Hoy", hoy_count, "Agenda", Colors.SECONDARY),
-            ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
-        ], columns=5)
-
     def render_super_admin_agenda_calendar_tab(eventos, db_ok):
         if db_ok:
             with st.spinner("Cargando calendario..."):
                 render_calendario_multi_barbero(eventos, read_only=not db_ok)
         else:
             st.warning("Calendario no disponible sin base de datos (modo demo).")
-
-    def render_super_admin_agenda_list_filters(bid_ctx):
-        view_type = st.radio(
-            "Modo de vista",
-            ["Tarjetas Tarjetas", "Calendario Calendario"],
-            horizontal=True,
-            key="super_view_type"
-        )
-
-        filtro_su = st.selectbox(
-            "Filtrar por barbero",
-            opciones_filtro_barberos_ui(bid_ctx) if bid_ctx else ["Todos"] + list(barberos.keys()),
-            key="tabla_super_filtro",
-        )
-        return view_type, filtro_su
-
-    def render_super_admin_agenda_list_card_actions(rows_su):
-        mostrar_reservas_dataframe(rows_su)
-        ui_marcar_pagado_reservas(rows_su, "super_panel")
-        ui_eliminar_reserva_lista(rows_su, "super_panel")
-
-    def render_super_admin_agenda_list_results(view_type, rows_su):
-        if not rows_su:
-            st.info("No hay reservas")
-            return
-
-        if view_type == "Tarjetas Tarjetas":
-            render_super_admin_agenda_list_card_actions(rows_su)
-            return
-
-        render_agenda_calendar_results(rows_su)
-
-    def render_super_admin_agenda_list_tab(bid_ctx, usuario, db_ok):
-        st.markdown("### Reservas")
-
-        if not db_ok:
-            st.info("Tabla no disponible sin base de datos.")
-            return
-
-        view_type, filtro_su = render_super_admin_agenda_list_filters(bid_ctx)
-        with st.spinner("Cargando reservas..."):
-            rows_su = listar_reservas_filtradas(bid_ctx, "SUPER_ADMIN", usuario, filtro_barbero=filtro_su)
-
-        render_super_admin_agenda_list_results(view_type, rows_su)
 
     def render_super_admin_agenda_income_tab(bid_ctx, db_ok):
         st.markdown("### Ingresos (barbería activa)")
@@ -6411,12 +6189,12 @@ try:
                 ),
             )
 
-    def render_super_admin_agenda_section(bid_ctx, usuario, db_ok):
+    def render_super_admin_agenda_section(bid_ctx, usuario, db_ok, barberia_name):
         render_panel_header(
             "Agenda global",
             "Vista consolidada de citas, reservas e ingresos.",
             eyebrow="Agenda",
-            meta="Contexto global",
+            meta=barberia_name,
         )
 
         eventos = []
@@ -6427,7 +6205,7 @@ try:
                 logger.exception("Error fetching eventos for SUPER_ADMIN")
                 eventos = []
 
-        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario Calendario", "Editar Crear/Editar", "Listado Reservas", "$ Ingresos"])
+        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario", "Crear / Editar", "Listado", "Ingresos"])
 
         with tab_cal:
             render_super_admin_agenda_calendar_tab(eventos, db_ok)
@@ -6436,22 +6214,22 @@ try:
             render_gestion_agenda()
 
         with tab_lista:
-            render_super_admin_agenda_list_tab(bid_ctx, usuario, db_ok)
+            render_super_admin_agenda_list_tab(
+                bid_ctx=bid_ctx,
+                usuario=usuario,
+                db_ok=db_ok,
+                barberos=barberos,
+                opciones_filtro_barberos_ui=opciones_filtro_barberos_ui,
+                listar_reservas_filtradas=listar_reservas_filtradas,
+                mostrar_reservas_dataframe=mostrar_reservas_dataframe,
+                ui_marcar_pagado_reservas=ui_marcar_pagado_reservas,
+                ui_eliminar_reserva_lista=ui_eliminar_reserva_lista,
+                mostrar_calendario_reservas=mostrar_calendario_reservas,
+                render_public_note=render_public_note,
+            )
 
         with tab_ingresos:
             render_super_admin_agenda_income_tab(bid_ctx, db_ok)
-
-    def render_super_admin_barberos_section(bid_ctx):
-        render_panel_header(
-            "Equipo",
-            "Barberos del contexto de barbería seleccionado.",
-            eyebrow="Gestión",
-            meta="Contexto activo",
-        )
-        if bid_ctx:
-            render_equipo_barberos(bid_ctx)
-        else:
-            st.info("Selecciona una barbería en la barra lateral.")
 
     def render_super_admin_configuracion_section():
         render_panel_header(
@@ -6461,18 +6239,6 @@ try:
             meta="Super admin",
         )
         st.info("Parámetros de plataforma próximamente.")
-
-    def render_super_admin_servicios_section(bid_ctx):
-        render_panel_header(
-            "Servicios",
-            "Administra los servicios de la barbería activa en contexto.",
-            eyebrow="Catálogo",
-            meta="Contexto activo",
-        )
-        if bid_ctx:
-            render_gestion_servicios(bid_ctx)
-        else:
-            render_alert("Selecciona una barbería en la barra lateral para gestionar sus servicios.", alert_type="info")
 
     def render_super_admin_clientes_section():
         render_panel_header(
@@ -6512,15 +6278,29 @@ try:
 
     def render_super_admin_content(seccion, barberia_id, bid_ctx, usuario, user, db_ok, barberia_name):
         if seccion == "Dashboard":
-            render_super_admin_dashboard_section(bid_ctx, db_ok)
+            render_super_admin_dashboard_section(
+                bid_ctx=bid_ctx,
+                db_ok=db_ok,
+                barberia_name=barberia_name,
+            )
         elif seccion == "Agenda":
-            render_super_admin_agenda_section(bid_ctx, usuario, db_ok)
+            render_super_admin_agenda_section(bid_ctx, usuario, db_ok, barberia_name)
         elif seccion == "Barberos":
-            render_super_admin_barberos_section(bid_ctx)
+            render_barberos_section(
+                barberia_id=bid_ctx,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="Selecciona una barbería en la barra lateral.",
+            )
         elif seccion == "Configuración":
             render_super_admin_configuracion_section()
         elif seccion == "Servicios":
-            render_super_admin_servicios_section(bid_ctx)
+            render_services_section(
+                barberia_id=bid_ctx,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="Selecciona una barbería en la barra lateral para gestionar sus servicios.",
+            )
         elif seccion == "Clientes":
             render_super_admin_clientes_section()
         elif seccion == "Sitio Web":

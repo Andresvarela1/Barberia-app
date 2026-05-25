@@ -1,8 +1,9 @@
-"""
+﻿"""
 Global Design System for Barberia App
 Ensures consistent, modern, and premium UI across all screens
 """
 
+import html
 import streamlit as st
 import textwrap
 
@@ -1389,10 +1390,10 @@ def apply_public_booking_css():
 
 def render_public_landing_hero(barberia):
     """Render the public barberia hero using shared public CSS classes."""
-    nombre = barberia.get("nombre", "Barbería")
-    telefono = barberia.get("telefono") or "Teléfono por confirmar"
-    direccion = barberia.get("direccion") or "Dirección por confirmar"
-    ciudad = barberia.get("ciudad") or "Atención local"
+    nombre = barberia.get("nombre", "BarberÃ­a")
+    telefono = barberia.get("telefono") or "TelÃ©fono por confirmar"
+    direccion = barberia.get("direccion") or "DirecciÃ³n por confirmar"
+    ciudad = barberia.get("ciudad") or "AtenciÃ³n local"
     logo_url = barberia.get("logo_url")
     banner_url = barberia.get("banner_url") or barberia.get("imagen_url") or barberia.get("foto_url")
     logo_html = f'<img src="{logo_url}" alt="{nombre}">' if logo_url else "BL"
@@ -1416,14 +1417,14 @@ def render_public_landing_hero(barberia):
     </div>
     <section class="public-hero" {hero_style}>
         <div class="public-hero-content">
-            <div class="public-badge">Barbería premium · Reserva simple</div>
+            <div class="public-badge">BarberÃ­a premium Â· Reserva simple</div>
             <h1>{nombre}</h1>
             <p>Cortes precisos, barberos expertos y horarios disponibles en segundos. Elige servicio, barbero y hora sin llamadas.</p>
         </div>
     </section>
     <div class="public-contact-grid">
-        <div class="public-info-card"><strong>Teléfono</strong><span>{telefono}</span></div>
-        <div class="public-info-card"><strong>Dirección</strong><span>{direccion}</span></div>
+        <div class="public-info-card"><strong>TelÃ©fono</strong><span>{telefono}</span></div>
+        <div class="public-info-card"><strong>DirecciÃ³n</strong><span>{direccion}</span></div>
         <div class="public-info-card"><strong>Ciudad</strong><span>{ciudad}</span></div>
     </div>
     """, unsafe_allow_html=True)
@@ -1434,7 +1435,7 @@ def render_public_payment_notice():
     st.markdown("""
     <div class="public-payment-notice">
         <h3>Finaliza tu pago ahora</h3>
-        <p>Tu hora está bloqueada temporalmente para ti. Completa el pago para asegurar tu cita.</p>
+        <p>Tu hora estÃ¡ bloqueada temporalmente para ti. Completa el pago para asegurar tu cita.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1454,7 +1455,7 @@ def render_public_booking_summary(data):
             </div>
             <div class="public-summary-item">
                 <span>Fecha y hora</span>
-                <strong>{data.get('fecha', 'N/A')} · {data.get('hora', 'N/A')}</strong>
+                <strong>{data.get('fecha', 'N/A')} Â· {data.get('hora', 'N/A')}</strong>
             </div>
             <div class="public-summary-item">
                 <span>Monto</span>
@@ -1469,8 +1470,10 @@ def render_public_booking_summary(data):
     """, unsafe_allow_html=True)
 
 
-def render_public_note(message, warning=False):
+def render_public_note(message, warning=False, note_type=None):
     """Render a compact public note."""
+    if note_type is not None:
+        warning = str(note_type).strip().lower() in {"warning", "error", "danger"}
     class_name = "public-warning-note" if warning else "public-note"
     st.markdown(f'<div class="{class_name}">{message}</div>', unsafe_allow_html=True)
 
@@ -1573,6 +1576,13 @@ def apply_internal_panel_css():
         box-shadow: {Shadows.SM};
     }}
 
+    .panel-header-main {{
+        display: flex;
+        flex-direction: column;
+        gap: {Spacing.XS};
+        min-width: 0;
+    }}
+
     .panel-eyebrow {{
         color: {Colors.PRIMARY};
         font-size: {Typography.TINY};
@@ -1601,10 +1611,27 @@ def apply_internal_panel_css():
         color: {Colors.TEXT_SECONDARY};
         background: {Colors.CARD_HOVER};
         border: 1px solid {Colors.BORDER};
-        border-radius: {BorderRadius.FULL};
-        padding: 8px 12px;
+        border-radius: {BorderRadius.LG};
+        padding: 10px 12px;
+        min-width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    }}
+
+    .panel-header-meta-label {{
+        color: {Colors.TEXT_TERTIARY};
+        font-size: {Typography.TINY};
+        font-weight: {Typography.BOLD};
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }}
+
+    .panel-header-meta-value {{
+        color: {Colors.TEXT};
         font-size: {Typography.SMALL};
-        font-weight: {Typography.MEDIUM};
+        font-weight: {Typography.SEMIBOLD};
         white-space: nowrap;
     }}
 
@@ -1745,6 +1772,10 @@ def apply_internal_panel_css():
         .panel-header-meta {{
             display: inline-block;
             margin-top: {Spacing.MD};
+            min-width: 0;
+        }}
+
+        .panel-header-meta-value {{
             white-space: normal;
         }}
     }}
@@ -1756,11 +1787,11 @@ def render_panel_header(title, subtitle=None, eyebrow=None, meta=None):
     """Render a consistent header for authenticated internal panels."""
     eyebrow_html = f'<div class="panel-eyebrow">{eyebrow}</div>' if eyebrow else ""
     subtitle_html = f'<p class="panel-subtitle">{subtitle}</p>' if subtitle else ""
-    meta_html = f'<div class="panel-header-meta">{meta}</div>' if meta else ""
+    meta_html = f'<div class="panel-header-meta"><span class="panel-header-meta-label">Contexto</span><span class="panel-header-meta-value">{meta}</span></div>' if meta else ""
 
     st.markdown(f"""
     <div class="panel-header">
-        <div>
+        <div class="panel-header-main">
             {eyebrow_html}
             <h1 class="panel-title">{title}</h1>
             {subtitle_html}
@@ -1866,7 +1897,7 @@ def render_divider(color=Colors.BORDER, height="2px", margin=Spacing.LG):
     )
 
 
-def render_stat_box(label, value, icon="📊", color=Colors.PRIMARY):
+def render_stat_box(label, value, icon="ðŸ“Š", color=Colors.PRIMARY):
     """
     Render a stat box with icon and value
     
@@ -1942,7 +1973,7 @@ def render_metric_grid(metrics, columns=None, gap="large"):
         if isinstance(metric, dict):
             label = metric.get("label", "")
             value = metric.get("value", "")
-            icon = metric.get("icon", "📊")
+            icon = metric.get("icon", "ðŸ“Š")
             color = metric.get("color", Colors.PRIMARY)
         else:
             label, value, icon, color = metric
@@ -1969,12 +2000,12 @@ def render_alert(message, alert_type="info", title=None):
     color = color_map.get(alert_type, Colors.SECONDARY)
     
     icon_map = {
-        "success": "✅",
-        "error": "❌",
-        "warning": "⚠️",
-        "info": "ℹ️",
+        "success": "&#10003;",
+        "error": "&#10005;",
+        "warning": "&#9888;",
+        "info": "i",
     }
-    icon = icon_map.get(alert_type, "ℹ️")
+    icon = icon_map.get(alert_type, "i")
     
     st.markdown(
         f"""
@@ -1991,8 +2022,19 @@ def render_alert(message, alert_type="info", title=None):
                 gap: {Spacing.MD};
             ">
                 <div style="
-                    font-size: 1.5rem;
+                    font-size: 1rem;
                     margin-top: 2px;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 999px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba({int(color.lstrip('#')[0:2], 16)}, {int(color.lstrip('#')[2:4], 16)}, {int(color.lstrip('#')[4:6], 16)}, 0.14);
+                    color: {color};
+                    font-weight: {Typography.BOLD};
+                    line-height: 1;
+                    flex-shrink: 0;
                 ">{icon}</div>
                 <div>
                     {f'<h4 style="margin: 0 0 {Spacing.SM} 0; color: {color};">{title}</h4>' if title else ''}
@@ -2288,7 +2330,7 @@ def render_action_button(label, primary=True, icon=None, full_width=True, size="
     )
 
 
-def render_cta_section(title, description, button_text="Continuar", button_key=None, icon="🚀"):
+def render_cta_section(title, description, button_text="Continuar", button_key=None, icon="ðŸš€"):
     """
     Render a visually rich CTA (Call-To-Action) section with gradient background.
     
@@ -2372,51 +2414,48 @@ def render_cta_section(title, description, button_text="Continuar", button_key=N
         )
 
 
-def render_barber_card(barber_name, barber_id, availability="Disponible", icon="💈", is_selected=False, disabled=False):
-    """
-    Render a premium interactive barber selection card with smooth UX.
-    
-    Premium Features:
-    - Smooth click feedback (scale 0.97, 100ms)
-    - Hover depth effects (shadow lift, -2px translateY)
-    - Improved visual hierarchy (3x icon, large bold name, lighter secondary)
-    - Selected state with animated check mark
-    - Smooth transitions (0.15-0.25s ease-in-out)
-    - Responsive and accessible
-    
-    Args:
-        barber_name: Name of the barber
-        barber_id: Unique identifier for the barber
-        availability: Availability status text (default: "Disponible")
-        icon: Emoji icon for the barber (default: "💈")
-        is_selected: Whether this barber is currently selected
-        disabled: Whether the card is disabled
-    
-    Returns:
-        True if card was clicked, False otherwise
-    """
-    
-    # Generate unique key for this card's button
+def _get_barber_card_icon_markup(icon, barber_name):
+    icon_text = str(icon or "").strip()
+    normalized = icon_text.lower()
+
+    if normalized in {"", "tijeras", "scissors", "barbero", "barber", "servicio", "corte", "ðÿ’ˆ", "💈"}:
+        return """
+        <svg class="barber-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="6" cy="6" r="2.2"></circle>
+            <circle cx="6" cy="18" r="2.2"></circle>
+            <path d="M8 7.5 18.5 3.5"></path>
+            <path d="M8 16.5 18.5 20.5"></path>
+            <path d="M9 9.5 18.2 18.8"></path>
+            <path d="M9 14.5 18.2 5.2"></path>
+        </svg>
+        """
+
+    if len(icon_text) <= 2 and not icon_text.isalnum():
+        return f'<span class="barber-icon-text">{html.escape(icon_text)}</span>'
+
+    fallback_initial = html.escape((barber_name or "?")[0].upper())
+    return f'<span class="barber-icon-fallback">{fallback_initial}</span>'
+
+
+def render_barber_card(barber_name, barber_id, availability="Disponible", icon="scissors", is_selected=False, disabled=False):
+    """Render an interactive barber selection card with robust icon fallback."""
+
     barber_id_str = str(barber_id)
     button_key = f"barber_card_{barber_id_str}_{barber_name.replace(' ', '_')}"
     card_class = f"barber-card-{barber_id_str.replace(' ', '_').replace('-', '_').lower()}"
-    
-    # Determine colors and styles based on state
+    icon_markup = _get_barber_card_icon_markup(icon, barber_name)
+
     if is_selected:
         border_color = Colors.PRIMARY
         border_width = "3px"
-        bg_color = rgb_to_rgba(Colors.PRIMARY, 0.12)
-        shadow = Shadows.LG
-        check_mark = "✓"
+        check_mark = "&#10003;"
         check_display = "flex"
     else:
         border_color = Colors.BORDER
         border_width = "2px"
-        bg_color = Colors.CARD
-        shadow = Shadows.MD
         check_mark = ""
         check_display = "none"
-    
+
     if disabled:
         opacity = "0.6"
         cursor = "not-allowed"
@@ -2425,8 +2464,7 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
         opacity = "1"
         cursor = "pointer"
         pointer_events = "auto"
-    
-    # Build the enhanced card HTML with premium UX
+
     card_html = f"""
     <style>
         .{card_class} {{
@@ -2450,29 +2488,45 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             user-select: none;
             -webkit-user-select: none;
         }}
-        
+
         .{card_class}:hover {{
             border-color: {Colors.PRIMARY};
             box-shadow: {Shadows.LG}, {Shadows.INSET_SUBTLE}, {Shadows.GLOW_SOFT};
             background: {Gradients.CARD_HOVER};
         }}
-        
-        .{card_class}:active {{
-            transition: all 0.1s ease-in-out;
-        }}
-        
-        .{card_class}.selected {{
-            background: {Gradients.CARD_SELECTED};
-            box-shadow: {Shadows.LG}, {Shadows.INSET_SUBTLE}, {Shadows.GLOW_STRONG};
-        }}
-        
+
         .barber-icon-container {{
-            font-size: 3.5rem;
             margin-bottom: {Spacing.MD};
-            display: block;
-            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 64px;
         }}
-        
+
+        .barber-icon-svg {{
+            width: 54px;
+            height: 54px;
+            stroke: {Colors.PRIMARY};
+            stroke-width: 1.8;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }}
+
+        .barber-icon-fallback,
+        .barber-icon-text {{
+            width: 56px;
+            height: 56px;
+            border-radius: {BorderRadius.FULL};
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: {rgb_to_rgba(Colors.PRIMARY, 0.12)};
+            color: {Colors.PRIMARY};
+            font-size: 1.5rem;
+            font-weight: {Typography.BOLD};
+        }}
+
         .barber-name {{
             font-size: 1.5rem;
             font-weight: {Typography.BOLD};
@@ -2481,7 +2535,7 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             word-break: break-word;
             letter-spacing: 0.3px;
         }}
-        
+
         .barber-divider {{
             width: 30px;
             height: 2px;
@@ -2489,7 +2543,7 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             margin: {Spacing.SM} auto {Spacing.SM} auto;
             border-radius: 1px;
         }}
-        
+
         .barber-availability {{
             font-size: {Typography.TINY};
             color: {Colors.TEXT_SECONDARY};
@@ -2501,19 +2555,21 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             font-weight: {Typography.MEDIUM};
             letter-spacing: 0;
         }}
-        
+
         .barber-availability::before {{
-            content: "●";
-            font-size: 0.4rem;
-            color: {Colors.SUCCESS};
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: {Colors.SUCCESS};
             animation: pulse-dot 2s ease-in-out infinite;
         }}
-        
+
         @keyframes pulse-dot {{
             0%, 100% {{ opacity: 1; }}
             50% {{ opacity: 0.6; }}
         }}
-        
+
         .barber-check {{
             position: absolute;
             top: {Spacing.MD};
@@ -2532,31 +2588,26 @@ def render_barber_card(barber_name, barber_id, availability="Disponible", icon="
             z-index: 10;
         }}
     </style>
-    
+
     <div class="{card_class}">{f'<div class="barber-check">{check_mark}</div>' if is_selected else ''}
-        <span class="barber-icon-container">{icon}</span>
+        <div class="barber-icon-container">{icon_markup}</div>
         <div class="barber-name">{barber_name}</div>
         <div class="barber-divider"></div>
         <div class="barber-availability">{availability}</div>
     </div>
     """
-    
-    # Render the card and button
+
     st.markdown(textwrap.dedent(card_html).strip(), unsafe_allow_html=True)
-    
-    # Create invisible button with the same width as the card container
-    clicked = st.button(
+
+    return st.button(
         label="",
         key=button_key,
         use_container_width=True,
         disabled=disabled,
         help=f"Seleccionar a {barber_name}" if not disabled else "No disponible"
     )
-    
-    return clicked
 
-
-def render_barber_selector(barbers, selected_id=None, icon="💈", on_select_callback=None):
+def render_barber_selector(barbers, selected_id=None, icon="scissors", on_select_callback=None):
     """
     Render a grid of barber selection cards with premium styling.
     
@@ -2594,7 +2645,7 @@ def render_barber_selector(barbers, selected_id=None, icon="💈", on_select_cal
             clicked = render_barber_card(
                 barber_name=barber_name,
                 barber_id=barber_id,
-                availability="✓ Disponible",
+                availability="Disponible",
                 icon=icon,
                 is_selected=is_selected
             )
@@ -2649,7 +2700,7 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
     """
     
     if not available_times:
-        st.warning("⏰ No hay horarios disponibles")
+        st.warning("â° No hay horarios disponibles")
         return None
     
     # Normalize times for comparison
@@ -2723,7 +2774,7 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
             st.markdown(chip_html, unsafe_allow_html=True)
             
             if st.button(
-                f"🕐\n{time_display}",
+                f"ðŸ•\n{time_display}",
                 key=button_key,
                 use_container_width=True,
                 help=f"Seleccionar {time_display}"
@@ -2847,7 +2898,7 @@ def render_booking_section(title=None, content_func=None):
                 f'</div>'
             )
             st.markdown(title_html, unsafe_allow_html=True)
-        # Use native st.container() — no open HTML tags left dangling
+        # Use native st.container() â€” no open HTML tags left dangling
         with st.container():
             yield
 
@@ -2995,7 +3046,7 @@ def render_step_indicator(current_step, total_steps, step_titles=None):
     for step_num in range(1, total_steps + 1):
         if step_num < current_step:
             status = "completed"
-            symbol = "✓"
+            symbol = "âœ“"
         elif step_num == current_step:
             status = "active"
             symbol = str(step_num)
@@ -3067,31 +3118,31 @@ def render_info_alert(message, alert_type="info", icon=None, title=None, margin_
             "bg": Gradients.OVERLAY_SUBTLE,
             "border": Colors.SECONDARY,
             "color": Colors.SECONDARY,
-            "icon": "ℹ️"
+            "icon": "â„¹ï¸"
         },
         "success": {
             "bg": "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 163, 74, 0.05) 100%)",
             "border": Colors.SUCCESS,
             "color": Colors.SUCCESS,
-            "icon": "✅"
+            "icon": "âœ…"
         },
         "warning": {
             "bg": "linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%)",
             "border": Colors.WARNING,
             "color": Colors.WARNING,
-            "icon": "⚠️"
+            "icon": "âš ï¸"
         },
         "danger": {
             "bg": "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.05) 100%)",
             "border": Colors.DANGER,
             "color": Colors.DANGER,
-            "icon": "❌"
+            "icon": "âŒ"
         },
         "payment": {
             "bg": Gradients.CTA_PRIMARY,
             "border": Colors.DANGER,
             "color": Colors.WHITE,
-            "icon": "💳"
+            "icon": "ðŸ’³"
         }
     }
     
@@ -3121,7 +3172,7 @@ def render_info_alert(message, alert_type="info", icon=None, title=None, margin_
     """, unsafe_allow_html=True)
 
 
-def render_metric_card(label, value, delta=None, icon="📊", color=Colors.PRIMARY, size="medium"):
+def render_metric_card(label, value, delta=None, icon="ðŸ“Š", color=Colors.PRIMARY, size="medium"):
     """
     Render consistent metric card with design system styling.
     
@@ -3488,7 +3539,7 @@ def render_sidebar_section(title, items, active_item=None):
     """
     st.markdown(f"""
     <div class="sidebar-section">
-        <h4 style="margin: 0 0 {Spacing.MD} 0; color: {Colors.TEXT}; font-size: {Typography.SMALL}; font-weight: {Typography.SEMIBOLD}; text-transform: none; letter-spacing: 0;">
+        <h4 style="margin: 0 0 {Spacing.SM} 0; color: {Colors.TEXT_SECONDARY}; font-size: {Typography.TINY}; font-weight: {Typography.BOLD}; text-transform: uppercase; letter-spacing: 0.08em;">
             {title}
         </h4>
     </div>
@@ -3500,15 +3551,17 @@ def render_sidebar_section(title, items, active_item=None):
         <div class="sidebar-item {'active' if is_active else ''}" style="
             background: {'linear-gradient(135deg, ' + Colors.PRIMARY + ' 0%, ' + Colors.PRIMARY_DARK + ' 100%)' if is_active else Colors.CARD_HOVER};
             color: {'white' if is_active else Colors.TEXT};
-            border-left: 4px solid {Colors.SECONDARY if is_active else 'transparent'};
+            border: 1px solid {rgb_to_rgba(Colors.SECONDARY, 0.35) if is_active else Colors.BORDER};
             padding: {Spacing.MD} {Spacing.LG};
-            padding-left: {('calc(' + Spacing.LG + ' - 4px)') if is_active else Spacing.LG};
             margin-bottom: {Spacing.SM};
-            cursor: pointer;
-            border-radius: {BorderRadius.SM};
+            border-radius: {BorderRadius.MD};
             transition: all 0.2s ease;
+            box-shadow: {'0 14px 28px -22px rgba(197,160,40,0.65)' if is_active else 'none'};
         ">
-            <span>{icon}</span> <span style="margin-left: {Spacing.SM}; font-weight: {'bold' if is_active else 'normal'};">{label}</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <span style="font-size:{Typography.TINY}; text-transform:uppercase; letter-spacing:0.08em; color:{'rgba(255,255,255,0.78)' if is_active else Colors.TEXT_TERTIARY};">{icon}</span>
+                <span style="font-weight:{Typography.SEMIBOLD}; line-height:1.35;">{label}</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -3560,9 +3613,9 @@ def render_appointment_block(time, service, barber, duration, status="scheduled"
     ">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <p style="margin: 0; font-size: {Typography.SMALL}; opacity: 0.9;">⏰ {time}</p>
-                <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.BODY}; font-weight: bold;">✂️ {service}</p>
-                <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.SMALL}; opacity: 0.85;">👤 {barber} • {duration} min</p>
+                <p style="margin: 0; font-size: {Typography.SMALL}; opacity: 0.9;">â° {time}</p>
+                <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.BODY}; font-weight: bold;">âœ‚ï¸ {service}</p>
+                <p style="margin: {Spacing.SM} 0 0 0; font-size: {Typography.SMALL}; opacity: 0.85;">ðŸ‘¤ {barber} â€¢ {duration} min</p>
             </div>
             <div style="font-size: {Typography.TINY}; opacity: 0.8; text-transform: none; font-weight: {Typography.SEMIBOLD};">
                 {status.title()}
@@ -3570,3 +3623,4 @@ def render_appointment_block(time, service, barber, duration, status="scheduled"
         </div>
     </div>
     """, unsafe_allow_html=True)
+
