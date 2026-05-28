@@ -1,6 +1,6 @@
 """Metrics queries for the dashboard.
 
-Extracted from app.py.  All public names keep their original signatures.
+Extracted from app.py. All public names keep their original signatures.
 """
 
 import logging
@@ -12,6 +12,40 @@ from app_core.db.safe_queries import safe_fetch_one
 from app_core.security.tenant_access import get_current_barberia_id
 
 logger = logging.getLogger("barberia_app")
+
+
+def _build_operational_metrics_query(scope_all_barberias=False):
+    if scope_all_barberias:
+        return """
+            SELECT
+                COUNT(*) as reservas_creadas,
+                COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'completada' THEN 1 END) as reservas_completadas,
+                COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'cancelada' THEN 1 END) as reservas_canceladas,
+                COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'no_show' THEN 1 END) as reservas_no_show,
+                COUNT(
+                    DISTINCT NULLIF(
+                        TRIM(COALESCE(NULLIF(nombre, ''), NULLIF(cliente, ''))),
+                        ''
+                    )
+                ) as clientes_unicos
+            FROM reservas
+        """
+
+    return """
+        SELECT
+            COUNT(*) as reservas_creadas,
+            COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'completada' THEN 1 END) as reservas_completadas,
+            COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'cancelada' THEN 1 END) as reservas_canceladas,
+            COUNT(CASE WHEN COALESCE(estado, 'pendiente') = 'no_show' THEN 1 END) as reservas_no_show,
+            COUNT(
+                DISTINCT NULLIF(
+                    TRIM(COALESCE(NULLIF(nombre, ''), NULLIF(cliente, ''))),
+                    ''
+                )
+            ) as clientes_unicos
+        FROM reservas
+        WHERE barberia_id = %s
+    """
 
 
 def calcular_metricas_header(barberia_id=None):
@@ -40,7 +74,7 @@ def calcular_metricas_header(barberia_id=None):
             return metrics[0], metrics[1], metrics[2]
         return 0, 0, 0
     except Exception:
-        logger.exception("Error calculando métricas header")
+        logger.exception("Error calculando metricas header")
         return 0, 0, 0
 
 
@@ -71,7 +105,7 @@ def calcular_metricas_cliente(barberia_id=None, usuario=None):
             return metrics[0], metrics[1], 0
         return 0, 0, 0
     except Exception:
-        logger.exception("Error calculando métricas cliente")
+        logger.exception("Error calculando metricas cliente")
         return 0, 0, 0
 
 
@@ -102,7 +136,7 @@ def calcular_metricas_barbero(barberia_id=None, barbero_id=None):
             return metrics[0], metrics[1], metrics[2]
         return 0, 0, 0
     except Exception:
-        logger.exception("Error calculando métricas barbero")
+        logger.exception("Error calculando metricas barbero")
         return 0, 0, 0
 
 
@@ -134,7 +168,7 @@ def calcular_metricas_admin(barberia_id=None):
             return metrics[0], metrics[1], metrics[2], metrics[3]
         return 0, 0, 0, 0
     except Exception:
-        logger.exception("Error calculando métricas admin")
+        logger.exception("Error calculando metricas admin")
         return 0, 0, 0, 0
 
 
@@ -185,5 +219,53 @@ def calcular_metricas_super_admin(barberia_id=None):
             return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
         return 0, 0, 0, 0, 0
     except Exception:
-        logger.exception("Error calculando métricas super admin")
+        logger.exception("Error calculando metricas super admin")
         return 0, 0, 0, 0, 0
+
+
+@st.cache_data(ttl=45)
+def calcular_metricas_operativas_admin(barberia_id=None):
+    barberia_id = get_current_barberia_id()
+    if not barberia_id or not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0, 0
+
+    try:
+        metrics = safe_fetch_one(
+            _build_operational_metrics_query(scope_all_barberias=False),
+            (barberia_id,),
+        )
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
+        return 0, 0, 0, 0, 0
+    except Exception:
+        logger.exception("Error calculando metricas operativas admin")
+        return 0, 0, 0, 0, 0
+
+
+@st.cache_data(ttl=60)
+def calcular_metricas_operativas_super_admin(barberia_id=None):
+    if not st.session_state.get("db_available", True):
+        return 0, 0, 0, 0, 0, "Sin contexto"
+
+    try:
+        viewing_all = st.session_state.get("super_admin_all_barberias", False)
+
+        if viewing_all:
+            metrics = safe_fetch_one(_build_operational_metrics_query(scope_all_barberias=True))
+            context_label = "Global"
+        else:
+            barberia_id = get_current_barberia_id()
+            if not barberia_id:
+                return 0, 0, 0, 0, 0, "Barberia activa requerida"
+            metrics = safe_fetch_one(
+                _build_operational_metrics_query(scope_all_barberias=False),
+                (barberia_id,),
+            )
+            context_label = "Barberia activa"
+
+        if metrics:
+            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4], context_label
+        return 0, 0, 0, 0, 0, context_label
+    except Exception:
+        logger.exception("Error calculando metricas operativas super admin")
+        return 0, 0, 0, 0, 0, "Sin contexto"

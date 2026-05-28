@@ -959,7 +959,7 @@ def apply_public_booking_css():
     }}
 
     .public-hero {{
-        min-height: 480px;
+        min-height: 520px;
         border-radius: 28px;
         padding: clamp(28px, 6vw, 72px);
         color: #ffffff;
@@ -968,9 +968,17 @@ def apply_public_booking_css():
         display: flex;
         align-items: flex-end;
         background:
-            radial-gradient(circle at 82% 18%, rgba(197, 159, 85, 0.34), transparent 34%),
-            linear-gradient(135deg, #111827 0%, #2f241d 54%, #16110d 100%);
-        box-shadow: 0 28px 70px -38px rgba(17, 24, 39, 0.7);
+            radial-gradient(circle at 82% 18%, rgba(245, 200, 92, 0.22), transparent 34%),
+            linear-gradient(145deg, #0f172a 0%, #18181b 42%, #23180d 100%);
+        box-shadow: 0 34px 84px -42px rgba(15, 23, 42, 0.82);
+    }}
+
+    .public-hero::after {{
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.28) 100%);
+        pointer-events: none;
     }}
 
     .public-logo img {{
@@ -986,33 +994,65 @@ def apply_public_booking_css():
         z-index: 1;
     }}
 
+    .public-hero-eyebrow {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: rgba(255,255,255,0.78) !important;
+        font-size: {Typography.TINY};
+        font-weight: {Typography.BOLD};
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 {Spacing.SM};
+    }}
+
     .public-badge {{
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: rgba(255, 255, 255, 0.14);
-        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.26);
         border-radius: {BorderRadius.FULL};
-        padding: 8px 12px;
+        padding: 9px 14px;
         font-size: {Typography.SMALL};
         font-weight: {Typography.SEMIBOLD};
         margin-bottom: {Spacing.MD};
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
     }}
 
     .public-hero h1 {{
         color: #ffffff !important;
-        font-size: clamp(2.35rem, 6vw, 5rem);
-        line-height: 0.98;
-        margin: 0 0 {Spacing.MD};
+        font-size: clamp(2.5rem, 6vw, 5.2rem);
+        line-height: 1.02;
+        margin: 0 0 {Spacing.SM};
         letter-spacing: 0 !important;
     }}
 
     .public-hero p {{
-        color: rgba(255, 255, 255, 0.88) !important;
-        font-size: clamp(1rem, 2.4vw, 1.2rem);
-        line-height: 1.65;
-        margin: 0 0 {Spacing.LG};
+        color: rgba(255, 255, 255, 0.94) !important;
+        font-size: clamp(1.02rem, 2.35vw, 1.22rem);
+        line-height: 1.58;
+        margin: 0 0 {Spacing.MD};
+        max-width: 56ch;
+    }}
+
+    .public-hero-meta {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: {Spacing.LG};
+    }}
+
+    .public-hero-meta span {{
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.92);
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: {BorderRadius.FULL};
+        padding: 8px 12px;
+        font-size: {Typography.SMALL};
+        font-weight: {Typography.SEMIBOLD};
     }}
 
     .public-contact-grid,
@@ -1025,11 +1065,11 @@ def apply_public_booking_css():
 
     .public-info-card,
     .public-trust-card {{
-        background: #141414;
-        border: 1px solid rgba(197,159,85,0.25);
+        background: linear-gradient(180deg, rgba(23,23,23,0.96) 0%, rgba(32,32,32,0.98) 100%);
+        border: 1px solid rgba(197,159,85,0.18);
         border-radius: {BorderRadius.XL};
         padding: {Spacing.LG};
-        box-shadow: 0 16px 40px -32px rgba(0,0,0,0.75);
+        box-shadow: 0 18px 44px -34px rgba(0,0,0,0.72);
     }}
 
     .public-info-card strong,
@@ -1043,7 +1083,7 @@ def apply_public_booking_css():
     .public-info-card span,
     .public-info-card p,
     .public-trust-card p {{
-        color: rgba(245,240,232,0.65) !important;
+        color: rgba(245,240,232,0.78) !important;
         font-size: {Typography.SMALL};
         margin: 0;
     }}
@@ -1061,8 +1101,29 @@ def apply_public_booking_css():
     }}
 
     .public-section-heading p {{
-        color: rgba(245,240,232,0.6) !important;
+        color: rgba(245,240,232,0.74) !important;
         margin: 0;
+    }}
+
+    .public-primary-cta .stButton > button {{
+        min-height: 58px !important;
+        font-size: 1rem !important;
+        font-weight: {Typography.BOLD} !important;
+        background: linear-gradient(135deg, #d6ad3b 0%, #b58417 100%) !important;
+        color: #140f08 !important;
+        box-shadow: 0 18px 34px -22px rgba(214,173,59,0.72) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+    }}
+
+    .public-primary-cta .stButton > button:hover {{
+        background: linear-gradient(135deg, #e0b94f 0%, #c28d18 100%) !important;
+        transform: translateY(-1px);
+    }}
+
+    .public-secondary-cta-note {{
+        color: rgba(245,240,232,0.72) !important;
+        font-size: {Typography.SMALL};
+        margin: {Spacing.SM} 0 0 0 !important;
     }}
 
     .public-service-button .stButton > button {{
@@ -1271,11 +1332,11 @@ def apply_public_booking_css():
         max-width: 960px;
         margin: 0 auto 1.25rem;
         gap: 10px;
-        background: #111111;
-        border: 1px solid rgba(197,159,85,0.2);
+        background: linear-gradient(180deg, rgba(17,17,17,0.98) 0%, rgba(24,24,24,0.98) 100%);
+        border: 1px solid rgba(197,159,85,0.18);
         border-radius: 18px;
-        padding: 0.85rem;
-        box-shadow: 0 12px 32px -28px rgba(0,0,0,0.7);
+        padding: 0.9rem 1rem;
+        box-shadow: 0 14px 36px -28px rgba(0,0,0,0.75);
         overflow-x: auto;
     }}
 
@@ -1301,9 +1362,10 @@ def apply_public_booking_css():
     }}
 
     .step-circle.active {{
-        background: #111827;
-        color: white;
-        box-shadow: 0 0 0 4px rgba(197, 159, 85, 0.18);
+        background: linear-gradient(135deg, #c59f55 0%, #9f7414 100%);
+        color: #140f08;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 0 0 4px rgba(197, 159, 85, 0.16), 0 10px 24px -16px rgba(197,159,85,0.7);
     }}
 
     .step-circle.completed {{
@@ -1321,7 +1383,7 @@ def apply_public_booking_css():
         flex: 1;
         height: 2px;
         min-width: 18px;
-        background: #eadfce;
+        background: rgba(245,240,232,0.18);
         margin-top: 22px;
     }}
 
@@ -1331,7 +1393,7 @@ def apply_public_booking_css():
 
     .step-label {{
         font-size: 0.85rem;
-        color: rgba(245,240,232,0.55);
+        color: rgba(245,240,232,0.64);
         text-align: center;
         min-width: 72px;
         max-width: 92px;
@@ -1339,8 +1401,8 @@ def apply_public_booking_css():
     }}
 
     .step-label.active {{
-        color: #7c3aed;
-        font-weight: 600;
+        color: #f8f6f1;
+        font-weight: 700;
     }}
 
     @media (max-width: 768px) {{
@@ -1390,18 +1452,18 @@ def apply_public_booking_css():
 
 def render_public_landing_hero(barberia):
     """Render the public barberia hero using shared public CSS classes."""
-    nombre = barberia.get("nombre", "BarberÃ­a")
-    telefono = barberia.get("telefono") or "TelÃ©fono por confirmar"
-    direccion = barberia.get("direccion") or "DirecciÃ³n por confirmar"
-    ciudad = barberia.get("ciudad") or "AtenciÃ³n local"
+    nombre = barberia.get("nombre", "Barberia")
+    telefono = barberia.get("telefono") or "Telefono por confirmar"
+    direccion = barberia.get("direccion") or "Direccion por confirmar"
+    ciudad = barberia.get("ciudad") or "Atencion local"
     logo_url = barberia.get("logo_url")
     banner_url = barberia.get("banner_url") or barberia.get("imagen_url") or barberia.get("foto_url")
     logo_html = f'<img src="{logo_url}" alt="{nombre}">' if logo_url else "BL"
     hero_style = ""
     if banner_url:
         hero_style = (
-            'style="background: linear-gradient(90deg, rgba(17, 24, 39, 0.92) 0%, '
-            'rgba(17, 24, 39, 0.68) 52%, rgba(17, 24, 39, 0.24) 100%), '
+            'style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, '
+            'rgba(15, 23, 42, 0.78) 50%, rgba(15, 23, 42, 0.34) 100%), '
             f'url(\'{banner_url}\') center/cover;"'
         )
 
@@ -1417,14 +1479,20 @@ def render_public_landing_hero(barberia):
     </div>
     <section class="public-hero" {hero_style}>
         <div class="public-hero-content">
-            <div class="public-badge">BarberÃ­a premium Â· Reserva simple</div>
+            <div class="public-hero-eyebrow">Reserva online disponible</div>
             <h1>{nombre}</h1>
-            <p>Cortes precisos, barberos expertos y horarios disponibles en segundos. Elige servicio, barbero y hora sin llamadas.</p>
+            <p>Reserva tu proxima cita en pocos pasos. Elige servicio, barbero y horario con una experiencia clara, rapida y confiable.</p>
+            <div class="public-badge">Confirmacion inmediata</div>
+            <div class="public-hero-meta">
+                <span>Reserva en minutos</span>
+                <span>Barberos expertos</span>
+                <span>Horarios disponibles</span>
+            </div>
         </div>
     </section>
     <div class="public-contact-grid">
-        <div class="public-info-card"><strong>TelÃ©fono</strong><span>{telefono}</span></div>
-        <div class="public-info-card"><strong>DirecciÃ³n</strong><span>{direccion}</span></div>
+        <div class="public-info-card"><strong>Telefono</strong><span>{telefono}</span></div>
+        <div class="public-info-card"><strong>Direccion</strong><span>{direccion}</span></div>
         <div class="public-info-card"><strong>Ciudad</strong><span>{ciudad}</span></div>
     </div>
     """, unsafe_allow_html=True)
@@ -1434,40 +1502,77 @@ def render_public_payment_notice():
     """Render public payment reminder without touching payment logic."""
     st.markdown("""
     <div class="public-payment-notice">
-        <h3>Finaliza tu pago ahora</h3>
-        <p>Tu hora estÃ¡ bloqueada temporalmente para ti. Completa el pago para asegurar tu cita.</p>
+        <h3>Reserva creada · pago disponible</h3>
+        <p>Tu cita ya fue registrada. Completa el pago ahora para dejarla confirmada con mayor claridad para ti y para la barberia.</p>
     </div>
     """, unsafe_allow_html=True)
 
 
 def render_public_booking_summary(data):
     """Render public booking summary card."""
-    st.markdown(f"""
+    def _safe_summary_value(value, fallback="N/A"):
+        text = str(value).strip() if value is not None else ""
+        if not text:
+            text = fallback
+        return html.escape(text)
+
+    summary_items = [
+        ("Servicio", data.get("servicio"), "N/A"),
+        ("Barbero", data.get("barbero_nombre"), "N/A"),
+        (
+            "Fecha y hora",
+            f"{data.get('fecha') or 'N/A'} | {data.get('hora') or 'N/A'}",
+            "N/A | N/A",
+        ),
+        ("Monto", f"${data.get('precio', 0):,}", "$0"),
+        ("Reserva", f"#{data.get('reserva_id') or 'N/A'}", "#N/A"),
+    ]
+
+    customer_fields = data.get("customer_fields")
+    if customer_fields:
+        for field in customer_fields:
+            if not isinstance(field, (list, tuple)) or len(field) < 2:
+                continue
+            label = field[0]
+            value = field[1]
+            fallback = field[2] if len(field) > 2 else "N/A"
+            summary_items.append((label, value, fallback))
+    else:
+        if data.get("nombre"):
+            summary_items.append(("Cliente", data.get("nombre"), "N/A"))
+        if data.get("telefono"):
+            summary_items.append(("Telefono", data.get("telefono"), "N/A"))
+        if data.get("email"):
+            summary_items.append(("Email", data.get("email"), "-"))
+
+    rendered_items = "".join(
+        f"""
+            <div class="public-summary-item">
+                <span>{html.escape(str(label))}</span>
+                <strong>{_safe_summary_value(value, fallback)}</strong>
+            </div>
+        """
+        for label, value, fallback in summary_items
+    )
+
+    summary_html = textwrap.dedent(f"""
     <div class="public-summary-card">
-        <div class="public-summary-grid">
-            <div class="public-summary-item">
-                <span>Servicio</span>
-                <strong>{data.get('servicio', 'N/A')}</strong>
-            </div>
-            <div class="public-summary-item">
-                <span>Barbero</span>
-                <strong>{data.get('barbero_nombre', 'N/A')}</strong>
-            </div>
-            <div class="public-summary-item">
-                <span>Fecha y hora</span>
-                <strong>{data.get('fecha', 'N/A')} Â· {data.get('hora', 'N/A')}</strong>
-            </div>
-            <div class="public-summary-item">
-                <span>Monto</span>
-                <strong>${data.get('precio', 0):,}</strong>
-            </div>
-            <div class="public-summary-item">
-                <span>Reserva</span>
-                <strong>#{data.get('reserva_id', 'N/A')}</strong>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+            <div>
+                <span style="display:block;color:rgba(245,240,232,0.64);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.08em;">Resumen</span>
+                <strong style="display:block;color:#f5f0e8;font-size:1.15rem;">Confirma los datos de tu cita</strong>
             </div>
         </div>
+        <div class="public-summary-grid">
+            {rendered_items}
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+    """).strip()
+
+    if hasattr(st, "html"):
+        st.html(summary_html)
+    else:
+        st.markdown(summary_html, unsafe_allow_html=True)
 
 
 def render_public_note(message, warning=False, note_type=None):
@@ -2330,7 +2435,7 @@ def render_action_button(label, primary=True, icon=None, full_width=True, size="
     )
 
 
-def render_cta_section(title, description, button_text="Continuar", button_key=None, icon="ðŸš€"):
+def render_cta_section(title, description, button_text="Continuar", button_key=None, icon="OK"):
     """
     Render a visually rich CTA (Call-To-Action) section with gradient background.
     
@@ -2700,7 +2805,7 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
     """
     
     if not available_times:
-        st.warning("â° No hay horarios disponibles")
+        st.warning("No hay horarios disponibles")
         return None
     
     # Normalize times for comparison
@@ -2774,7 +2879,7 @@ def render_time_chips(available_times, selected_time=None, on_time_selected=None
             st.markdown(chip_html, unsafe_allow_html=True)
             
             if st.button(
-                f"ðŸ•\n{time_display}",
+                time_display,
                 key=button_key,
                 use_container_width=True,
                 help=f"Seleccionar {time_display}"
@@ -2851,25 +2956,26 @@ def render_booking_header(title, subtitle=None, step=None, total_steps=None):
     """
     subtitle_html = (
         f'<p style="font-size:{Typography.BODY};color:{Colors.TEXT_SECONDARY};'
-        f'margin:0 0 {Spacing.LG} 0;line-height:1.6;">{subtitle}</p>'
+        f'margin:0;line-height:1.6;max-width:56ch;">{subtitle}</p>'
     ) if subtitle else ""
 
     step_html = (
-        f'<div style="display:flex;align-items:center;justify-content:center;'
-        f'gap:{Spacing.SM};margin-top:{Spacing.MD};">'
-        f'<span style="font-size:{Typography.SMALL};color:{Colors.PRIMARY};'
-        f'font-weight:{Typography.BOLD};">Paso {step}</span>'
-        f'<span style="color:{Colors.TEXT_TERTIARY};">de {total_steps}</span>'
+        f'<div style="display:inline-flex;align-items:center;justify-content:center;'
+        f'gap:{Spacing.SM};margin-bottom:{Spacing.MD};padding:8px 12px;'
+        f'background:{rgb_to_rgba(Colors.PRIMARY, 0.08)};border:1px solid {rgb_to_rgba(Colors.PRIMARY, 0.16)};'
+        f'border-radius:{BorderRadius.FULL};">'
+        f'<span style="font-size:{Typography.TINY};color:{Colors.PRIMARY};'
+        f'font-weight:{Typography.BOLD};text-transform:uppercase;letter-spacing:0.08em;">Paso {step} de {total_steps}</span>'
         f'</div>'
     ) if (step and total_steps) else ""
 
     header_html = (
-        f'<div style="text-align:center;margin-bottom:{Spacing.XXL};'
+        f'<div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:{Spacing.XXL};'
         f'padding-bottom:{Spacing.XL};border-bottom:1px solid {Colors.BORDER};">'
+        f'{step_html}'
         f'<h1 style="font-size:{Typography.H1};font-weight:{Typography.BOLD};'
         f'color:{Colors.TEXT};margin:0 0 {Spacing.MD} 0;">{title}</h1>'
         f'{subtitle_html}'
-        f'{step_html}'
         f'</div>'
     )
     st.markdown(header_html, unsafe_allow_html=True)
@@ -2953,12 +3059,13 @@ def render_form_group(
     if input_func and callable(input_func):
         result = input_func()
     else:
+        text_input_type = "default" if input_type in (None, "", "text") else input_type
         result = st.text_input(
             help_text or label,
             value=value,
             placeholder=placeholder,
             key=key,
-            type=input_type,
+            type=text_input_type,
             help=helper,
             label_visibility="collapsed",
             **input_kwargs,
@@ -3046,7 +3153,7 @@ def render_step_indicator(current_step, total_steps, step_titles=None):
     for step_num in range(1, total_steps + 1):
         if step_num < current_step:
             status = "completed"
-            symbol = "âœ“"
+            symbol = "&#10003;"
         elif step_num == current_step:
             status = "active"
             symbol = str(step_num)
@@ -3056,8 +3163,9 @@ def render_step_indicator(current_step, total_steps, step_titles=None):
         
         label = step_titles[step_num - 1] if step_titles and step_num <= len(step_titles) else f"Step {step_num}"
         
+        active_step_class = " active" if step_num == current_step else ""
         indicator_html += f"""
-        <div class="step-item">
+        <div class="step-item{active_step_class}">
             <div class="step-circle {status}">{symbol}</div>
             <div class="step-label {status}">{label}</div>
         </div>
@@ -3118,25 +3226,25 @@ def render_info_alert(message, alert_type="info", icon=None, title=None, margin_
             "bg": Gradients.OVERLAY_SUBTLE,
             "border": Colors.SECONDARY,
             "color": Colors.SECONDARY,
-            "icon": "â„¹ï¸"
+            "icon": "i"
         },
         "success": {
             "bg": "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 163, 74, 0.05) 100%)",
             "border": Colors.SUCCESS,
             "color": Colors.SUCCESS,
-            "icon": "âœ…"
+            "icon": "&#10003;"
         },
         "warning": {
             "bg": "linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%)",
             "border": Colors.WARNING,
             "color": Colors.WARNING,
-            "icon": "âš ï¸"
+            "icon": "&#9888;"
         },
         "danger": {
             "bg": "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.05) 100%)",
             "border": Colors.DANGER,
             "color": Colors.DANGER,
-            "icon": "âŒ"
+            "icon": "&#10005;"
         },
         "payment": {
             "bg": Gradients.CTA_PRIMARY,

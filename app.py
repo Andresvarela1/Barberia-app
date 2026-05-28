@@ -218,6 +218,7 @@ from app_core.agenda import (
 )
 from app_core.features.services import render_services_section
 from app_core.features.barberos import render_barberos_section
+from app_core.features.clientes import render_clientes_section
 from app_core.features.dashboard import (
     render_admin_dashboard_section,
     render_super_admin_dashboard_section,
@@ -1035,6 +1036,22 @@ def _build_reserva_payment_ui(reserva):
         "label": "Pagada" if pagado else "Pendiente de pago",
         "color": "#16a34a" if pagado else "#f59e0b",
     }
+
+
+def _reserva_estado_action_success_message(reserva_id, estado):
+
+    estado_key = _normalizar_estado_operativo_ui(estado)
+
+    if estado_key == "cancelada":
+        return f"Reserva #{reserva_id} cancelada correctamente."
+
+    if estado_key == "completada":
+        return f"Reserva #{reserva_id} marcada como completada."
+
+    if estado_key == "no_show":
+        return f"Reserva #{reserva_id} marcada como no show."
+
+    return f"Estado de la reserva #{reserva_id} actualizado a {_format_reserva_estado_label(estado_key)}."
 
 
 def _calendar_estado_visual(reserva):
@@ -2057,10 +2074,11 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
         reserva_detalle = mostrar_detalles_reserva(reserva_id)
 
 
+        estado_detalle = _build_reserva_estado_ui(reserva_detalle) if reserva_detalle else None
+        puede_cambiar_estado = estado_detalle and estado_detalle["key"] not in {"cancelada", "completada", "no_show"}
+
         # Action buttons below
-
-        col_btn_left, col_btn_center, col_btn_right = st.columns([1, 1, 1])
-
+        col_btn_left, col_btn_right = st.columns([1, 1])
 
         with col_btn_left:
 
@@ -2069,27 +2087,6 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
                 if marcar_reserva_pagada(reserva_id):
 
                     st.success(f"Pago registrado para la reserva #{reserva_id}.")
-
-                    st.session_state.mostrar_detalles_reserva = False
-
-                    st.rerun()
-
-
-        with col_btn_center:
-
-            estado_detalle = _build_reserva_estado_ui(reserva_detalle) if reserva_detalle else None
-            puede_cancelar = estado_detalle and estado_detalle["key"] not in {"cancelada", "completada", "no_show"}
-
-            if st.button(
-                "Cancelar reserva",
-                key="btn_cancelar_action",
-                use_container_width=True,
-                disabled=not puede_cancelar,
-            ):
-
-                if actualizar_estado_reserva(reserva_id, "cancelada"):
-
-                    st.success(f"Reserva #{reserva_id} cancelada correctamente.")
 
                     st.session_state.mostrar_detalles_reserva = False
 
@@ -2105,6 +2102,45 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
                 st.session_state.reserva_seleccionada_id = None
 
                 st.rerun()
+
+        st.caption("Acciones de estado")
+        col_estado_1, col_estado_2, col_estado_3 = st.columns(3)
+
+        with col_estado_1:
+            if st.button(
+                "Completar",
+                key="btn_completar_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "completada"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "completada"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+
+        with col_estado_2:
+            if st.button(
+                "Marcar no show",
+                key="btn_no_show_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "no_show"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "no_show"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+
+        with col_estado_3:
+            if st.button(
+                "Cancelar reserva",
+                key="btn_cancelar_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "cancelada"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "cancelada"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
 
     else:
 
@@ -2346,9 +2382,9 @@ def render_gestion_agenda(barbero_actual=None):
                     or barbero_editado != barbero_actual_ref
                 )
 
-                if estado_editado == "cancelada":
+                if estado_editado in {"cancelada", "completada", "no_show"}:
 
-                    st.success(f"Reserva #{reserva_id} cancelada correctamente.")
+                    st.success(_reserva_estado_action_success_message(reserva_id, estado_editado))
 
                 elif cambio_programacion:
 
@@ -2370,7 +2406,7 @@ def render_gestion_agenda(barbero_actual=None):
 
             if actualizar_estado_reserva(reserva_id, "cancelada"):
 
-                st.success(f"Reserva #{reserva_id} cancelada correctamente.")
+                st.success(_reserva_estado_action_success_message(reserva_id, "cancelada"))
 
                 st.rerun()
 
@@ -2521,6 +2557,7 @@ def _load_agenda_service_catalog(barberia_id):
 
 # ================= MULTI-BARBERIA PUBLIC ACCESS (moved to app_core/services/servicios_service.py) =================
 from app_core.services.servicios_service import (
+    barberia_es_publicable,
     obtener_barberia_por_slug,
     obtener_servicios,
 )
@@ -5118,6 +5155,32 @@ def render_landing_publico(barberia):
 
     render_public_landing_hero(barberia)
 
+    col_cta_primary, col_cta_secondary = st.columns([1.25, 1], gap="large")
+    with col_cta_primary:
+        st.markdown('<div class="public-primary-cta">', unsafe_allow_html=True)
+        hero_cta_clicked = st.button(
+            "Reservar ahora",
+            key="barberia_hero_cta_button",
+            use_container_width=True,
+            type="primary",
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="public-secondary-cta-note">Elige servicio, barbero y horario desde aqui.</p>',
+            unsafe_allow_html=True,
+        )
+    with col_cta_secondary:
+        render_alert(
+            "Reserva online disponible para esta barberia. Si prefieres, tambien puedes revisar servicios antes de avanzar.",
+            alert_type="info",
+            title="Agenda tu cita",
+        )
+
+    if hero_cta_clicked:
+        st.session_state[landing_key] = False
+        st.session_state.booking_step = 1
+        st.rerun()
+
     st.markdown("""
     <div class="public-trust-grid">
         <div class="public-trust-card">
@@ -5251,12 +5314,34 @@ def render_booking_publico(barberia_slug):
 
     barberia = obtener_barberia_por_slug(barberia_slug)
 
-    if not barberia:
-
-        st.error("Barbería no encontrada")
-
+    if not barberia_es_publicable(barberia):
+        st.session_state.public_mode = False
+        apply_public_booking_css()
+        render_public_section_heading(
+            "Barberia no disponible",
+            "No pudimos abrir esta pagina publica con el enlace recibido.",
+        )
+        render_alert(
+            "Verifica el enlace o vuelve al inicio para elegir una barberia disponible.",
+            alert_type="warning",
+            title="No encontramos una barberia publica activa",
+        )
+        volver_inicio = render_cta_section(
+            "Volver al inicio",
+            "Puedes regresar a la portada publica y continuar desde una barberia disponible.",
+            button_text="Ir al inicio",
+            button_key="public_barberia_invalid_back_home",
+            icon="OK",
+        )
+        render_public_note(
+            "Si el enlace es correcto pero sigue sin funcionar, contacta a la barberia directamente.",
+            warning=False,
+        )
+        if volver_inicio:
+            st.query_params.clear()
+            st.session_state.view = "home"
+            st.rerun()
         st.stop()
-
         return
 
 
@@ -6082,16 +6167,14 @@ try:
         )
         render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
 
-    def render_admin_clientes_section(barberia_name):
-        render_panel_header(
-            "Clientes",
-            "Centraliza la vista de clientes, historial y actividad.",
-            eyebrow="CRM",
+    def render_admin_clientes_section(barberia_id, barberia_name, db_ok):
+        render_clientes_section(
+            barberia_id=barberia_id,
+            db_ok=db_ok,
             meta=barberia_name,
-        )
-        render_panel_empty_state(
-            "Vista de clientes pendiente",
-            "Esta sección queda preparada visualmente para una futura pantalla de clientes sin cambiar consultas ni base de datos.",
+            no_context_message="No hay barberia asociada a la sesion.",
+            search_key="clientes_busqueda_admin",
+            picker_key="clientes_selector_admin",
         )
 
     def render_admin_sitio_web_section(barberia_name):
@@ -6149,7 +6232,7 @@ try:
                 no_context_message="No hay barbería asociada a la sesión.",
             )
         elif seccion == "Clientes":
-            render_admin_clientes_section(barberia_name)
+            render_admin_clientes_section(barberia_id, barberia_name, db_ok)
         elif seccion == "Sitio Web":
             render_admin_sitio_web_section(barberia_name)
         elif seccion == "Complementos":
@@ -6240,16 +6323,14 @@ try:
         )
         st.info("Parámetros de plataforma próximamente.")
 
-    def render_super_admin_clientes_section():
-        render_panel_header(
-            "Clientes",
-            "Vista preparada para clientes e historial por barbería.",
-            eyebrow="CRM",
-            meta="Contexto activo",
-        )
-        render_panel_empty_state(
-            "Clientes pendiente",
-            "No se agregaron consultas nuevas para respetar el alcance visual y no tocar base de datos.",
+    def render_super_admin_clientes_section(bid_ctx, barberia_name, db_ok):
+        render_clientes_section(
+            barberia_id=bid_ctx,
+            db_ok=db_ok,
+            meta=barberia_name,
+            no_context_message="Selecciona una barberia activa para ver clientes.",
+            search_key="clientes_busqueda_super_admin",
+            picker_key="clientes_selector_super_admin",
         )
 
     def render_super_admin_sitio_web_section():
@@ -6302,7 +6383,7 @@ try:
                 no_context_message="Selecciona una barbería en la barra lateral para gestionar sus servicios.",
             )
         elif seccion == "Clientes":
-            render_super_admin_clientes_section()
+            render_super_admin_clientes_section(bid_ctx, barberia_name, db_ok)
         elif seccion == "Sitio Web":
             render_super_admin_sitio_web_section()
         elif seccion == "Complementos":

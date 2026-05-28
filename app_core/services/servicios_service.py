@@ -10,6 +10,8 @@ from app_core.security.tenant_access import get_current_barberia_id
 
 logger = logging.getLogger("barberia_app")
 
+PUBLIC_BARBERIA_STATES = {"activa", "active", "publica", "published"}
+
 
 def obtener_barberia_por_slug(slug):
     """Get barberia by slug for public booking."""
@@ -44,6 +46,18 @@ def obtener_barberia_por_slug(slug):
     except Exception as e:
         logger.exception(f"Error getting barberia by slug: {str(e)}")
         return None
+
+
+def barberia_es_publicable(barberia):
+    """Return True when a barberia can be exposed in public routes."""
+    if not barberia:
+        return False
+
+    estado = str(barberia.get("estado") or "").strip().lower()
+    if not estado:
+        return True
+
+    return estado in PUBLIC_BARBERIA_STATES
 
 
 def obtener_servicios(barberia_id=None):

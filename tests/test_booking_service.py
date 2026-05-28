@@ -329,6 +329,45 @@ class BookingServiceTests(TestCase):
             ("cancelada", 55, 1),
         )
 
+    def test_actualizar_estado_reserva_no_show(self):
+        self.fake_streamlit.session_state.update(
+            {
+                "db_available": True,
+                "user": (5, "admin_user", "x", "ADMIN"),
+                "barberia_id": 1,
+            }
+        )
+
+        with patch.object(
+            booking_service,
+            "obtener_reserva_por_id",
+            return_value={
+                "id": 77,
+                "nombre": "maria",
+                "cliente": "maria",
+                "barbero": "nico",
+                "barbero_id": 7,
+                "barberia_id": 1,
+                "estado": "confirmada",
+            },
+        ), patch.object(
+            booking_service,
+            "safe_execute",
+            return_value=True,
+        ) as execute_mock:
+            ok = booking_service.actualizar_estado_reserva(77, "no-show")
+
+        self.assertTrue(ok)
+        execute_mock.assert_called_once_with(
+            """
+                UPDATE reservas
+                SET estado = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND barberia_id = %s
+                """,
+            ("no_show", 77, 1),
+        )
+
     def test_insertar_reserva_con_fecha_hora_maneja_rechazo_db(self):
         self.fake_streamlit.session_state["db_available"] = True
 

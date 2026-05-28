@@ -34,15 +34,43 @@ from design_system import (
 logger = logging.getLogger("barberia_app")
 
 
+def _build_public_booking_summary_data(data):
+    """Normalize step data into a summary-safe payload with structured customer fields."""
+    summary_data = {
+        "servicio": data.get("servicio"),
+        "barbero_nombre": data.get("barbero_nombre"),
+        "fecha": data.get("fecha"),
+        "hora": data.get("hora"),
+        "precio": data.get("precio", 0),
+        "reserva_id": data.get("reserva_id"),
+        "customer_fields": [],
+    }
+
+    customer_candidates = [
+        ("Cliente", data.get("nombre"), "N/A"),
+        ("Telefono", data.get("telefono"), "N/A"),
+    ]
+    email_val = data.get("email")
+    if email_val:
+        customer_candidates.append(("Email", email_val, "-"))
+
+    for label, value, fallback in customer_candidates:
+        if value:
+            summary_data["customer_fields"].append((label, value, fallback))
+
+    return summary_data
+
+
 def render_step_1_service_selection(servicios):
-    render_step_indicator(1, 6, ["Servicio", "Barbero", "Hora", "Datos", "Revisar", "Confirmar"])
+    render_step_indicator(1, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
     render_booking_header(
-        title="¿Qué servicio deseas?",
-        subtitle="Elige una de nuestras especialidades",
+        title="Elige tu servicio",
+        subtitle="Selecciona el tipo de cita para continuar con tu reserva.",
         step=1,
         total_steps=6,
     )
     with render_booking_section():
+        render_public_note("Reservar te toma menos de un minuto. Empieza por el servicio.", warning=False)
         cols = st.columns(2)
         services = list(servicios.keys())
         if not services:
@@ -65,10 +93,10 @@ def render_step_1_service_selection(servicios):
 
 
 def render_step_2_barber_selection(barberia_id):
-    render_step_indicator(2, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
-    render_booking_header("Selecciona tu barbero", "¿Con quién quieres tu corte?", step=2, total_steps=6)
+    render_step_indicator(2, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
+    render_booking_header("Selecciona tu barbero", "Elige con quien quieres atenderte.", step=2, total_steps=6)
     with render_booking_container():
-        if st.button("<- Cambiar servicio", key="back_to_svc"):
+        if st.button("<- Volver a servicio", key="back_to_svc"):
             go_to_booking_step(1)
             st.rerun()
 
@@ -77,7 +105,10 @@ def render_step_2_barber_selection(barberia_id):
         servicio_duracion = st.session_state.booking_data.get("duracion", 0)
         servicio_precio = st.session_state.booking_data.get("precio", 0)
         precio_fmt = f"${servicio_precio:,}".replace(",", ".")
-        st.info(f"Servicio: {servicio_nombre} | Duración: {servicio_duracion} min | Precio: {precio_fmt}")
+        render_public_note(
+            f"Servicio elegido: {servicio_nombre} · {servicio_duracion} min · {precio_fmt}",
+            warning=False,
+        )
 
     barberos = obtener_barberos_disponibles(barberia_id)
     if not barberos:
@@ -91,9 +122,13 @@ def render_step_2_barber_selection(barberia_id):
                 """,
                 (barberia_id,),
             )
-            logger.warning(f"Step 2 - Fallback query returned {len(barberos) if barberos else 0} barbers: {barberos}")
-        except Exception as e:
-            logger.exception(f"Step 2 - Fallback query failed: {str(e)}")
+            logger.warning(
+                "Step 2 - Fallback query returned %s barbers: %s",
+                len(barberos) if barberos else 0,
+                barberos,
+            )
+        except Exception as exc:
+            logger.exception("Step 2 - Fallback query failed: %s", str(exc))
             barberos = []
 
     if not barberos:
@@ -101,7 +136,7 @@ def render_step_2_barber_selection(barberia_id):
         st.stop()
         return
 
-    st.markdown("### Selecciona tu barbero")
+    render_public_note("Selecciona el profesional con quien quieres reservar.", warning=False)
     if "barber_selection_loading" not in st.session_state:
         st.session_state.barber_selection_loading = False
 
@@ -124,7 +159,7 @@ def render_step_2_barber_selection(barberia_id):
     selected = render_barber_selector(
         barbers=barberos,
         selected_id=st.session_state.booking_data.get("barbero_id"),
-        icon="Tijeras",
+        icon="scissors",
         on_select_callback=on_barber_selected,
     )
 
@@ -138,8 +173,8 @@ def render_step_2_barber_selection(barberia_id):
 def render_step_3_datetime_selection(barberia_id):
     from datetime import time as time_type
 
-    render_step_indicator(3, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
-    render_booking_header("Elige tu fecha y hora", "Cuándo te gustaría venir?", step=3, total_steps=6)
+    render_step_indicator(3, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
+    render_booking_header("Elige tu horario", "Selecciona la fecha y la hora que mejor te acomode.", step=3, total_steps=6)
     with render_booking_container():
         if st.button("<- Volver a barbero", key="back_to_brb"):
             go_to_booking_step(2)
@@ -154,6 +189,10 @@ def render_step_3_datetime_selection(barberia_id):
         )
 
     st.session_state.selected_fecha = fecha
+    render_public_note(
+        f"Reserva para {st.session_state.booking_data.get('barbero_nombre', 'tu barbero')} el {fecha}.",
+        warning=False,
+    )
     horarios = obtener_horarios_disponibles(
         barberia_id,
         st.session_state.booking_data["barbero_id"],
@@ -168,11 +207,9 @@ def render_step_3_datetime_selection(barberia_id):
 
     num_slots = len(horarios)
     if num_slots <= 4:
-        st.warning("Quedan pocos horarios disponibles hoy")
+        render_public_note("Quedan pocos horarios disponibles para esta fecha.", warning=True)
 
-    st.markdown(f"Horarios disponibles ({num_slots})")
-    if "booking_time_loading" not in st.session_state:
-        st.session_state.booking_time_loading = False
+    st.markdown(f"### Horarios disponibles ({num_slots})")
 
     def on_time_selected_callback(time_obj):
         import time as time_module
@@ -181,16 +218,16 @@ def render_step_3_datetime_selection(barberia_id):
         try:
             if isinstance(time_obj, datetime):
                 hora_final = time_obj.time()
-            elif isinstance(time_obj, time_type):
+            elif hasattr(time_obj, "strftime"):
                 hora_final = time_obj
             else:
                 raise ValueError(f"Invalid hora type: {type(time_obj)}")
 
             update_booking_data("fecha", fecha)
             update_booking_data("hora", hora_final)
-            logger.info(f"Booking time set: {type(time_obj).__name__} -> {hora_final}")
-        except Exception as e:
-            logger.error(f"Error setting booking time: {str(e)}")
+            logger.info("Booking time set: %s -> %s", type(time_obj).__name__, hora_final)
+        except Exception as exc:
+            logger.error("Error setting booking time: %s", str(exc))
             st.error("Error al seleccionar la hora. Por favor, intenta de nuevo.")
             st.stop()
             return
@@ -207,28 +244,30 @@ def render_step_3_datetime_selection(barberia_id):
 
 
 def render_step_4_customer_form():
-    render_step_indicator(4, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
-    render_booking_header("Tu información", "Necesitamos tus datos para la reserva", step=4, total_steps=6)
+    render_step_indicator(4, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
+    render_booking_header("Tus datos", "Necesitamos esta informacion para confirmar tu cita.", step=4, total_steps=6)
     with render_booking_container():
         if st.button("<- Volver a horario", key="back_to_time"):
             go_to_booking_step(3)
             st.rerun()
+
         with st.form("booking_form_premium"):
+            render_public_note("Te contactaremos por WhatsApp con el detalle de tu reserva.", warning=False)
             nombre = render_form_group(
                 "Nombre",
-                "Ej: Juan Pérez",
+                "Ej: Juan Perez",
                 "Nombre completo",
-                placeholder="Ej: Juan Pérez",
+                placeholder="Ej: Juan Perez",
                 key="booking_nombre_premium",
-                help="Nombre como aparecerá en tu reserva",
+                help="Nombre como aparecera en tu reserva",
             )
             telefono = render_form_group(
-                "Teléfono",
+                "Telefono",
                 "Ej: +56 9 1234 5678",
-                "Teléfono",
+                "Telefono",
                 placeholder="Ej: +56 9 1234 5678",
                 key="booking_telefono_premium",
-                help="Usaremos este número para confirmarte",
+                help="Usaremos este numero para confirmarte",
             )
             email = render_form_group(
                 "Email",
@@ -236,30 +275,29 @@ def render_step_4_customer_form():
                 "Email (opcional)",
                 placeholder="Ej: tu@email.com",
                 key="booking_email_premium",
-                help="Para recibir confirmación de tu reserva",
+                help="Para recibir confirmacion de tu reserva",
             )
 
             st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                submit_btn = st.form_submit_button("Ver resumen", use_container_width=True, type="primary")
-                if submit_btn:
-                    errors = []
-                    if not nombre or len(nombre) < 3:
-                        errors.append("Nombre debe tener al menos 3 caracteres")
-                    if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
-                        errors.append("Teléfono debe tener al menos 9 dígitos")
-                    if email and "@" not in email:
-                        errors.append("Email no válido")
+            submit_btn = st.form_submit_button("Ver resumen", use_container_width=True, type="primary")
 
-                    if errors:
-                        st.error("Revisa los siguientes errores:\n" + "\n".join(errors))
-                    else:
-                        update_booking_data("nombre", nombre)
-                        update_booking_data("telefono", telefono)
-                        update_booking_data("email", email)
-                        go_to_booking_step(5)
-                        st.rerun()
+            if submit_btn:
+                errors = []
+                if not nombre or len(nombre) < 3:
+                    errors.append("Nombre debe tener al menos 3 caracteres")
+                if not telefono or len(telefono.replace("+", "").replace(" ", "").replace("-", "")) < 9:
+                    errors.append("Telefono debe tener al menos 9 digitos")
+                if email and "@" not in email:
+                    errors.append("Email no valido")
+
+                if errors:
+                    st.error("Revisa los siguientes errores:\n" + "\n".join(errors))
+                else:
+                    update_booking_data("nombre", nombre)
+                    update_booking_data("telefono", telefono)
+                    update_booking_data("email", email)
+                    go_to_booking_step(5)
+                    st.rerun()
 
 
 def render_step_5_review(
@@ -268,53 +306,51 @@ def render_step_5_review(
     crear_pago_mercadopago,
     normalizar_texto,
 ):
-    render_step_indicator(5, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
-    render_booking_header("Revisa tu reserva", "Verifica que todo esté correcto", step=5, total_steps=6)
+    render_step_indicator(5, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
+    render_booking_header("Revisa tu reserva", "Confirma que los datos de tu cita esten correctos antes de agendar.", step=5, total_steps=6)
     with render_booking_container():
-        with render_booking_section("Detalles de tu cita"):
-            st.write(f"**Servicio:** {st.session_state.booking_data.get('servicio')}")
-            st.write(f"**Barbero:** {st.session_state.booking_data.get('barbero_nombre')}")
-            st.write(f"**Fecha:** {st.session_state.booking_data.get('fecha')} a las {st.session_state.booking_data.get('hora')}")
-            st.write(f"**Precio:** ${st.session_state.booking_data.get('precio', 0):,}")
         data = st.session_state.booking_data
-
-        st.markdown("## Tus datos")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.text_input("Nombre", value=data.get('nombre', 'N/A'), disabled=True)
-        with col2:
-            st.text_input("Teléfono", value=data.get('telefono', 'N/A'), disabled=True)
-        with col3:
-            st.text_input("Email", value=data.get('email', 'N/A') or "-", disabled=True)
+        render_public_booking_summary(_build_public_booking_summary_data(data))
+        render_public_note("Si algo no coincide, vuelve al paso anterior antes de confirmar.", warning=False)
+        render_public_note(
+            "Al continuar, registraremos tu cita y luego te mostraremos el siguiente paso de pago si esta disponible.",
+            warning=False,
+        )
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Cancelar", key="cancel_booking_step5", use_container_width=True):
+            if st.button("Cancelar proceso", key="cancel_booking_step5", use_container_width=True):
                 reset_booking_flow()
                 st.rerun()
 
         with col2:
-            if st.button("Agendar mi cita", key="confirm_booking_step5", use_container_width=True, type="primary", help="Confirma tu reserva"):
+            if st.button(
+                "Registrar reserva y continuar",
+                key="confirm_booking_step5",
+                use_container_width=True,
+                type="primary",
+                help="Crea la reserva y avanza al siguiente paso",
+            ):
                 with st.spinner("Creando tu reserva..."):
                     reserva_id = insertar_reserva_con_fecha_hora(
                         barberia_id,
-                        normalizar_texto(data.get('nombre', '')),
-                        data.get('barbero_id'),
-                        data.get('servicio'),
-                        data.get('fecha'),
-                        data.get('hora'),
-                        data.get('precio'),
-                        data.get('duracion'),
-                        barbero_nombre=data.get('barbero_nombre'),
+                        normalizar_texto(data.get("nombre", "")),
+                        data.get("barbero_id"),
+                        data.get("servicio"),
+                        data.get("fecha"),
+                        data.get("hora"),
+                        data.get("precio"),
+                        data.get("duracion"),
+                        barbero_nombre=data.get("barbero_nombre"),
                     )
 
                     if reserva_id:
                         with st.spinner("Generando enlace de pago..."):
                             pago_url = crear_pago_mercadopago(
                                 reserva_id,
-                                data.get('precio', 0),
-                                f"Reserva barbería: {data.get('servicio')}",
-                                data.get('email'),
+                                data.get("precio", 0),
+                                f"Reserva barberia: {data.get('servicio')}",
+                                data.get("email"),
                                 show_errors=True,
                             )
 
@@ -335,34 +371,66 @@ def render_step_5_review(
 
 def render_step_6_confirmation():
     data = st.session_state.booking_data
-    render_step_indicator(6, 6, ["Servicio", "Barbero", "Hora", "Datos", "Resumen", "[OK] Listo!"])
-    render_booking_header("[OK] Reserva confirmada!", "Tu cita está lista", step=6, total_steps=6)
+    render_step_indicator(6, 6, ["Servicio", "Barbero", "Horario", "Datos", "Resumen", "Listo"])
+    render_booking_header("Reserva registrada", "Tu cita ya quedo guardada. Ahora te mostramos el estado del pago y la accion siguiente.", step=6, total_steps=6)
     with render_booking_container():
         st.balloons()
-        render_cta_section(
-            "[OK] Reserva confirmada!",
-            "Tu cita ha sido programada con éxito. Te hemos enviado un WhatsApp con la confirmación.",
-            "👍",
-        )
-        if data.get('pago_url'):
+
+        render_public_note("La cita ya quedo registrada correctamente.", warning=False)
+
+        if data.get("pago_url"):
+            render_cta_section(
+                "Pago disponible",
+                "Tu reserva ya fue creada. El siguiente paso es completar el pago para cerrar el proceso con mayor claridad.",
+                "Entendido",
+                icon="OK",
+            )
             render_public_payment_notice()
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 st.link_button(
-                    "Pagar ahora",
-                    url=data.get('pago_url', '#'),
+                    "Ir a pagar ahora",
+                    url=data.get("pago_url", "#"),
                     use_container_width=True,
                     help="Finaliza el pago en MercadoPago",
                 )
-            st.markdown('<p class="public-payment-helper">Pago seguro con MercadoPago · No guardamos datos de tu tarjeta</p>', unsafe_allow_html=True)
+            st.markdown(
+                '<p class="public-payment-helper">Pago seguro con MercadoPago | No guardamos datos de tu tarjeta</p>',
+                unsafe_allow_html=True,
+            )
+            render_public_note(
+                "Siguiente paso: abre el pago, completa la transaccion y luego vuelve si necesitas revisar el estado de tu cita.",
+                warning=False,
+            )
         elif data.get("pago_pendiente"):
+            render_cta_section(
+                "Pago pendiente",
+                "Tu reserva ya fue creada, pero no pudimos dejar un enlace de pago listo en este paso.",
+                "Entendido",
+                icon="OK",
+            )
             st.warning("Reserva creada, pago pendiente. Contacta al local para coordinar el pago.")
+            render_public_note(
+                "Siguiente paso: contacta a la barberia para completar el pago o recibir instrucciones.",
+                warning=True,
+            )
+        else:
+            render_cta_section(
+                "Reserva registrada",
+                "Tu cita fue creada correctamente. Revisa el resumen y conserva la confirmacion enviada por WhatsApp.",
+                "Entendido",
+                icon="OK",
+            )
+            render_public_note(
+                "Siguiente paso: revisa el detalle de tu cita y espera la confirmacion habitual del local.",
+                warning=False,
+            )
 
-    render_public_note("Te enviamos la confirmación a WhatsApp. Revisa tu teléfono para más detalles.")
+    render_public_note("Te enviamos la confirmacion a WhatsApp. Revisa tu telefono para ver el detalle de la cita.", warning=False)
     with st.expander("Ver detalles de tu cita", expanded=False):
-        render_public_booking_summary(data)
-    render_public_note("Más de 100 clientes ya reservaron online.", warning=False)
-    render_public_note("Tu hora está reservada. Recibirás confirmación por WhatsApp y puedes cancelar hasta 24h antes.", warning=True)
+        render_public_booking_summary(_build_public_booking_summary_data(data))
+    render_public_note("Estado de la cita y estado de pago se muestran por separado para evitar confusiones.", warning=False)
+    render_public_note("Tu hora esta reservada. Recibiras confirmacion por WhatsApp y puedes cancelar hasta 24h antes.", warning=True)
 
     col1, col2 = st.columns([1, 1])
     with col1:
