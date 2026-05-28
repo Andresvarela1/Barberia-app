@@ -3,6 +3,7 @@
 from streamlit_calendar import calendar
 
 from datetime import datetime, timedelta
+import html
 
 import logging
 
@@ -5159,41 +5160,42 @@ def render_landing_publico(barberia):
     with col_cta_primary:
         st.markdown('<div class="public-primary-cta">', unsafe_allow_html=True)
         hero_cta_clicked = st.button(
-            "Reservar ahora",
+            "Reservar ahora en pocos pasos",
             key="barberia_hero_cta_button",
             use_container_width=True,
             type="primary",
         )
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="public-secondary-cta-note">Elige servicio, barbero y horario desde aqui.</p>',
+            '<p class="public-secondary-cta-note"><strong>Empieza aqui.</strong> Elige servicio, barbero y horario sin perder el contexto de la barberia.</p>',
             unsafe_allow_html=True,
         )
     with col_cta_secondary:
         render_alert(
-            "Reserva online disponible para esta barberia. Si prefieres, tambien puedes revisar servicios antes de avanzar.",
+            "Proceso claro y rapido: revisa servicios, elige horario y confirma tu cita desde esta misma pagina.",
             alert_type="info",
-            title="Agenda tu cita",
+            title="Reserva online disponible",
         )
 
     if hero_cta_clicked:
         st.session_state[landing_key] = False
         st.session_state.booking_step = 1
+        st.session_state["public_barberia_nombre"] = barberia_name
         st.rerun()
 
     st.markdown("""
     <div class="public-trust-grid">
         <div class="public-trust-card">
-            <h3>Reserva en segundos</h3>
-            <p>Elige servicio, barbero y horario desde tu teléfono.</p>
+            <h3>Proceso rapido</h3>
+            <p>Empiezas a reservar en pocos pasos y sin formularios innecesarios.</p>
         </div>
         <div class="public-trust-card">
-            <h3>Confirmación inmediata</h3>
-            <p>Recibe el detalle de tu cita y mantén tu hora organizada.</p>
+            <h3>Todo claro antes de confirmar</h3>
+            <p>Servicio, barbero, horario y pago se muestran de forma simple y ordenada.</p>
         </div>
         <div class="public-trust-card">
-            <h3>Atención profesional</h3>
-            <p>Una experiencia clara, rápida y confiable de principio a fin.</p>
+            <h3>Disponibilidad visible</h3>
+            <p>Avanzas directo a los horarios disponibles de esta barberia sin perder contexto.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -5204,76 +5206,60 @@ def render_landing_publico(barberia):
     if servicios_list:
 
         render_public_section_heading(
-            "Elige tu servicio",
-            "Selecciona una categoría y continúa con tu barbero y horario.",
+            "Servicios destacados",
+            "Entiende rapido que incluye cada opcion y reserva desde la misma card si ya sabes cual quieres.",
         )
-
-
-        # Display services in responsive grid - CLICKABLE
-
-        num_services = len(servicios_list)
-
-        if num_services == 1:
-
-            cols = st.columns(1)
-
-            cols_list = [cols]
-
-        elif num_services == 2:
-
-            cols = st.columns(2, gap="large")
-
-            cols_list = cols
-
-        else:
-
-            cols = st.columns(min(3, num_services), gap="large")
-
-            cols_list = cols
-
+        cols = st.columns(min(3, max(1, len(servicios_list))), gap="large")
 
         for idx, servicio in enumerate(servicios_list):
-
-            col = cols_list[idx % len(cols_list)] if isinstance(cols_list[0], object) else cols_list[idx]
-
+            col = cols[idx % len(cols)]
 
             with col:
-
-                # Format price with thousand separator
-
                 precio_formateado = f"${servicio['precio']:,}".replace(",", ".")
-
-
-                # Clickable service button - looks like card, acts like button
-
+                descripcion = html.escape((servicio.get("descripcion") or "Reserva este servicio y elige tu horario en el siguiente paso.").strip())
+                icono = html.escape(str(servicio.get("icono") or "SV").strip()[:2])
+                servicio_nombre = html.escape(servicio["nombre"])
+                st.markdown(
+                    f"""
+                    <div class="public-service-shell">
+                        <div class="public-service-kicker">{icono}</div>
+                        <h3>{servicio_nombre}</h3>
+                        <p class="public-service-description">{descripcion}</p>
+                        <div class="public-service-meta">
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Que es</span>
+                                <span class="public-service-meta-value">{servicio_nombre}</span>
+                            </div>
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Duracion</span>
+                                <span class="public-service-meta-value">{servicio['duracion']} min</span>
+                            </div>
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Precio</span>
+                                <span class="public-service-meta-value">{precio_formateado}</span>
+                            </div>
+                        </div>
+                        <p class="public-service-footer">Continua con barbero y horario sin perder el contexto de la barberia.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
                 button_clicked = st.button(
-
-                    label=f"{servicio.get('icono') or 'Servicio'}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n{servicio['duracion']} min · {precio_formateado}",
-
+                    f"Reservar {servicio['nombre']}",
                     key=f"service_card_{servicio['id']}",
-
                     use_container_width=True,
-
-                    help=f"Seleccionar {servicio['nombre']}"
-
+                    help=f"Seleccionar {servicio['nombre']}",
                 )
 
                 if button_clicked:
-
                     st.session_state.preselected_service = {
-
                         "nombre": servicio["nombre"],
-
                         "duracion": servicio["duracion"],
-
                         "precio": servicio["precio"],
-
                     }
-
                     st.session_state[landing_key] = False
-
                     st.session_state.booking_step = 2  # Skip to barber selection
-
+                    st.session_state["public_barberia_nombre"] = barberia_name
                     st.rerun()
 
     else:
@@ -5286,9 +5272,9 @@ def render_landing_publico(barberia):
 
 
     cta_clicked = render_cta_section(
-        "Agenda tu próxima cita",
-        "También puedes comenzar sin elegir servicio y decidir en el primer paso.",
-        button_text="Agendar mi cita",
+        f"Reserva online en {barberia_name}",
+        "Si todavia no decides el servicio, entra igual: veras opciones, horarios y el siguiente paso con claridad.",
+        button_text="Empezar reserva",
         button_key="barberia_cta_button",
         icon="Agenda",
     )
@@ -5298,6 +5284,7 @@ def render_landing_publico(barberia):
         st.session_state[landing_key] = False
 
         st.session_state.booking_step = 1  # Go to service selection
+        st.session_state["public_barberia_nombre"] = barberia_name
 
         st.rerun()
 
@@ -5346,13 +5333,18 @@ def render_booking_publico(barberia_slug):
 
 
     barberia_id = barberia["id"]
+    st.session_state["public_barberia_nombre"] = barberia.get("nombre", "Barberia")
+    barberia_ciudad = (barberia.get("ciudad") or "").strip()
+    page_title = f"Reserva en {barberia['nombre']}"
+    if barberia_ciudad:
+        page_title = f"{page_title} | {barberia_ciudad}"
 
 
     # Set page config
 
     st.set_page_config(
 
-        page_title=f"Reserva en {barberia['nombre']}",
+        page_title=page_title,
 
         page_icon="Barberia",
 

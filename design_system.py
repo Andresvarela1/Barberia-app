@@ -994,6 +994,11 @@ def apply_public_booking_css():
         z-index: 1;
     }}
 
+    .public-hero-copy {{
+        display: grid;
+        gap: {Spacing.MD};
+    }}
+
     .public-hero-eyebrow {{
         display: inline-flex;
         align-items: center;
@@ -1020,6 +1025,14 @@ def apply_public_booking_css():
         backdrop-filter: blur(10px);
     }}
 
+    .public-hero-promise {{
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: {Typography.H4};
+        font-weight: {Typography.SEMIBOLD};
+        margin: 0;
+        max-width: 34ch;
+    }}
+
     .public-hero h1 {{
         color: #ffffff !important;
         font-size: clamp(2.5rem, 6vw, 5.2rem);
@@ -1034,6 +1047,14 @@ def apply_public_booking_css():
         line-height: 1.58;
         margin: 0 0 {Spacing.MD};
         max-width: 56ch;
+    }}
+
+    .public-hero-support {{
+        color: rgba(255, 255, 255, 0.74) !important;
+        font-size: {Typography.SMALL};
+        line-height: 1.55;
+        margin: 0;
+        max-width: 58ch;
     }}
 
     .public-hero-meta {{
@@ -1088,6 +1109,99 @@ def apply_public_booking_css():
         margin: 0;
     }}
 
+    .public-services-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: {Spacing.LG};
+        margin: 0 0 {Spacing.XL};
+    }}
+
+    .public-service-shell {{
+        background: linear-gradient(180deg, rgba(23,23,23,0.98) 0%, rgba(18,18,18,1) 100%);
+        border: 1px solid rgba(197,159,85,0.2);
+        border-radius: {BorderRadius.XL};
+        padding: {Spacing.LG};
+        box-shadow: 0 20px 44px -34px rgba(0,0,0,0.74);
+        min-height: 100%;
+    }}
+
+    .public-service-kicker {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        min-height: 42px;
+        border-radius: 14px;
+        background: rgba(197,159,85,0.16);
+        color: #f8d47a;
+        font-size: 0.92rem;
+        font-weight: {Typography.BOLD};
+        margin-bottom: {Spacing.MD};
+    }}
+
+    .public-service-shell h3 {{
+        color: #f5f0e8 !important;
+        font-size: 1.15rem;
+        margin: 0 0 {Spacing.SM};
+    }}
+
+    .public-service-description {{
+        color: rgba(245,240,232,0.74) !important;
+        font-size: {Typography.SMALL};
+        line-height: 1.55;
+        margin: 0 0 {Spacing.LG};
+        min-height: 3.2em;
+    }}
+
+    .public-service-meta {{
+        display: grid;
+        gap: 10px;
+        margin-bottom: {Spacing.LG};
+    }}
+
+    .public-service-meta-row {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-top: 1px solid rgba(255,255,255,0.08);
+    }}
+
+    .public-service-meta-row:first-child {{
+        border-top: none;
+        padding-top: 0;
+    }}
+
+    .public-service-meta-label {{
+        color: rgba(245,240,232,0.62) !important;
+        font-size: {Typography.TINY};
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }}
+
+    .public-service-meta-value {{
+        color: #f5f0e8 !important;
+        font-size: {Typography.SMALL};
+        font-weight: {Typography.SEMIBOLD};
+        text-align: right;
+    }}
+
+    .public-service-shell .stButton > button {{
+        min-height: 48px !important;
+        font-weight: {Typography.BOLD} !important;
+        background: linear-gradient(135deg, #d6ad3b 0%, #b58417 100%) !important;
+        color: #140f08 !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        box-shadow: 0 16px 30px -22px rgba(214,173,59,0.68) !important;
+    }}
+
+    .public-service-footer {{
+        color: rgba(245,240,232,0.66) !important;
+        font-size: {Typography.SMALL};
+        margin: 0;
+    }}
+
     .public-section-heading {{
         text-align: center;
         margin: {Spacing.XXL} auto {Spacing.XL};
@@ -1107,7 +1221,7 @@ def apply_public_booking_css():
 
     .public-primary-cta .stButton > button {{
         min-height: 58px !important;
-        font-size: 1rem !important;
+        font-size: 1.05rem !important;
         font-weight: {Typography.BOLD} !important;
         background: linear-gradient(135deg, #d6ad3b 0%, #b58417 100%) !important;
         color: #140f08 !important;
@@ -1124,6 +1238,11 @@ def apply_public_booking_css():
         color: rgba(245,240,232,0.72) !important;
         font-size: {Typography.SMALL};
         margin: {Spacing.SM} 0 0 0 !important;
+    }}
+
+    .public-secondary-cta-note strong {{
+        color: #f5f0e8 !important;
+        font-weight: {Typography.SEMIBOLD};
     }}
 
     .public-service-button .stButton > button {{
@@ -1420,7 +1539,8 @@ def apply_public_booking_css():
         }}
 
         .public-contact-grid,
-        .public-trust-grid {{
+        .public-trust-grid,
+        .public-services-grid {{
             grid-template-columns: 1fr;
         }}
 
@@ -1467,6 +1587,21 @@ def render_public_landing_hero(barberia):
             f'url(\'{banner_url}\') center/cover;"'
         )
 
+    horarios = []
+    if barberia.get("hora_apertura"):
+        horarios.append(str(barberia.get("hora_apertura")))
+    if barberia.get("hora_cierre"):
+        horarios.append(str(barberia.get("hora_cierre")))
+    horario_texto = " a ".join(horarios) if len(horarios) == 2 else "Consulta horarios disponibles"
+    propuesta = "Cortes, barba y cuidado personal con reserva online disponible."
+    contexto = (
+        f"Reserva en {nombre}"
+        + (f" desde {ciudad}." if ciudad and ciudad != "Atencion local" else ".")
+    )
+    eyebrow = "Reserva online disponible"
+    if ciudad and ciudad != "Atencion local":
+        eyebrow = f"Reserva online en {ciudad}"
+
     st.markdown(f"""
     <div class="public-topbar">
         <div style="display:flex; align-items:center; gap:12px;">
@@ -1479,14 +1614,17 @@ def render_public_landing_hero(barberia):
     </div>
     <section class="public-hero" {hero_style}>
         <div class="public-hero-content">
-            <div class="public-hero-eyebrow">Reserva online disponible</div>
-            <h1>{nombre}</h1>
-            <p>Reserva tu proxima cita en pocos pasos. Elige servicio, barbero y horario con una experiencia clara, rapida y confiable.</p>
-            <div class="public-badge">Confirmacion inmediata</div>
+            <div class="public-hero-copy">
+                <div class="public-hero-eyebrow">Pagina oficial · {eyebrow}</div>
+                <h1>{nombre}</h1>
+                <p class="public-hero-promise">{propuesta}</p>
+                <p class="public-hero-support">{contexto}</p>
+            </div>
+            <div class="public-badge">Reserva guiada en pocos pasos</div>
             <div class="public-hero-meta">
+                <span>{horario_texto}</span>
                 <span>Reserva en minutos</span>
-                <span>Barberos expertos</span>
-                <span>Horarios disponibles</span>
+                <span>Confirmacion clara</span>
             </div>
         </div>
     </section>

@@ -70,7 +70,10 @@ def render_step_1_service_selection(servicios):
         total_steps=6,
     )
     with render_booking_section():
-        render_public_note("Reservar te toma menos de un minuto. Empieza por el servicio.", warning=False)
+        barberia_nombre = st.session_state.get("public_barberia_nombre")
+        if barberia_nombre:
+            render_public_note(f"Estas reservando en {barberia_nombre}.", warning=False)
+        render_public_note("Reservar te toma menos de un minuto. Empieza por el servicio y luego elige horario.", warning=False)
         cols = st.columns(2)
         services = list(servicios.keys())
         if not services:
