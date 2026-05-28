@@ -3,14 +3,13 @@
 from streamlit_calendar import calendar
 
 from datetime import datetime, timedelta
+import html
 
 import logging
 
 import os
 
 import traceback
-
-from dotenv import load_dotenv
 
 import bcrypt
 
@@ -46,13 +45,9 @@ from design_system import (
 
     render_card,
 
-    render_section_title,
-
     render_subsection_title,
 
     render_badge,
-
-    render_stat_box,
 
     render_alert,
 
@@ -65,6 +60,8 @@ from design_system import (
     render_time_chips,
 
     render_metric_grid,
+
+    render_metric_card,
 
     render_status_legend,
 
@@ -97,6 +94,14 @@ from design_system import (
     render_panel_header,
 
     render_panel_empty_state,
+
+    render_section_block,
+
+    render_sidebar_section,
+
+    render_cta_section,
+
+    render_appointment_block,
 
     render_public_landing_hero,
 
@@ -135,10 +140,6 @@ except ImportError:
     GeocoderTimedOut = None
 
     GeocoderUnavailable = None
-
-_dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-
-load_dotenv(dotenv_path=_dotenv_path)
 
 st.set_page_config(
 
@@ -186,514 +187,49 @@ logger = logging.getLogger("barberia_app")
 
 # ------------------ DB ------------------
 
-from app_core.db.connection import (
-    get_database_url,
-    _masked_postgres_url,
-    create_fresh_connection,
-    get_connection,
+from app_core.db import (
     is_db_available,
-)
-
-from app_core.db.safe_queries import (
-    execute_query,
-    fetch_one,
-    fetch_all,
-    execute_write,
-    safe_fetch_one,
-    safe_fetch_all,
     safe_execute,
+    safe_fetch_all,
+    safe_fetch_one,
 )
 
-def ensure_database_tables():
-
-    """Create application tables if they are missing; commit on success."""
-
-    conn = None
-
-    all_ok = True
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            st.warning("Base de datos no disponible, modo demo activo")
-
-            return
-
-        with conn.cursor() as cur:
-
-            # 1. barberias table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS barberias (
-
-                        id SERIAL PRIMARY KEY,
-
-                        nombre TEXT NOT NULL UNIQUE,
-
-                        slug TEXT UNIQUE
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'barberias' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'barberias': {e}")
-
-                st.error(f"Error creando tabla 'barberias': {e}")
-
-            # 2. usuarios table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS usuarios (
-
-                        id SERIAL PRIMARY KEY,
-
-                        usuario TEXT NOT NULL,
-
-                        password TEXT NOT NULL,
-
-                        rol TEXT NOT NULL,
-
-                        telefono TEXT,
-
-                        cortes_acumulados INTEGER NOT NULL DEFAULT 0,
-
-                        barberia_id INTEGER,
-
-                        CONSTRAINT fk_usuarios_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE RESTRICT
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'usuarios' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'usuarios': {e}")
-
-                st.error(f"Error creando tabla 'usuarios': {e}")
-
-            # Add UNIQUE constraint on usuario if not exists - safe approach
-
-            try:
-
-                # Check if constraint exists using safer query
-
-                cur.execute(
-
-                    """
-
-                    SELECT conname 
-
-                    FROM pg_constraint 
-
-                    WHERE conname = 'usuarios_usuario_unique' 
-
-                    AND conrelid = 'public.usuarios'::regclass
-
-                    LIMIT 1;
-
-                    """
-
-                )
-
-                constraint_exists = cur.fetchone()
-
-
-                if not constraint_exists:
-
-                    # Use IF NOT EXISTS syntax for PostgreSQL 9.1+ or handle gracefully
-
-                    try:
-
-                        cur.execute(
-
-                            "ALTER TABLE usuarios ADD CONSTRAINT usuarios_usuario_unique UNIQUE (usuario);"
-
-                        )
-
-                        logger.info(" Restricción UNIQUE en 'usuario' añadida")
-
-                    except Exception as constraint_error:
-
-                        # If constraint already exists (race condition), ignore safely
-
-                        if "already exists" in str(constraint_error).lower() or "duplicate" in str(constraint_error).lower():
-
-                            logger.info(" Restricción UNIQUE en 'usuario' ya existe (race condition handled)")
-
-                        else:
-
-                            raise constraint_error
-
-                else:
-
-                    logger.info(" Restricción UNIQUE en 'usuario' ya existe")
-
-
-                conn.commit()
-
-            except Exception as e:
-
-                conn.rollback()
-
-                # Don't fail the entire table creation for a constraint issue
-
-                logger.warning(f"Advertencia creando restricción UNIQUE (continuando): {e}")
-
-                # Only show error to user if it's a critical issue
-
-                if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
-
-                    st.warning(f"Restricción UNIQUE no pudo crearse (app continuará): {e}")
-
-            # Index on usuarios
-
-            try:
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_barberia ON usuarios(barberia_id);")
-
-                conn.commit()
-
-                logger.info(" Índice 'idx_usuarios_barberia' creado o ya existe")
-
-                logger.info("[OK] Índice 'idx_usuarios_barberia' creado o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
-
-                st.error(f"Error creando índice 'idx_usuarios_barberia': {e}")
-
-            # 3. reservas table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS reservas (
-
-                        id SERIAL PRIMARY KEY,
-
-                        nombre TEXT NOT NULL,
-
-                        barbero TEXT NOT NULL,
-
-                        servicio TEXT NOT NULL,
-
-                        precio INTEGER NOT NULL,
-
-                        inicio TIMESTAMP NOT NULL,
-
-                        fin TIMESTAMP NOT NULL,
-
-                        barberia_id INTEGER NOT NULL,
-
-                        CONSTRAINT fk_reservas_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE RESTRICT
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'reservas' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'reservas': {e}")
-
-                st.error(f"Error creando tabla 'reservas': {e}")
-
-            # 4. servicios table
-
-            try:
-
-                cur.execute(
-
-                    """
-
-                    CREATE TABLE IF NOT EXISTS servicios (
-
-                        id SERIAL PRIMARY KEY,
-
-                        barberia_id INTEGER NOT NULL,
-
-                        nombre TEXT NOT NULL,
-
-                        duracion_minutos INTEGER NOT NULL,
-
-                        precio INTEGER NOT NULL,
-
-                        descripcion TEXT,
-
-                        icono TEXT DEFAULT 'Servicio',
-
-                        CONSTRAINT fk_servicios_barberia
-
-                            FOREIGN KEY (barberia_id)
-
-                            REFERENCES barberias(id)
-
-                            ON DELETE CASCADE,
-
-                        UNIQUE(barberia_id, nombre)
-
-                    );
-
-                    """
-
-                )
-
-                conn.commit()
-
-                logger.info("[OK] Tabla 'servicios' creada o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando tabla 'servicios': {e}")
-
-                st.error(f"Error creando tabla 'servicios': {e}")
-
-            # Index on servicios
-
-            try:
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_servicios_barberia ON servicios(barberia_id);")
-
-                conn.commit()
-
-                logger.info("[OK] Índice 'idx_servicios_barberia' creado o ya existe")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índice 'idx_servicios_barberia': {e}")
-
-                st.error(f"Error creando índice 'idx_servicios_barberia': {e}")
-
-            # Optional columns for barberias
-
-            try:
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS telefono TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS email TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS ciudad TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS direccion TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS latitud NUMERIC(10, 6);")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS longitud NUMERIC(10, 6);")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS logo_url TEXT;")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS color_primario TEXT DEFAULT '#667eea';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS hora_apertura TIME DEFAULT '09:00:00';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS hora_cierre TIME DEFAULT '18:00:00';")
-
-                cur.execute("ALTER TABLE barberias ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activa';")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'barberias' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a barberias: {e}")
-
-            # Optional columns for usuarios
-
-            try:
-
-                cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nombre TEXT;")
-
-                cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS apellido TEXT;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'usuarios' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a usuarios: {e}")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);")
-
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_pagado ON reservas(pagado);")
-
-                conn.commit()
-
-                logger.info("[OK] Índices de 'reservas' creados o ya existen")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error creando índices de 'reservas': {e}")
-
-            # Optional columns
-
-            try:
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente TEXT;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS fecha DATE;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora TIME;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS estado TEXT DEFAULT 'activo';")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pagado BOOLEAN NOT NULL DEFAULT FALSE;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS monto INTEGER;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS payment_id TEXT;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
-
-                cur.execute("ALTER TABLE reservas ADD COLUMN IF NOT EXISTS barbero_id INTEGER;")
-
-                cur.execute("UPDATE reservas SET monto = precio WHERE monto IS NULL;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas opcionales en 'reservas' añadidas o actualizadas")
-
-                logger.info("[OK] payment_id column ensured")
-
-                logger.info("[OK] updated_at column ensured")
-
-                logger.info("[OK] barbero_id column ensured")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                all_ok = False
-
-                logger.error(f"Error alterando tabla 'reservas': {e}")
-
-
-            # Ensure servicios has all required columns for multi-tenant
-
-            try:
-
-                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS icono TEXT DEFAULT 'Servicio';")
-
-                cur.execute("ALTER TABLE servicios ADD COLUMN IF NOT EXISTS descripcion TEXT;")
-
-                conn.commit()
-
-                logger.info("[OK] Columnas en tabla 'servicios' aseguradas")
-
-            except Exception as e:
-
-                conn.rollback()
-
-                logger.warning(f"[AVISO] Error añadiendo columnas a servicios: {e}")
-
-        if all_ok:
-
-            logger.info("[OK] Todas las tablas y restricciones creadas correctamente")
-
-        else:
-
-            logger.warning("[AVISO] Algunas operaciones de base de datos fallaron")
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("Error al asegurar tablas de base de datos")
-
-    finally:
-
-        # Don't close connection - keep it in session state
-
-        pass
+# ------------------ BOOTSTRAP (DDL + seed) ------------------
+from app_core.bootstrap import (
+    ensure_database_tables,
+    inicializar_barberia,
+    seed_default_data,
+)
+
+# ------------------ AUTH ------------------
+from app_core.auth import (
+    normalizar_texto,
+    es_hash_bcrypt,
+    verificar_password,
+    login,
+    login_and_prepare_session,
+    resolve_screen_dispatch,
+    logout_and_reset_session,
+    registrar,
+    registrar_barberia,
+)
+from app_core.agenda import (
+    render_admin_agenda_list_tab,
+    render_super_admin_agenda_list_tab,
+)
+from app_core.features.services import render_services_section
+from app_core.features.barberos import render_barberos_section
+from app_core.features.clientes import render_clientes_section
+from app_core.features.dashboard import (
+    render_admin_dashboard_section,
+    render_super_admin_dashboard_section,
+)
+
+# NOTE: ensure_database_tables, inicializar_barberia, seed_default_data,
+#       normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
+#       login, registrar, registrar_barberia
+#       have been extracted to app_core/bootstrap.py and app_core/auth.py.
+#       The definitions below have been removed; they are now imported above.
 
 # ------------------ DATOS ------------------
 
@@ -731,17 +267,30 @@ _ROL_LEGACY = {
 
 }
 
-from app_core.security.tenant_access import (
-    session_barberia_for_write,
-    effective_barberia_id,
-    get_current_barberia_id,
-    enforce_access,
-    get_user_barberia_id,
-    get_user_role,
+_RESERVA_ESTADO_META = {
+    "pendiente": {"label": "Pendiente", "color": "#f59e0b"},
+    "confirmada": {"label": "Confirmada", "color": "#3b82f6"},
+    "cancelada": {"label": "Cancelada", "color": "#ef4444"},
+    "completada": {"label": "Completada", "color": "#16a34a"},
+    "no_show": {"label": "No show", "color": "#f97316"},
+}
+
+from app_core.tenancy import (
+    apply_public_barberia_context,
     can_access_barberia,
+    effective_barberia_id,
+    enforce_access,
     enforce_barberia_access,
+    ensure_session_defaults,
+    get_cached_barberia_name,
+    get_current_barberia_id,
+    get_user_barberia_id,
     get_user_id,
+    get_user_role,
+    load_super_admin_context_options,
     normalizar_rol,
+    reset_public_barberia_context,
+    session_barberia_for_write,
 )
 
 from app_core.services.availability_service import (
@@ -749,537 +298,33 @@ from app_core.services.availability_service import (
     obtener_barberos_disponibles,
     obtener_horarios_disponibles,
 )
+from app_core.services.booking_service import (
+    normalizar_reserva, normalizar_datetime,
+    guardar_reserva, actualizar_reserva, eliminar_reserva,
+    insertar_reserva_con_fecha_hora, obtener_reserva_por_id, obtener_reserva,
+    actualizar_estado_reserva,
+)
+from app_core.services.payment_service import (
+    marcar_reserva_pagada,
+    crear_pago_mercadopago,
+)
 
 from app_core.public_booking.flow import flujo_reserva_publica
 
-# ------------------ FUNCIONES ------------------
-
-def normalizar_texto(valor):
-
-    return valor.strip() if isinstance(valor, str) else ""
-
-def es_hash_bcrypt(valor):
-
-    return isinstance(valor, str) and valor.startswith(("$2a$", "$2b$", "$2y$"))
-
-def hash_password(password):
-
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-def verificar_password(password, password_guardada):
-
-    """Verifica contraseña contra hash bcrypt o plain text."""
-
-    if not password_guardada:
-
-        logger.warning("[ERROR] No hay contraseña guardada")
-
-        return False
-
-    if es_hash_bcrypt(password_guardada):
-
-        try:
-
-            # El hash está en formato bcrypt
-
-            resultado = bcrypt.checkpw(
-
-                password.encode("utf-8"),
-
-                password_guardada.encode("utf-8"),
-
-            )
-
-            logger.info(f"[OK] Verificación bcrypt: {resultado}")
-
-            return resultado
-
-        except ValueError as e:
-
-            logger.exception("[ERROR] Error en hash bcrypt: %s", str(e))
-
-            return False
-
-    else:
-
-        # Fallback: comparar como plain text (para contraseñas antiguas)
-
-        resultado = password == password_guardada
-
-        logger.warning(f"[AVISO] Usando comparación plain text (legacy): {resultado}")
-
-        return resultado
-
-def login(usuario, password):
-
-    """Autentica usuario contra la base de datos."""
-
-    usuario = normalizar_texto(usuario)
-
-    password = normalizar_texto(password)
-
-    if not usuario or not password:
-
-        logger.warning(f"[ERROR] Usuario o contraseña vacío. Usuario: '{usuario}'")
-
-        return None
-
-    if not st.session_state.get("db_available", True):
-
-        logger.warning("[ERROR] Base de datos no disponible")
-
-        return None
-
-    # Buscar usuario en base de datos - uses safe wrapper for audit trail
-
-    user = safe_fetch_one(
-
-        """
-
-        SELECT id, usuario, password, rol, telefono, barberia_id, cortes_acumulados
-
-        FROM usuarios
-
-        WHERE usuario=%s
-
-        """,
-
-        (usuario,),
-
-    )
-
-
-    if not user:
-
-        logger.warning(f"[ERROR] Usuario no encontrado: '{usuario}'")
-
-        return None
-
-
-    logger.info(f"[OK] Usuario encontrado: {user[1]} (ID: {user[0]})")
-
-    logger.info(f"Verificando Hash format: {user[2][:20]}... (bcrypt: {es_hash_bcrypt(user[2])})")
-
-
-    # Verificar contraseña
-
-    if not verificar_password(password, user[2]):
-
-        logger.warning(f"[ERROR] Contraseña incorrecta para usuario: {usuario}")
-
-        return None
-
-
-    logger.info(f"[OK] Contraseña verificada para: {usuario}")
-
-
-    # Normalizar rol para asegurar que siempre sea válido
-
-    rol_normalizado = normalizar_rol(user[3])
-
-    if rol_normalizado != user[3]:
-
-        logger.info(f"Procesando Normalizando rol de '{user[3]}' a '{rol_normalizado}' para: {usuario}")
-
-        # Actualizar rol en la base de datos si es diferente
-
-        if execute_write(
-
-            "UPDATE usuarios SET rol=%s WHERE id=%s",
-
-            (rol_normalizado, user[0]),
-
-        ):
-
-            user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
-
-            logger.info(f"[OK] Rol actualizado en BD para: {usuario}")
-
-        else:
-
-            logger.warning(f"[AVISO] No se pudo actualizar rol en BD, usando rol normalizado localmente")
-
-            user = (user[0], user[1], user[2], rol_normalizado, user[4], user[5], user[6])
-
-    # Si la contraseña es plain text, rehashearla con bcrypt
-
-    if not es_hash_bcrypt(user[2]):
-
-        logger.info(f"Procesando Rehasheando contraseña para: {usuario}")
-
-        nuevo_hash = hash_password(password)
-
-        if execute_write(
-
-            "UPDATE usuarios SET password=%s WHERE id=%s",
-
-            (nuevo_hash, user[0]),
-
-        ):
-
-            logger.info(f"[OK] Contraseña rehashada para: {usuario}")
-
-            user = (user[0], user[1], nuevo_hash, user[3], user[4], user[5], user[6])
-
-        else:
-
-            logger.warning(f"[AVISO] No se pudo rehasear contraseña para: {usuario}")
-
-    logger.info(f"[OK] Login exitoso para: {usuario} con rol: {user[3]}")
-
-    return user
-
-@st.cache_data(ttl=300)
-
-def inicializar_barberia():
-
-    if not get_database_url():
-
-        return None
-
-    row = fetch_one("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
-
-    if row and row[0]:
-
-        return row[0]
-
-    row = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-
-    if row and row[0]:
-
-        return row[0]
-
-    created = execute_write(
-
-        "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
-
-        ("Barbería Principal",),
-
-        fetch_one_result=True,
-
-    )
-
-    if not created or not created[0]:
-
-        logger.error(
-
-            "No se pudo inicializar la barbería por defecto. "
-
-            "Verifica la conexión/credenciales y que exista la tabla 'barberias'."
-
-        )
-
-        return None
-
-    return created[0]
-
-def registrar(usuario, password, rol, telefono=None, barberia_id=None):
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos: el registro no está disponible en modo demo.")
-
-        return False
-
-    if barberia_id is None:
-
-        barberia_id = st.session_state["barberia_id"]
-
-    if not barberia_id:
-
-        st.error("No hay barbería configurada para registrar usuarios.")
-
-        return False
-
-    password_hash = hash_password(password)
-
-    rol_db = normalizar_rol(rol) if rol else ""
-
-    try:
-
-        result = execute_write(
-
-            "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id) VALUES (%s, %s, %s, %s, %s)",
-
-            (usuario, password_hash, rol_db, telefono, barberia_id),
-
-        )
-
-        return bool(result)
-
-    except Exception as e:
-
-        logger.exception("registrar")
-
-        st.error(str(e))
-
-        return False
-
-def registrar_barberia(nombre_barberia, admin_usuario, admin_password):
-
-    """Crea barbería y usuario ADMIN dueño (multi-tenant)."""
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos.")
-
-        return False
-
-    nombre_barberia = normalizar_texto(nombre_barberia)
-
-    admin_usuario = normalizar_texto(admin_usuario)
-
-    admin_password = normalizar_texto(admin_password)
-
-    if not nombre_barberia or not admin_usuario or not admin_password:
-
-        st.error("Completa nombre de barbería, usuario y contraseña.")
-
-        return False
-
-    conn = None
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            return False
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-
-                "INSERT INTO barberias (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING RETURNING id",
-
-                (nombre_barberia,),
-
-            )
-
-            row = cur.fetchone()
-
-            if row and row[0]:
-
-                bid = row[0]
-
-            else:
-
-                cur.execute("SELECT id FROM barberias WHERE nombre = %s", (nombre_barberia,))
-
-                bid = cur.fetchone()[0]
-
-            cur.execute("SELECT id FROM usuarios WHERE usuario = %s", (admin_usuario,))
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Ese usuario administrador ya existe.")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados)
-
-                VALUES (%s, %s, %s, %s, %s, 0)
-
-                """,
-
-                (admin_usuario, hash_password(admin_password), "ADMIN", None, bid),
-
-            )
-
-        conn.commit()
-
-        st.success("Barbería registrada. Ya puedes iniciar sesión como administrador.")
-
-        return True
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("registrar_barberia")
-
-        st.error(str(e))
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
-
-def seed_default_data():
-
-    """Datos iniciales: super admin, barbería Leveling, barberos (solo si faltan)."""
-
-    if not get_database_url():
-
-        logger.warning("[AVISO] DATABASE_URL no configurada - seed_default_data ignorado")
-
-        return False
-
-    conn = None
-
-    try:
-
-        conn = get_connection(notify_missing_url=False)
-
-        if conn is None:
-
-            logger.warning("[AVISO] No se pudo conectar a la BD - seed_default_data ignorado")
-
-            return False
-
-        with conn.cursor() as cur:
-
-            # 1. Crear barbería Leveling si no existe
-
-            logger.info("Verificando Verificando si barbería 'Barberia Leveling' existe...")
-
-            cur.execute("SELECT id FROM barberias WHERE nombre = %s", ("Barberia Leveling",))
-
-            barberia_row = cur.fetchone()
-
-            if barberia_row:
-
-                bid = barberia_row[0]
-
-                logger.info(f"[OK] Barbería Leveling ya existe (ID: {bid})")
-
-            else:
-
-                logger.info("[AVISO] Barbería Leveling NO existe - creando...")
-
-                cur.execute(
-
-                    "INSERT INTO barberias (nombre) VALUES (%s) RETURNING id",
-
-                    ("Barberia Leveling",),
-
-                )
-
-                barberia_row = cur.fetchone()
-
-                if barberia_row and barberia_row[0]:
-
-                    bid = barberia_row[0]
-
-                    logger.info(f"[OK] Barbería Leveling creada con ID: {bid}")
-
-                else:
-
-                    raise Exception("No se pudo crear la barbería por defecto")
-
-            # 2. Crear SUPER_ADMIN si no existe
-
-            logger.info("Verificando Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...")
-
-            cur.execute("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
-
-            super_admin_row = cur.fetchone()
-
-            if super_admin_row:
-
-                logger.info(f"[OK] SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: {super_admin_row[0]})")
-
-            else:
-
-                logger.info("[AVISO] SUPER_ADMIN 'JoanBeatsAD' NO existe - creando...")
-
-                password_hash = hash_password("suguha09")
-
-                cur.execute(
-
-                    "INSERT INTO usuarios (usuario, password, rol, barberia_id) VALUES (%s, %s, %s, %s)",
-
-                    ("JoanBeatsAD", password_hash, "SUPER_ADMIN", None),
-
-                )
-
-                logger.info("[OK] INSERT SUPER_ADMIN ejecutado")
-
-            # 3. Crear barberos si no existen
-
-            logger.info("Verificando Verificando barberos...")
-
-            pwd_barb = hash_password("barbero123")
-
-            for bu in ("Yor", "Andres", "Andrea", "Maikel"):
-
-                cur.execute("SELECT id FROM usuarios WHERE usuario = %s", (bu,))
-
-                if cur.fetchone():
-
-                    logger.info(f"[OK] Barbero '{bu}' ya existe")
-
-                    continue
-
-                cur.execute(
-
-                    "INSERT INTO usuarios (usuario, password, rol, telefono, barberia_id, cortes_acumulados) VALUES (%s, %s, %s, %s, %s, %s)",
-
-                    (bu, pwd_barb, "BARBERO", None, bid, 0),
-
-                )
-
-                logger.info(f"[OK] Barbero '{bu}' creado")
-
-        conn.commit()
-
-        logger.info("[OK] Commit exitoso - verificando SUPER_ADMIN...")
-
-        try:
-
-            user_check = fetch_one("SELECT id FROM usuarios WHERE usuario = %s", ("JoanBeatsAD",))
-
-            if user_check:
-
-                logger.info("[OK] SUPER_ADMIN listo en la base de datos")
-
-                return True
-
-            # st.sidebar.error("SUPER_ADMIN no se pudo crear")
-
-            logger.error("SUPER_ADMIN no se pudo crear")
-
-            return False
-
-        except Exception as e:
-
-            # st.sidebar.error(f"Seed error: {str(e)}")
-
-            logger.error(f"Seed error: {str(e)}")
-
-            return False
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("[ERROR] Error en seed_default_data")
-
-        # st.sidebar.error(f"Seed error: {str(e)}")
-
-        logger.error(f"Seed error: {str(e)}")
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
+from app_core.services.barberias_service import (
+    get_default_barberia_id,
+    check_barberia_name_exists,
+    create_barberia_in_db,
+    create_admin_user_in_db,
+    create_services_in_db,
+    create_barbers_in_db,
+    obtener_todas_barberias,
+)
+
+# ------------------ FUNCIONES (moved to app_core) ------------------
+# normalizar_texto, es_hash_bcrypt, hash_password, verificar_password,
+# login, registrar, registrar_barberia  →  app_core/auth.py
+# ensure_database_tables, inicializar_barberia, seed_default_data  →  app_core/bootstrap.py
 
 # ---------------------------------------------------------------------------
 # Migration guard: only run DDL (CREATE/ALTER/INDEX) when explicitly enabled.
@@ -1374,347 +419,6 @@ def opciones_filtro_barberos_ui(barberia_id):
 
     return ["Todos"] + nombres
 
-def marcar_reserva_pagada(reserva_id):
-
-    if not st.session_state.get("db_available", True):
-
-        return False
-
-    user = st.session_state.get("user")
-
-    if not user:
-
-        return False
-
-    prev = obtener_reserva_por_id(reserva_id)
-
-    if not prev:
-
-        st.error("Reserva no encontrada.")
-
-        return False
-
-    rol_u = normalizar_rol(user[3])
-
-    uid = user[1]
-
-    if rol_u == "BARBERO" and prev[2] != uid:
-
-        st.error("Sin permiso.")
-
-        return False
-
-    if rol_u == "ADMIN" and prev[7] != st.session_state.get("barberia_id"):
-
-        st.error("Sin permiso.")
-
-        return False
-
-    if rol_u == "CLIENTE":
-
-        st.error("Sin permiso.")
-
-        return False
-
-    try:
-
-        # ALL roles must update with barberia_id filter - NO EXCEPTIONS!
-
-        barberia_id_from_reserva = prev.get("barberia_id") or prev[7]
-
-
-        # CRITICAL: Enforce barberia context for SUPER_ADMIN too
-
-        if rol_u == "SUPER_ADMIN":
-
-            enforce_access(barberia_id_from_reserva)
-
-
-        return bool(
-
-            execute_write(
-
-                """
-
-                UPDATE reservas
-
-                SET pagado = TRUE, monto = COALESCE(monto, precio)
-
-                WHERE id = %s AND barberia_id = %s
-
-                """,
-
-                (reserva_id, barberia_id_from_reserva),
-
-            )
-
-        )
-
-    except Exception as e:
-
-        logger.exception("marcar_reserva_pagada")
-
-        st.error(str(e))
-
-        return False
-
-# ==================== MERCADOPAGO PAYMENTS ====================
-
-def crear_pago_mercadopago(reserva_id, monto, descripcion, cliente_email=None, show_errors=True):
-
-    """
-
-    Create MercadoPago payment preference and return checkout URL.
-
-
-    Args:
-
-        reserva_id: Reservation ID
-
-        monto: Payment amount in CLP
-
-        descripcion: Service description
-
-        cliente_email: Customer email (optional)
-
-        show_errors: Whether to show st.error() messages (True for UI, False for backend)
-
-
-    Returns:
-
-        URL to MercadoPago checkout, or None if error
-
-    """
-
-    # Validate SDK is available
-
-    if not mercadopago:
-
-        error_msg = "MercadoPago SDK no está instalado. Ejecuta: pip install mercadopago"
-
-        logger.error(error_msg)
-
-        if show_errors:
-
-            st.error(error_msg)
-
-        return None
-
-
-    # Load and validate access token
-
-    access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-
-    if not access_token or access_token.strip() == "":
-
-        error_msg = "MERCADOPAGO_ACCESS_TOKEN no configurado. Agrega a .env: MERCADOPAGO_ACCESS_TOKEN=tu_token"
-
-        logger.error(error_msg)
-
-        if show_errors:
-
-            st.error(error_msg)
-
-        return None
-
-
-    # Debug: Show token was loaded (masked)
-
-    token_preview = access_token[:10] + "..." if len(access_token) > 10 else access_token
-
-    logger.info(f"Token Token cargado: {token_preview}")
-
-
-    try:
-
-        # Initialize SDK
-
-        sdk = mercadopago.SDK(access_token)
-
-
-        # Validate payment amount
-
-        try:
-
-            monto_float = float(monto)
-
-            if monto_float <= 0:
-
-                raise ValueError("Monto debe ser mayor a 0")
-
-        except (ValueError, TypeError) as e:
-
-            error_msg = f"Monto inválido: {monto}. Error: {str(e)}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        # Build preference data
-
-        preference_data = {
-
-            "items": [
-
-                {
-
-                    "title": str(descripcion)[:256],  # MercadoPago title max 256 chars
-
-                    "quantity": 1,
-
-                    "currency_id": "CLP",
-
-                    "unit_price": monto_float
-
-                }
-
-            ],
-
-            "external_reference": str(reserva_id),
-
-            "notification_url": "https://splendid-morphine-maximize.ngrok-free.dev/webhook",
-
-        }
-
-
-        # Add back URLs if configured
-
-        success_url = os.getenv("MERCADOPAGO_SUCCESS_URL")
-
-        failure_url = os.getenv("MERCADOPAGO_FAILURE_URL")
-
-        pending_url = os.getenv("MERCADOPAGO_PENDING_URL")
-
-
-        if success_url or failure_url or pending_url:
-
-            preference_data["back_urls"] = {
-
-                "success": success_url or "https://barberia-app.com/success",
-
-                "failure": failure_url or "https://barberia-app.com/failure",
-
-                "pending": pending_url or "https://barberia-app.com/pending"
-
-            }
-
-
-        # Add payer email if provided
-
-        if cliente_email and "@" in str(cliente_email):
-
-            preference_data["payer"] = {"email": str(cliente_email)}
-
-
-        logger.info(f"Enviando preference a MercadoPago para reserva {reserva_id}...")
-
-
-        # Create preference
-
-        preference_response = sdk.preference().create(preference_data)
-
-        logger.info(f"Respuesta de MercadoPago: {preference_response}")
-
-
-        # Validate response structure
-
-        if not isinstance(preference_response, dict):
-
-            error_msg = f"Respuesta inválida de MercadoPago: tipo {type(preference_response)}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        # Check status code
-
-        response_status = preference_response.get("status")
-
-        if response_status != 201:
-
-            error_msg = f"MercadoPago error (status {response_status}): {preference_response}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        # Extract init_point
-
-        if "response" not in preference_response:
-
-            error_msg = f"No 'response' en respuesta de MercadoPago: {preference_response}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        response_data = preference_response["response"]
-
-        if "init_point" not in response_data:
-
-            error_msg = f"No 'init_point' en response de MercadoPago: {response_data}"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        init_point = response_data.get("init_point")
-
-        if not init_point:
-
-            error_msg = "init_point es vacío en respuesta de MercadoPago"
-
-            logger.error(error_msg)
-
-            if show_errors:
-
-                st.error(error_msg)
-
-            return None
-
-
-        logger.info(f"[OK] Pago creado para reserva {reserva_id}: {init_point}")
-
-        return init_point
-
-
-    except Exception as e:
-
-        error_msg = f"Error creando pago MercadoPago para reserva {reserva_id}: {str(e)}"
-
-        logger.exception(error_msg)
-
-        if show_errors:
-
-            st.error(error_msg)
-
-        return None
-
 def ui_pagar_reserva(rows, barberia_id, usuario):
 
     """
@@ -1765,21 +469,9 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
     st.markdown("### Pagar reservas pendientes")
 
 
-    # DEBUG: Show token status (temporary, for troubleshooting)
+    if not os.getenv("MERCADOPAGO_ACCESS_TOKEN"):
 
-    access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-
-    token_status = "[OK] Cargado" if access_token else "[ERROR] No configurado"
-
-    with st.expander(f"Debug - Token: {token_status}"):
-
-        if access_token:
-
-            st.info(f"Token cargado: {access_token[:10]}...")
-
-        else:
-
-            st.error("MERCADOPAGO_ACCESS_TOKEN no está en .env")
+        st.warning("MERCADOPAGO_ACCESS_TOKEN no está configurado en el entorno.")
 
 
     for r in unpaid:
@@ -1805,12 +497,15 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
         with col1:
 
-            st.caption(f"{fecha_label} {hora_label} · {servicio}")
+            render_public_note(
+                f"{fecha_label} {hora_label} · {servicio}",
+                note_type="info",
+            )
 
 
         with col2:
 
-            st.metric("Monto", f"${monto}")
+            render_metric_card("Monto", f"${monto}", icon="$", color=Colors.SUCCESS, size="small")
 
 
         with col3:
@@ -1893,12 +588,9 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
                         st.rerun()
 
 
-                st.caption(
-
-                    " Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. "
-
-                    "La confirmación puede tomar algunos minutos."
-
+                render_public_note(
+                    "Serás redirigido a MercadoPago. Después de pagar, vuelve a esta página. La confirmación puede tomar algunos minutos.",
+                    note_type="info",
                 )
 
             else:
@@ -1911,21 +603,29 @@ def ui_pagar_reserva(rows, barberia_id, usuario):
 
     st.markdown("---")
 
-def obtener_telefono_usuario(usuario):
+def obtener_telefono_usuario(usuario, barberia_id=None):
 
-    row = fetch_one("SELECT telefono FROM usuarios WHERE usuario=%s", (usuario,))
+    if barberia_id is None:
+
+        barberia_id = effective_barberia_id()
+
+    if not barberia_id:
+
+        return None
+
+    row = safe_fetch_one(
+
+        "SELECT telefono FROM usuarios WHERE usuario=%s AND barberia_id=%s",
+
+        (usuario, barberia_id),
+
+    )
 
     return row[0] if row and row[0] else None
 
-def get_default_barberia_id():
-
-    row = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-
-    return row[0] if row else None
-
 def registrar_fidelizacion(usuario, barberia_id):
 
-    row = execute_write(
+    row = safe_execute(
 
         """
 
@@ -1955,7 +655,7 @@ def procesar_beneficio_fidelizacion(usuario, barberia_id):
 
         return
 
-    execute_write(
+    safe_execute(
 
         """
 
@@ -1971,7 +671,7 @@ def procesar_beneficio_fidelizacion(usuario, barberia_id):
 
     )
 
-    telefono_cliente = obtener_telefono_usuario(usuario)
+    telefono_cliente = obtener_telefono_usuario(usuario, barberia_id)
 
     if telefono_cliente:
 
@@ -2004,47 +704,6 @@ def construir_mensaje_reserva(nombre, inicio, barbero, servicio):
         f"Servicio: {servicio}"
 
     )
-
-def normalizar_reserva(r):
-
-    """
-
-    Normalize reservation tuple to dict.
-
-    Handles schema: id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto
-
-    Indices:      0    1        2          3      4     5        6       7       8       9       10       11
-
-    """
-
-    if isinstance(r, dict):
-
-        return r
-
-    if not r or len(r) < 6:
-
-        return {}
-
-
-    return {
-
-        "id": r[0],
-
-        "barbero": r[1],
-
-        "servicio": r[2],
-
-        "fecha": r[3],
-
-        "hora": r[4],
-
-        "cliente": r[5],
-
-        "pagado": r[10] if len(r) > 10 else False,
-
-        "monto": r[11] if len(r) > 11 else (r[8] if len(r) > 8 else 0),
-
-    }
 
 @st.cache_data(ttl=30)
 
@@ -2088,7 +747,7 @@ def obtener_reservas_raw(barbero_filtro=None):
 
         sql = """
 
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, pagado, monto
+            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, estado, pagado, monto, barbero_id
 
             FROM reservas
 
@@ -2147,9 +806,13 @@ def obtener_reservas_raw(barbero_filtro=None):
 
                 "barberia_id": r[7],
 
-                "pagado": r[8] if len(r) > 8 else False,
+                "estado": r[8] if len(r) > 8 else None,
 
-                "monto": r[9] if len(r) > 9 else r[4],
+                "pagado": r[9] if len(r) > 9 else False,
+
+                "monto": r[10] if len(r) > 10 else r[4],
+
+                "barbero_id": r[11] if len(r) > 11 else None,
 
             })
 
@@ -2177,7 +840,9 @@ def construir_eventos_calendario(reservas):
 
             cliente = r.get("nombre", "Desconocido")
 
-            barbero_id = r.get("barbero", "unknown")
+            barbero_id = r.get("barbero_id") or r.get("barbero", "unknown")
+
+            barbero_nombre = r.get("barbero", "unknown")
 
             servicio = r.get("servicio", "")
 
@@ -2201,6 +866,8 @@ def construir_eventos_calendario(reservas):
 
                 barbero_id = r[2]
 
+                barbero_nombre = r[2]
+
                 servicio = r[3]
 
                 fecha_inicio = r[5]
@@ -2218,6 +885,8 @@ def construir_eventos_calendario(reservas):
                 continue
 
 
+        estado_visual = _calendar_estado_visual(r if isinstance(r, dict) else {"estado": r[9] if len(r) > 9 else None})
+
         # Crear título en formato moderno
 
         if es_bloqueo:
@@ -2227,6 +896,8 @@ def construir_eventos_calendario(reservas):
         else:
 
             titulo = f"{cliente} - {servicio}"
+            if estado_visual:
+                titulo = f"{estado_visual['title_prefix']} | {titulo}"
 
 
         # Color by payment status: Green for paid, Orange for pending
@@ -2236,6 +907,12 @@ def construir_eventos_calendario(reservas):
             color = "#666666"
 
             border_color = "#4b5563"
+
+        elif estado_visual:
+
+            color = estado_visual["color"]
+
+            border_color = estado_visual["border_color"]
 
         elif pagado:
 
@@ -2281,13 +958,17 @@ def construir_eventos_calendario(reservas):
 
                 "nombre": cliente,
 
-                "barbero": barbero_id,
+                "barbero": barbero_nombre,
+
+                "barbero_id": barbero_id,
 
                 "servicio": servicio,
 
                 "monto": r.get("monto") if isinstance(r, dict) else (r[4] if len(r) > 4 else 0),
 
                 "pagado": pagado,
+
+                "estado": r.get("estado") if isinstance(r, dict) else (r[9] if len(r) > 9 else None),
 
                 "bloqueo": es_bloqueo,
 
@@ -2300,6 +981,106 @@ def construir_eventos_calendario(reservas):
         })
 
     return eventos
+
+
+def _build_reserva_estado_ui(reserva):
+
+    estado_raw = str(reserva.get("estado") or "").strip().lower()
+    estado_normalizado = _normalizar_estado_operativo_ui(estado_raw)
+
+    meta = _RESERVA_ESTADO_META.get(
+        estado_normalizado or "pendiente",
+        _RESERVA_ESTADO_META["pendiente"],
+    )
+
+    return {
+        "key": estado_normalizado or "pendiente",
+        "label": meta["label"],
+        "color": meta["color"],
+        "payment_label": "Pagada" if reserva.get("pagado", False) else "Pendiente de pago",
+    }
+
+
+def _normalizar_estado_operativo_ui(estado):
+
+    estado_raw = str(estado or "").strip().lower()
+
+    if estado_raw in {"", "activo"}:
+        return "pendiente"
+
+    if estado_raw in {"no-show", "no show", "noshow"}:
+        return "no_show"
+
+    if estado_raw in _RESERVA_ESTADO_META:
+        return estado_raw
+
+    return "pendiente"
+
+
+def _format_reserva_estado_label(estado):
+
+    estado_ui = _build_reserva_estado_ui({"estado": estado, "pagado": False})
+
+    meta = _RESERVA_ESTADO_META.get(
+        estado_ui["key"] or "pendiente",
+        _RESERVA_ESTADO_META["pendiente"],
+    )
+
+    return meta["label"]
+
+
+def _build_reserva_payment_ui(reserva):
+
+    pagado = bool(reserva.get("pagado", False))
+
+    return {
+        "label": "Pagada" if pagado else "Pendiente de pago",
+        "color": "#16a34a" if pagado else "#f59e0b",
+    }
+
+
+def _reserva_estado_action_success_message(reserva_id, estado):
+
+    estado_key = _normalizar_estado_operativo_ui(estado)
+
+    if estado_key == "cancelada":
+        return f"Reserva #{reserva_id} cancelada correctamente."
+
+    if estado_key == "completada":
+        return f"Reserva #{reserva_id} marcada como completada."
+
+    if estado_key == "no_show":
+        return f"Reserva #{reserva_id} marcada como no show."
+
+    return f"Estado de la reserva #{reserva_id} actualizado a {_format_reserva_estado_label(estado_key)}."
+
+
+def _calendar_estado_visual(reserva):
+
+    estado_key = _normalizar_estado_operativo_ui(reserva.get("estado"))
+
+    if estado_key == "cancelada":
+        return {
+            "title_prefix": "Cancelada",
+            "color": "#6b7280",
+            "border_color": "#4b5563",
+        }
+
+    if estado_key == "completada":
+        return {
+            "title_prefix": "Completada",
+            "color": "#0f766e",
+            "border_color": "#0d9488",
+        }
+
+    if estado_key == "no_show":
+        return {
+            "title_prefix": "No show",
+            "color": "#c2410c",
+            "border_color": "#ea580c",
+        }
+
+    return None
 
 def mostrar_detalles_reserva(reserva_id):
 
@@ -2326,11 +1107,8 @@ def mostrar_detalles_reserva(reserva_id):
 
     fecha_str = inicio.strftime("%d/%m/%Y") if hasattr(inicio, "strftime") else ""
 
-    pagado = reserva.get("pagado", False)
-
-    estado = "[OK] Pagado" if pagado else "Pendiente"
-
-    estado_color = "#16a34a" if pagado else "#f59e0b"
+    estado_ui = _build_reserva_estado_ui(reserva)
+    payment_ui = _build_reserva_payment_ui(reserva)
 
     monto = reserva.get('monto', 0)
 
@@ -2341,8 +1119,22 @@ def mostrar_detalles_reserva(reserva_id):
         inicio_str,
         fecha_str,
         monto,
-        estado,
-        estado_color,
+        estado_ui["label"],
+        estado_ui["color"],
+    )
+
+    st.markdown(
+        f"""
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <span style="display:inline-block;background:{estado_ui['color']}20;color:{estado_ui['color']};padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid {estado_ui['color']};">
+                Estado: {estado_ui['label']}
+            </span>
+            <span style="display:inline-block;background:{payment_ui['color']}20;color:{payment_ui['color']};padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid {payment_ui['color']};">
+                Pago: {payment_ui['label']}
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -2414,7 +1206,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
     except Exception as e:
 
-        st.error(f"Error al agrupar reservas:\n{traceback.format_exc()}")
+        logger.exception("Error al agrupar reservas")
+
+        st.error("Error al procesar las reservas. Por favor, recarga la página.")
 
         return
 
@@ -2438,6 +1232,8 @@ def render_calendario_multi_barbero(reservas, read_only=False):
     with col_legend:
 
         render_status_legend(compact=True)
+
+    st.caption("Cancelada, completada y no show usan colores propios en el calendario.")
 
 
     st.markdown("---")
@@ -2481,7 +1277,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
                 except Exception as e:
 
-                    st.error(f"Error construyendo eventos para {barber_name}:\n{traceback.format_exc()}")
+                    logger.exception("Error construyendo eventos para %s", barber_name)
+
+                    st.error(f"Error al procesar el calendario de {barber_name}. Por favor, recarga la página.")
 
                     continue
 
@@ -2583,7 +1381,9 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 
                 except Exception as e:
 
-                    st.error(f"Error al mostrar calendario para {barber_name}:\n{traceback.format_exc()}")
+                    logger.exception("Error al mostrar calendario para %s", barber_name)
+
+                    st.error(f"Error al mostrar el calendario de {barber_name}. Por favor, recarga la página.")
 
         except Exception as e:
 
@@ -2594,639 +1394,6 @@ def render_calendario_multi_barbero(reservas, read_only=False):
 def obtener_reservas(barbero=None):
 
     return construir_eventos_calendario(obtener_reservas_raw(barbero))
-
-def obtener_reserva_por_id(reserva_id):
-
-    """Get reservation by ID with multi-tenant isolation - must verify access."""
-
-    try:
-
-        result = fetch_one(
-
-            """
-
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente, pagado, monto
-
-            FROM reservas
-
-            WHERE id = %s
-
-            """,
-
-            (reserva_id,),
-
-        )
-
-        if not result:
-
-            return None
-
-
-        # Extract barberia_id and verify access
-
-        barberia_id = result[7]
-
-        enforce_barberia_access(barberia_id)
-
-
-        # Convert tuple to dictionary
-
-        return {
-
-            "id": result[0],
-
-            "nombre": result[1],
-
-            "barbero": result[2],
-
-            "servicio": result[3],
-
-            "precio": result[4],
-
-            "inicio": result[5],
-
-            "fin": result[6],
-
-            "barberia_id": result[7],
-
-            "cliente": result[8],
-
-            "pagado": result[9] if len(result) > 9 else False,
-
-            "monto": result[10] if len(result) > 10 else result[4],
-
-        }
-
-    except Exception:
-
-        logger.exception("obtener_reserva_por_id")
-
-        return None
-
-def obtener_reserva(reserva_id, barberia_id):
-
-    try:
-
-        result = fetch_one(
-
-            """
-
-            SELECT id, nombre, barbero, servicio, precio, inicio, fin, barberia_id, cliente, pagado, monto
-
-            FROM reservas
-
-            WHERE id = %s AND barberia_id = %s
-
-            """,
-
-            (reserva_id, barberia_id),
-
-        )
-
-        if not result:
-
-            return None
-
-
-        # Convert tuple to dictionary
-
-        return {
-
-            "id": result[0],
-
-            "nombre": result[1],
-
-            "barbero": result[2],
-
-            "servicio": result[3],
-
-            "precio": result[4],
-
-            "inicio": result[5],
-
-            "fin": result[6],
-
-            "barberia_id": result[7],
-
-            "cliente": result[8],
-
-            "pagado": result[9] if len(result) > 9 else False,
-
-            "monto": result[10] if len(result) > 10 else result[4],
-
-        }
-
-    except Exception:
-
-        logger.exception("obtener_reserva")
-
-        return None
-
-def normalizar_datetime(valor):
-
-    if isinstance(valor, datetime):
-
-        return valor.replace(tzinfo=None)
-
-    if isinstance(valor, str):
-
-        return datetime.fromisoformat(valor.replace("Z", "+00:00")).replace(tzinfo=None)
-
-    return valor
-
-def _guardar_reserva_tx(nombre, barbero, servicio, precio, inicio, fin, barberia_id):
-
-    conn = None
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            return False
-
-        with conn.cursor() as cur:
-
-            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"{barberia_id}:{barbero}",))
-
-            cur.execute(
-
-                """
-
-                SELECT id FROM reservas
-
-                WHERE barberia_id = %s
-
-                  AND barbero = %s
-
-                  AND inicio < %s
-
-                  AND fin > %s
-
-                LIMIT 1
-
-                """,
-
-                (barberia_id, barbero, fin, inicio),
-
-            )
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Horario ocupado")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                INSERT INTO reservas (nombre, barbero, servicio, precio, inicio, fin, barberia_id, monto, pagado)
-
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE)
-
-                """,
-
-                (nombre, barbero, servicio, precio, inicio, fin, barberia_id, precio),
-
-            )
-
-        conn.commit()
-
-        return True
-
-    except Exception:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("Error al guardar reserva")
-
-        st.error("No se pudo guardar la reserva.")
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
-
-def guardar_reserva(nombre, barbero, servicio, precio, inicio, fin):
-
-    barberia_id = session_barberia_for_write()
-
-    if not barberia_id:
-
-        return False
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos: no se pueden guardar reservas en modo demo.")
-
-        return False
-
-    inicio = normalizar_datetime(inicio)
-
-    fin = normalizar_datetime(fin)
-
-    if not inicio or not fin or inicio >= fin:
-
-        st.error("El horario de término debe ser posterior al inicio.")
-
-        return False
-
-    return _guardar_reserva_tx(nombre, barbero, servicio, precio, inicio, fin, barberia_id)
-
-def actualizar_reserva(reserva_id, nombre, barbero, servicio, precio, inicio, fin):
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos: no se pueden actualizar reservas en modo demo.")
-
-        return False
-
-    inicio = normalizar_datetime(inicio)
-
-    fin = normalizar_datetime(fin)
-
-    if not inicio or not fin or inicio >= fin:
-
-        st.error("El horario de término debe ser posterior al inicio.")
-
-        return False
-
-    user = st.session_state.get("user")
-
-    rol_u = normalizar_rol(user[3]) if user else ""
-
-    prev = obtener_reserva_por_id(reserva_id)
-
-    if not prev:
-
-        st.error("Reserva no encontrada.")
-
-        return False
-
-    bid_tx = prev[7]
-
-    sw = session_barberia_for_write()
-
-    if rol_u != "SUPER_ADMIN" and not sw:
-
-        return False
-
-    if rol_u == "BARBERO" and prev[2] != user[1]:
-
-        st.error("Sin permiso para modificar esta reserva.")
-
-        return False
-
-    if rol_u == "ADMIN" and bid_tx != st.session_state.get("barberia_id"):
-
-        st.error("Sin permiso para modificar esta reserva.")
-
-        return False
-
-    if rol_u == "CLIENTE":
-
-        st.error("Sin permiso para modificar esta reserva.")
-
-        return False
-
-    conn = None
-
-    try:
-
-        conn = get_connection()
-
-        if conn is None:
-
-            return False
-
-        with conn.cursor() as cur:
-
-            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"{bid_tx}:{barbero}",))
-
-            cur.execute(
-
-                """
-
-                SELECT id FROM reservas
-
-                WHERE barberia_id = %s
-
-                  AND barbero = %s
-
-                  AND id <> %s
-
-                  AND inicio < %s
-
-                  AND fin > %s
-
-                LIMIT 1
-
-                """,
-
-                (bid_tx, barbero, reserva_id, fin, inicio),
-
-            )
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Ese cambio genera solapamiento con otra reserva.")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                UPDATE reservas
-
-                SET nombre = %s, barbero = %s, servicio = %s, precio = %s, inicio = %s, fin = %s
-
-                WHERE id = %s AND barberia_id = %s
-
-                """,
-
-                (nombre, barbero, servicio, precio, inicio, fin, reserva_id, bid_tx),
-
-            )
-
-        conn.commit()
-
-        return True
-
-    except Exception:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("Error al actualizar reserva")
-
-        st.error("No se pudo actualizar la reserva.")
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
-
-def eliminar_reserva(reserva_id):
-
-    if not st.session_state.get("db_available", True):
-
-        st.warning("No hay base de datos: no se pueden eliminar reservas en modo demo.")
-
-        return False
-
-    user = st.session_state.get("user")
-
-    if not user:
-
-        return False
-
-    prev = obtener_reserva_por_id(reserva_id)
-
-    if not prev:
-
-        st.error("Reserva no encontrada.")
-
-        return False
-
-    rol_u = normalizar_rol(user[3])
-
-    uid = user[1]
-
-    cli = prev.get("cliente")
-
-    if rol_u == "BARBERO" and prev.get("barbero") != uid:
-
-        st.error("Sin permiso para eliminar esta reserva.")
-
-        return False
-
-    if rol_u == "ADMIN" and prev.get("barberia_id") != st.session_state.get("barberia_id"):
-
-        st.error("Sin permiso para eliminar esta reserva.")
-
-        return False
-
-    if rol_u == "CLIENTE" and (cli or prev.get("nombre")) != uid:
-
-        st.error("Sin permiso para eliminar esta reserva.")
-
-        return False
-
-    try:
-
-        if rol_u == "SUPER_ADMIN":
-
-            return bool(execute_write("DELETE FROM reservas WHERE id = %s", (reserva_id,)))
-
-        return bool(
-
-            execute_write(
-
-                "DELETE FROM reservas WHERE id = %s AND barberia_id = %s",
-
-                (reserva_id, prev.get("barberia_id")),
-
-            )
-
-        )
-
-    except Exception as e:
-
-        logger.exception("eliminar_reserva")
-
-        st.error(f"Error eliminando reserva:\n{traceback.format_exc()}")
-
-        return False
-
-def insertar_reserva_con_fecha_hora(
-
-    barberia_id,
-
-    cliente_usuario,
-
-    barbero_id,
-
-    barbero_nombre,
-
-    servicio,
-
-    fecha,
-
-    hora,
-
-    precio,
-
-    duracion_min,
-
-):
-
-    """Inserta reserva validando slot por fecha/hora y solapamiento por inicio/fin."""
-
-    conn = None
-
-    try:
-
-        if not fecha or not hora:
-
-            st.error("Selecciona fecha y hora.")
-
-            return False
-
-        inicio = datetime.combine(fecha, hora)
-
-        fin = inicio + timedelta(minutes=duracion_min)
-
-        conn = get_connection()
-
-        if conn is None:
-
-            return False
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-
-                """
-
-                SELECT id FROM reservas
-
-                WHERE barberia_id = %s AND barbero_id = %s AND fecha = %s AND hora = %s
-
-                LIMIT 1
-
-                """,
-
-                (barberia_id, barbero_id, fecha, hora),
-
-            )
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Horario ocupado")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                SELECT id FROM reservas
-
-                WHERE barberia_id = %s
-
-                  AND barbero_id = %s
-
-                  AND inicio < %s
-
-                  AND fin > %s
-
-                LIMIT 1
-
-                """,
-
-                (barberia_id, barbero_id, fin, inicio),
-
-            )
-
-            if cur.fetchone():
-
-                conn.rollback()
-
-                st.error("Horario ocupado")
-
-                return False
-
-            cur.execute(
-
-                """
-
-                INSERT INTO reservas (
-
-                    nombre, barbero, barbero_id, servicio, precio, inicio, fin, barberia_id,
-
-                    cliente, fecha, hora, estado, monto, pagado
-
-                )
-
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
-
-                RETURNING id
-
-                """,
-
-                (
-
-                    cliente_usuario,
-
-                    barbero_nombre,
-
-                    barbero_id,
-
-                    servicio,
-
-                    precio,
-
-                    inicio,
-
-                    fin,
-
-                    barberia_id,
-
-                    cliente_usuario,
-
-                    fecha,
-
-                    hora,
-
-                    "activo",
-
-                    precio,
-
-                ),
-
-            )
-
-            reserva_id = cur.fetchone()[0]
-
-        conn.commit()
-
-        return reserva_id
-
-    except Exception as e:
-
-        if conn:
-
-            conn.rollback()
-
-        logger.exception("Error al insertar reserva (fecha/hora)")
-
-        st.error(str(e))
-
-        return False
-
-    finally:
-
-        if conn:
-
-            conn.close()
 
 @st.cache_data(ttl=30)
 
@@ -3256,7 +1423,7 @@ def listar_reservas_filtradas(barberia_id_arg=None, rol_tag=None, usuario_login=
 
     cols = (
 
-        "id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto"
+        "id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto, barbero_id"
 
     )
 
@@ -3450,13 +1617,16 @@ def mostrar_reservas_dataframe(rows):
 
             monto = r.get("monto") or r.get("precio") or 0
 
-            estado = bool(r.get("pagado", False))
+            estado_ui = _build_reserva_estado_ui(r)
+            payment_ui = _build_reserva_payment_ui(r)
 
-            estado_label = "Pagado" if estado else "Pendiente"
+            estado_color = estado_ui["color"]
 
-            estado_color = "#16a34a" if estado else "#f59e0b"
+            estado_bg = f"{estado_color}20"
 
-            estado_bg = "rgba(22, 163, 74, 0.1)" if estado else "rgba(245, 158, 11, 0.1)"
+            pago_color = payment_ui["color"]
+
+            pago_bg = f"{pago_color}20"
 
             # Single-line HTML avoids Markdown blank-line re-entry that causes
             # 4-space-indented inner tags to be rendered as <pre><code> blocks.
@@ -3467,14 +1637,19 @@ def mostrar_reservas_dataframe(rows):
                 f'box-shadow:0 2px 8px rgba(0,0,0,0.15);'
                 f'border:1px solid rgba(255,255,255,0.1);">'
                 f'<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px;">'
-                f'<h4 style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">{cliente}</h4>'
+                f'<div><h4 style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">{cliente}</h4>'
+                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
                 f'<span style="background-color:{estado_bg};color:{estado_color};padding:4px 12px;'
                 f'border-radius:20px;font-size:12px;font-weight:600;border:1px solid {estado_color};">'
-                f'{estado_label}</span></div>'
+                f'Estado: {estado_ui["label"]}</span>'
+                f'<span style="background-color:{pago_bg};color:{pago_color};padding:4px 12px;'
+                f'border-radius:20px;font-size:12px;font-weight:600;border:1px solid {pago_color};">'
+                f'Pago: {payment_ui["label"]}</span></div></div>'
+                f'<span style="color:#94a3b8;font-size:12px;font-weight:600;">#{r.get("id")}</span></div>'
                 f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px;">'
                 f'<div style="display:flex;align-items:center;gap:8px;"><span>Hora</span><span style="color:#e0e0e0;"><strong>{hora_label}</strong></span></div>'
-                f'<div style="display:flex;align-items:center;gap:8px;"><span>Tijeras</span><span style="color:#e0e0e0;"><strong>{servicio}</strong></span></div>'
-                f'<div style="display:flex;align-items:center;gap:8px;"><span>·</span><span style="color:#e0e0e0;"><strong>{barbero}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Servicio</span><span style="color:#e0e0e0;"><strong>{servicio}</strong></span></div>'
+                f'<div style="display:flex;align-items:center;gap:8px;"><span>Barbero</span><span style="color:#e0e0e0;"><strong>{barbero}</strong></span></div>'
                 f'<div style="display:flex;align-items:center;gap:8px;"><span>Monto</span><span style="color:#e0e0e0;"><strong>${monto}</strong></span></div>'
                 f'</div></div>'
             )
@@ -3540,7 +1715,7 @@ def ui_marcar_pagado_reservas(rows, key_prefix):
 
             if marcar_reserva_pagada(rid):
 
-                st.success("Pago registrado")
+                st.success(f"Pago registrado para la reserva #{rid}.")
 
                 st.rerun()
 
@@ -3582,7 +1757,7 @@ def ui_eliminar_reserva_lista(rows, key_prefix):
 
             if eliminar_reserva(rid):
 
-                st.success("Reserva eliminada")
+                st.success(f"Reserva #{rid} eliminada.")
 
                 st.rerun()
 
@@ -3744,7 +1919,7 @@ def mostrar_calendario_reservas(reservas):
 
         logger.exception("Error displaying reservation calendar")
 
-        st.error(f"Error al mostrar el calendario:\\n{traceback.format_exc()}")
+        st.error("Error al mostrar el calendario. Por favor, recarga la página.")
 
 def manejar_interaccion_calendario(calendar_state):
 
@@ -3822,9 +1997,11 @@ def manejar_interaccion_calendario(calendar_state):
 
                         normalizar_datetime(evento.get("end")),
 
+                        barbero_id=reserva.get("barbero_id"),
+
                     )
 
-                st.success("Reserva actualizada")
+                st.success(f"Reserva #{reserva.get('id')} reprogramada correctamente.")
 
                 st.rerun()
 
@@ -3853,6 +2030,8 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
     with col_legend:
 
         render_status_legend()
+
+    st.caption("Cancelada, completada y no show usan colores propios en el calendario.")
 
 
     st.markdown("---")
@@ -3893,13 +2072,14 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
         # RENDER HTML OUTSIDE OF COLUMN CONTEXT - FULL WIDTH
 
-        mostrar_detalles_reserva(reserva_id)
+        reserva_detalle = mostrar_detalles_reserva(reserva_id)
 
+
+        estado_detalle = _build_reserva_estado_ui(reserva_detalle) if reserva_detalle else None
+        puede_cambiar_estado = estado_detalle and estado_detalle["key"] not in {"cancelada", "completada", "no_show"}
 
         # Action buttons below
-
         col_btn_left, col_btn_right = st.columns([1, 1])
-
 
         with col_btn_left:
 
@@ -3907,7 +2087,7 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
                 if marcar_reserva_pagada(reserva_id):
 
-                    st.success("Pago registrado")
+                    st.success(f"Pago registrado para la reserva #{reserva_id}.")
 
                     st.session_state.mostrar_detalles_reserva = False
 
@@ -3924,6 +2104,45 @@ def render_agenda_interactiva(eventos, barbero_actual=None, read_only=False):
 
                 st.rerun()
 
+        st.caption("Acciones de estado")
+        col_estado_1, col_estado_2, col_estado_3 = st.columns(3)
+
+        with col_estado_1:
+            if st.button(
+                "Completar",
+                key="btn_completar_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "completada"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "completada"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+
+        with col_estado_2:
+            if st.button(
+                "Marcar no show",
+                key="btn_no_show_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "no_show"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "no_show"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+
+        with col_estado_3:
+            if st.button(
+                "Cancelar reserva",
+                key="btn_cancelar_action",
+                use_container_width=True,
+                disabled=not puede_cambiar_estado,
+            ):
+                if actualizar_estado_reserva(reserva_id, "cancelada"):
+                    st.success(_reserva_estado_action_success_message(reserva_id, "cancelada"))
+                    st.session_state.mostrar_detalles_reserva = False
+                    st.rerun()
+
     else:
 
         st.info("📍 Haz clic en un evento del calendario para ver detalles y opciones")
@@ -3938,9 +2157,9 @@ def render_gestion_agenda(barbero_actual=None):
 
     super_all = rol_g == "SUPER_ADMIN" and st.session_state.get("super_admin_all_barberias")
 
-    if not super_all and not bid_eff:
+    if not bid_eff:
 
-        st.warning("Selecciona una barbería o asocia tu sesión a una barbería.")
+        st.warning("Selecciona una barbería activa para crear o editar reservas.")
 
         return
 
@@ -3955,18 +2174,32 @@ def render_gestion_agenda(barbero_actual=None):
         return
 
     reservas = obtener_reservas_raw(barbero_actual)
+    service_catalog, using_fallback_catalog = _load_agenda_service_catalog(bid_eff)
+
+    if using_fallback_catalog:
+        render_alert(
+            "La barbería activa no tiene servicios configurados. Se usan opciones de respaldo para no bloquear la operación.",
+            alert_type="warning",
+            title="Catálogo vacío",
+        )
+
+    barber_labels = {}
 
     if barbero_actual:
 
         barbero_options = [barbero_actual]
 
+        barber_labels = {barbero_actual: str(barbero_actual)}
+
     else:
 
         db_barbers = listar_usuarios_barberos(bid_eff) if bid_eff else []
 
-        barbero_options = [r[0] for r in db_barbers] if db_barbers else list(barberos.keys())
+        barber_labels = {r[0]: r[1] for r in db_barbers} if db_barbers else {}
 
-    servicio_options = list(servicios.keys()) + ["Bloqueo"]
+        barbero_options = list(barber_labels.keys()) if barber_labels else list(barberos.keys())
+
+    servicio_options = list(service_catalog.keys()) + ["Bloqueo"]
 
     with st.expander("Crear reserva o bloqueo", expanded=False):
 
@@ -3978,7 +2211,12 @@ def render_gestion_agenda(barbero_actual=None):
 
             nombre_nuevo = st.text_input("Cliente", value=nombre_default)
 
-            barbero_nuevo = st.selectbox("Barbero", barbero_options, key="agenda_barbero_nuevo")
+            barbero_nuevo = st.selectbox(
+                "Barbero",
+                barbero_options,
+                key="agenda_barbero_nuevo",
+                format_func=lambda ref: barber_labels.get(ref, str(ref)),
+            )
 
             inicio_nuevo = st.datetime_input("Inicio", key="agenda_inicio_nuevo")
 
@@ -3986,7 +2224,7 @@ def render_gestion_agenda(barbero_actual=None):
 
             if st.form_submit_button("Crear"):
 
-                precio_nuevo = 0 if servicio_nuevo == "Bloqueo" else servicios[servicio_nuevo]["precio"]
+                precio_nuevo = 0 if servicio_nuevo == "Bloqueo" else service_catalog[servicio_nuevo]["precio"]
 
                 nombre_final = "BLOQUEADO" if servicio_nuevo == "Bloqueo" else normalizar_texto(nombre_nuevo)
 
@@ -3998,7 +2236,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                     nombre_final,
 
-                    barbero_nuevo,
+                    barber_labels.get(barbero_nuevo, str(barbero_nuevo)),
 
                     servicio_nuevo,
 
@@ -4008,13 +2246,15 @@ def render_gestion_agenda(barbero_actual=None):
 
                     fin_nuevo,
 
+                    barbero_id=barbero_nuevo if barbero_nuevo in barber_labels else None,
+
                 ):
 
-                    st.success("Reserva creada")
+                    st.success("Reserva creada correctamente.")
 
                     st.rerun()
 
-    st.subheader("Editar o eliminar reserva")
+    st.subheader("Editar, cancelar o eliminar reserva")
 
     if not reservas:
 
@@ -4054,27 +2294,60 @@ def render_gestion_agenda(barbero_actual=None):
 
     with st.form("editar_reserva_calendario"):
 
-        servicio_idx = servicio_options.index(reserva.get("servicio")) if reserva.get("servicio") in servicio_options else 0
+        servicio_actual = reserva.get("servicio")
+        if servicio_actual and servicio_actual not in service_catalog and servicio_actual != "Bloqueo":
+            service_catalog[servicio_actual] = {
+                "precio": int(reserva.get("precio") or 0),
+                "duracion": 30,
+            }
+            servicio_options = list(service_catalog.keys()) + ["Bloqueo"]
 
-        barbero_idx = barbero_options.index(reserva.get("barbero")) if reserva.get("barbero") in barbero_options else 0
+        servicio_idx = servicio_options.index(servicio_actual) if servicio_actual in servicio_options else 0
+
+        barbero_actual_ref = (
+            reserva.get("barbero_id")
+            if reserva.get("barbero_id") in barbero_options
+            else reserva.get("barbero")
+        )
+
+        barbero_idx = barbero_options.index(barbero_actual_ref) if barbero_actual_ref in barbero_options else 0
+        estado_actual = _normalizar_estado_operativo_ui(reserva.get("estado"))
+        estado_options = ["pendiente", "confirmada", "completada", "no_show", "cancelada"]
+        estado_idx = estado_options.index(estado_actual) if estado_actual in estado_options else 0
 
         nombre_editado = st.text_input("Cliente", value=reserva.get("nombre", ""))
 
         servicio_editado = st.selectbox("Servicio", servicio_options, index=servicio_idx, key="agenda_servicio_editado")
 
-        barbero_editado = st.selectbox("Barbero", barbero_options, index=barbero_idx, key="agenda_barbero_editado")
+        barbero_editado = st.selectbox(
+            "Barbero",
+            barbero_options,
+            index=barbero_idx,
+            key="agenda_barbero_editado",
+            format_func=lambda ref: barber_labels.get(ref, str(ref)),
+        )
 
         inicio_editado = st.datetime_input("Inicio", value=reserva.get("inicio"), key="agenda_inicio_editado")
 
         fin_editado = st.datetime_input("Fin", value=reserva.get("fin"), key="agenda_fin_editado")
 
+        estado_editado = st.selectbox(
+            "Estado",
+            estado_options,
+            index=estado_idx,
+            key="agenda_estado_editado",
+            format_func=_format_reserva_estado_label,
+        )
+
         actualizar = st.form_submit_button("Guardar cambios")
+
+        cancelar = st.form_submit_button("Cancelar reserva")
 
         eliminar = st.form_submit_button("Eliminar reserva")
 
         if actualizar:
 
-            precio_editado = 0 if servicio_editado == "Bloqueo" else servicios[servicio_editado]["precio"]
+            precio_editado = 0 if servicio_editado == "Bloqueo" else service_catalog[servicio_editado]["precio"]
 
             nombre_final = "BLOQUEADO" if servicio_editado == "Bloqueo" else normalizar_texto(nombre_editado)
 
@@ -4088,7 +2361,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                 nombre_final,
 
-                barbero_editado,
+                barber_labels.get(barbero_editado, str(barbero_editado)),
 
                 servicio_editado,
 
@@ -4098,9 +2371,43 @@ def render_gestion_agenda(barbero_actual=None):
 
                 fin_editado,
 
+                barbero_id=barbero_editado if barbero_editado in barber_labels else None,
+
+                estado=estado_editado,
+
             ):
 
-                st.success("Reserva actualizada")
+                cambio_programacion = (
+                    inicio_editado != reserva.get("inicio")
+                    or fin_editado != reserva.get("fin")
+                    or barbero_editado != barbero_actual_ref
+                )
+
+                if estado_editado in {"cancelada", "completada", "no_show"}:
+
+                    st.success(_reserva_estado_action_success_message(reserva_id, estado_editado))
+
+                elif cambio_programacion:
+
+                    st.success(f"Reserva #{reserva_id} reprogramada correctamente.")
+
+                elif estado_editado != estado_actual:
+
+                    st.success(
+                        f"Estado de la reserva #{reserva_id} actualizado a {_format_reserva_estado_label(estado_editado)}."
+                    )
+
+                else:
+
+                    st.success(f"Reserva #{reserva_id} actualizada correctamente.")
+
+                st.rerun()
+
+        if cancelar:
+
+            if actualizar_estado_reserva(reserva_id, "cancelada"):
+
+                st.success(_reserva_estado_action_success_message(reserva_id, "cancelada"))
 
                 st.rerun()
 
@@ -4110,7 +2417,7 @@ def render_gestion_agenda(barbero_actual=None):
 
                 st.session_state.reserva_seleccionada_id = None
 
-                st.success("Reserva eliminada")
+                st.success(f"Reserva #{reserva_id} eliminada.")
 
                 st.rerun()
 
@@ -4130,359 +2437,15 @@ def render_modo_sin_db_banner():
 
 # ================= PUBLIC BOOKING FLOW (NO LOGIN) =================
 
-# ================= MÉTRICAS HELPERS =================
-
-def calcular_metricas_header(barberia_id=None):
-
-    """Calculate quick dashboard header metrics for today.
-
-
-    SECURITY: Always uses current barberia context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Single query for all today's metrics - SAFE wrapper ensures barberia_id filter
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_hoy,
-
-                COUNT(CASE WHEN pagado = TRUE THEN 1 END) as pagadas_hoy,
-
-                COUNT(CASE WHEN pagado = FALSE THEN 1 END) as pendientes_hoy
-
-            FROM reservas 
-
-            WHERE barberia_id = %s AND fecha = %s
-
-            """,
-
-            (barberia_id, hoy),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2]
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas header")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_cliente(barberia_id=None, usuario=None):
-
-    """Fast cached client metrics with optimized queries.
-
-
-    SECURITY: Always uses current context and validates user access.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not usuario or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        hoy = datetime.now().date()
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas
-
-            FROM reservas 
-
-            WHERE barberia_id = %s 
-
-              AND (cliente = %s OR nombre = %s)
-
-            """,
-
-            (hoy, barberia_id, usuario, usuario),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], 0
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas cliente")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_barbero(barberia_id=None, barbero_id=None):
-
-    """Fast cached barber metrics with optimized queries.
-
-
-    SECURITY: Always uses current context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not barbero_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0
-
-
-    try:
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        hoy = datetime.now().date()
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
-
-                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos
-
-            FROM reservas 
-
-            WHERE barberia_id = %s AND barbero_id = %s
-
-            """,
-
-            (hoy, barberia_id, barbero_id),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2]
-
-        return 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas barbero")
-
-        return 0, 0, 0
-
-@st.cache_data(ttl=45)
-
-def calcular_metricas_admin(barberia_id=None):
-
-    """Fast cached admin metrics with optimized queries.
-
-
-    SECURITY: Always uses current context.
-
-    """
-
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id or not st.session_state.get("db_available", True):
-
-        return 0, 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Single query for all metrics - SAFE wrapper ensures barberia_id filter
-
-        metrics = safe_fetch_one(
-
-            """
-
-            SELECT 
-
-                COUNT(*) as total_reservas,
-
-                COUNT(CASE WHEN fecha = %s THEN 1 END) as hoy_reservas,
-
-                COALESCE(SUM(CASE WHEN pagado = TRUE THEN monto ELSE precio END), 0) as total_ingresos,
-
-                (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO') as num_barberos
-
-            FROM reservas 
-
-            WHERE barberia_id = %s
-
-            """,
-
-            (hoy, barberia_id, barberia_id),
-
-        )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2], metrics[3]
-
-        return 0, 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas admin")
-
-        return 0, 0, 0, 0
-
-@st.cache_data(ttl=60)
-
-def calcular_metricas_super_admin(barberia_id=None):
-
-    """Fast cached super admin metrics - respects context (single barberia or global).
-
-
-    SECURITY: Uses current barberia context if set, otherwise respects super_admin_all_barberias flag.
-
-    """
-
-    if not st.session_state.get("db_available", True):
-
-        return 0, 0, 0, 0, 0
-
-
-    try:
-
-        hoy = datetime.now().date()
-
-
-        # Check if SUPER_ADMIN is viewing all barberias or specific context
-
-        viewing_all = st.session_state.get("super_admin_all_barberias", False)
-
-
-        if viewing_all:
-
-            # GLOBAL metrics - no barberia_id filter (SUPER_ADMIN chose to view all)
-
-            # This is authorized for SUPER_ADMIN role, uses safe_fetch_one which exempts global queries
-
-            metrics = safe_fetch_one(
-
-                """
-
-                SELECT 
-
-                    (SELECT COUNT(*) FROM barberias) as num_barberias,
-
-                    (SELECT COUNT(*) FROM usuarios) as num_usuarios,
-
-                    (SELECT COUNT(*) FROM reservas) as num_reservas,
-
-                    COALESCE((SELECT SUM(monto) FROM reservas WHERE pagado = TRUE), 0) as total_ingresos,
-
-                    (SELECT COUNT(*) FROM reservas WHERE DATE(inicio) = %s) as hoy_count
-
-                """,
-
-                (hoy,),
-
-            )
-
-        else:
-
-            # CONTEXT metrics - filter by barberia_id (SUPER_ADMIN selected a specific barberia)
-
-            # SECURITY: Use get_current_barberia_id() instead of parameter
-
-            barberia_id = get_current_barberia_id()
-
-            if not barberia_id:
-
-                return 0, 0, 0, 0, 0
-
-
-            metrics = safe_fetch_one(
-
-                """
-
-                SELECT 
-
-                    (SELECT COUNT(*) FROM barberias WHERE id = %s) as num_barberias,
-
-                    (SELECT COUNT(*) FROM usuarios WHERE barberia_id = %s) as num_usuarios,
-
-                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s) as num_reservas,
-
-                    COALESCE((SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE), 0) as total_ingresos,
-
-                    (SELECT COUNT(*) FROM reservas WHERE barberia_id = %s AND DATE(inicio) = %s) as hoy_count
-
-                """,
-
-                (barberia_id, barberia_id, barberia_id, barberia_id, barberia_id, hoy),
-
-            )
-
-
-        if metrics:
-
-            return metrics[0], metrics[1], metrics[2], metrics[3], metrics[4]
-
-        return 0, 0, 0, 0, 0
-
-    except Exception as e:
-
-        logger.exception("Error calculando métricas super admin")
-
-        return 0, 0, 0, 0, 0
-
+# ================= MÉTRICAS HELPERS (moved to app_core/metrics.py) =================
+from app_core.metrics import (
+    calcular_metricas_header,
+    calcular_metricas_cliente,
+    calcular_metricas_barbero,
+)
 def render_dashboard_cards(col_count, cards_data):
 
-    """Renderiza cards de métricas con layout flexible."""
+    """Renderiza métricas con el sistema premium unificado."""
 
     cols = st.columns(col_count)
 
@@ -4490,230 +2453,115 @@ def render_dashboard_cards(col_count, cards_data):
 
         with col:
 
-            st.metric(card["label"], card["value"], card.get("delta", None))
+            render_metric_card(
+                card["label"],
+                card["value"],
+                delta=card.get("delta", None),
+                icon=card.get("icon", "•"),
+                color=card.get("color", Colors.PRIMARY),
+                size=card.get("size", "medium"),
+            )
 
-# ================= MULTI-BARBERIA PUBLIC ACCESS =================
 
-def obtener_barberia_por_slug(slug):
+def render_internal_section_header(title, subtitle, eyebrow=None, meta=None):
 
-    """Get barberia by slug for public booking."""
+    """Normaliza encabezados internos entre roles."""
 
-    if not slug:
+    render_panel_header(title, subtitle, eyebrow=eyebrow, meta=meta)
 
-        return None
 
-    try:
+def render_upcoming_appointments_summary(title, reservas, limit=5):
 
-        result = fetch_one(
+    """Renderiza próximas citas con un bloque premium reutilizable."""
 
-            """SELECT id, nombre, slug, telefono, email, ciudad, direccion, 
+    if not reservas:
+        render_panel_empty_state(
+            title,
+            "No hay citas próximas para mostrar en este momento.",
+        )
+        return
 
-                      latitud, longitud, color_primario, logo_url, 
+    render_subsection_title(title)
 
-                      hora_apertura, hora_cierre, estado 
+    for reserva in reservas[:limit]:
+        hora_val = reserva[4] if isinstance(reserva, tuple) else reserva.get("hora")
+        cliente_val = (reserva[5] or reserva[6]) if isinstance(reserva, tuple) else (reserva.get("cliente") or reserva.get("nombre"))
+        servicio_val = reserva[2] if isinstance(reserva, tuple) else reserva.get("servicio")
+        barbero_val = reserva[1] if isinstance(reserva, tuple) else reserva.get("barbero")
 
-               FROM barberias WHERE slug = %s""",
+        hora_str = hora_val.strftime("%H:%M") if hasattr(hora_val, "strftime") else str(hora_val or "--:--")
+        persona_label = cliente_val or barbero_val or "Agenda"
+        if cliente_val and barbero_val and cliente_val != barbero_val:
+            persona_label = f"{cliente_val} · {barbero_val}"
 
-            (slug,),
-
+        render_appointment_block(
+            hora_str,
+            servicio_val or "Servicio",
+            persona_label,
+            30,
+            status="scheduled",
         )
 
-        if result:
 
-            return {
+def render_income_summary_card(total, title="Ingresos totales"):
 
-                "id": result[0],
-
-                "nombre": result[1],
-
-                "slug": result[2],
-
-                "telefono": result[3],
-
-                "email": result[4],
-
-                "ciudad": result[5],
-
-                "direccion": result[6],
-
-                "latitud": result[7],
-
-                "longitud": result[8],
-
-                "color_primario": result[9],
-
-                "logo_url": result[10],
-
-                "hora_apertura": result[11],
-
-                "hora_cierre": result[12],
-
-                "estado": result[13],
-
-            }
-
-        return None
-
-    except Exception as e:
-
-        logger.exception(f"Error getting barberia by slug: {str(e)}")
-
-        return None
-
-def obtener_servicios(barberia_id=None):
-
-    """Load services from database for a barberia.
+    render_metric_card(
+        title,
+        f"${total}",
+        icon="$",
+        color=Colors.SUCCESS,
+        size="medium",
+    )
 
 
-    SECURITY: Always uses current barberia context - prevents service leakage between barberias.
+def render_income_breakdown(barberos_list, get_income_fn):
 
-    """
+    items = []
 
-    # SECURITY: Always use current context
-
-    barberia_id = get_current_barberia_id()
-
-    if not barberia_id:
-
-        return []
-
-    try:
-
-        results = safe_fetch_all(
-
-            """SELECT id, nombre, duracion_minutos, precio, descripcion, icono 
-
-               FROM servicios 
-
-               WHERE barberia_id = %s 
-
-               ORDER BY id ASC""",
-
-            (barberia_id,),
-
+    for barbero_id_val, barbero_name in barberos_list:
+        ingreso = get_income_fn(barbero_id_val)
+        items.append(
+            f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:{Spacing.SM} 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:{Colors.TEXT}; font-weight:600;">{barbero_name}</span>
+                <span style="color:{Colors.SUCCESS}; font-weight:700;">${ingreso}</span>
+            </div>
+            """
         )
 
-        servicios_list = []
-
-        for row in results:
-
-            servicios_list.append({
-
-                "id": row[0],
-
-                "nombre": row[1],
-
-                "duracion": row[2],
-
-                "precio": row[3],
-
-                "descripcion": row[4],
-
-                "icono": row[5] or "Servicio",
-
-            })
-
-        # If no services in DB, return empty list (UI will show message)
-
-        return servicios_list
-
-    except Exception as e:
-
-        logger.exception(f"Error loading services for barberia {barberia_id}: {e}")
-
-        return []
+    render_card(
+        "".join(items) if items else "<p style='margin:0;'>Sin datos disponibles.</p>",
+        title="Desglose por barbero",
+        class_name="premium-card",
+    )
 
 
-def crear_servicio(barberia_id, nombre, duracion, precio, descripcion, icono):
+def _load_agenda_service_catalog(barberia_id):
+    """Load agenda service options from the active catalog, with a safe fallback."""
+    servicios_db = obtener_servicios(barberia_id) if barberia_id else []
+    catalogo = {}
 
-    """Insert a new service for a barberia. Returns True on success."""
+    for servicio in servicios_db or []:
+        nombre = (servicio.get("nombre") or "").strip()
+        if not nombre:
+            continue
+        catalogo[nombre] = {
+            "precio": int(servicio.get("precio") or 0),
+            "duracion": int(servicio.get("duracion") or 30),
+        }
 
-    current = get_current_barberia_id()
+    if catalogo:
+        return catalogo, False
 
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in crear_servicio")
-
-    try:
-
-        execute_write(
-
-            """INSERT INTO servicios (barberia_id, nombre, duracion_minutos, precio, descripcion, icono)
-               VALUES (%s, %s, %s, %s, %s, %s)
-               ON CONFLICT (barberia_id, nombre) DO NOTHING""",
-
-            (barberia_id, nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip()),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error creating service: {e}")
-
-        return False
+    return dict(servicios), True
 
 
-def actualizar_servicio(servicio_id, barberia_id, nombre, duracion, precio, descripcion, icono):
-
-    """Update an existing service. Enforces barberia_id ownership."""
-
-    current = get_current_barberia_id()
-
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in actualizar_servicio")
-
-    try:
-
-        execute_write(
-
-            """UPDATE servicios
-               SET nombre = %s, duracion_minutos = %s, precio = %s, descripcion = %s, icono = %s
-               WHERE id = %s AND barberia_id = %s""",
-
-            (nombre.strip(), int(duracion), int(precio), descripcion.strip(), icono.strip(), int(servicio_id), int(barberia_id)),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error updating service {servicio_id}: {e}")
-
-        return False
-
-
-def eliminar_servicio(servicio_id, barberia_id):
-
-    """Delete a service. Enforces barberia_id ownership."""
-
-    current = get_current_barberia_id()
-
-    if int(barberia_id) != int(current):
-
-        raise Exception("SECURITY: barberia_id mismatch in eliminar_servicio")
-
-    try:
-
-        execute_write(
-
-            "DELETE FROM servicios WHERE id = %s AND barberia_id = %s",
-
-            (int(servicio_id), int(barberia_id)),
-
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.exception(f"Error deleting service {servicio_id}: {e}")
-
-        return False
-
+# ================= MULTI-BARBERIA PUBLIC ACCESS (moved to app_core/services/servicios_service.py) =================
+from app_core.services.servicios_service import (
+    barberia_es_publicable,
+    obtener_barberia_por_slug,
+    obtener_servicios,
+)
 # ================= BARBER SHOP REGISTRATION FLOW (PRODUCTION) =================
 
 # --------- GEOCODING FUNCTIONS ---------
@@ -4867,257 +2715,6 @@ def validate_barbers(barbers):
 
 
     return [], valid_barbers
-
-def check_barberia_name_exists(nombre):
-
-    """Check if barber shop name already exists."""
-
-    try:
-
-        existing = fetch_one(
-
-            "SELECT id FROM barberias WHERE LOWER(nombre) = LOWER(%s) LIMIT 1",
-
-            (nombre,)
-
-        )
-
-        return existing is not None
-
-    except Exception as e:
-
-        logger.warning(f"Error checking barberia name: {str(e)}")
-
-        return False
-
-# --------- DATABASE FUNCTIONS ---------
-
-def create_barberia_in_db(data):
-
-    """Create barberia record in database. Returns barberia_id or None."""
-
-    # Generate slug: lowercase, replace spaces with hyphens, handle special chars
-
-    nombre = data["nombre"].lower()
-
-    slug = nombre.replace(" ", "-").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("?", "u").replace("ñ", "n")
-
-    slug = "".join(c for c in slug if c.isalnum() or c in "-_")  # Remove special chars
-
-
-    try:
-
-        result = execute_write(
-
-            """
-
-            INSERT INTO barberias 
-
-            (nombre, slug, telefono, email, ciudad, direccion, latitud, longitud,
-
-             color_primario, hora_apertura, hora_cierre, logo_url, estado)
-
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-
-            RETURNING id
-
-            """,
-
-            (
-
-                data["nombre"],
-
-                slug,
-
-                data["telefono"],
-
-                data["email"],
-
-                data["ciudad"],
-
-                data.get("direccion") or None,
-
-                data.get("latitud"),
-
-                data.get("longitud"),
-
-                data["color_primario"],
-
-                data["hora_apertura"],
-
-                data["hora_cierre"],
-
-                data["logo_url"] or None,
-
-                "activa"
-
-            ),
-
-            fetch_one_result=True
-
-        )
-
-
-        if result and result[0]:
-
-            logger.info(f"[OK] Barbería creada: {data['nombre']} (ID: {result[0]}, Slug: {slug})")
-
-            return result[0]
-
-        return None
-
-    except Exception as e:
-
-        logger.exception(f"Error creating barberia: {str(e)}")
-
-        return None
-
-def create_admin_user_in_db(barberia_id, slug, telefono):
-
-    """Create admin user. Returns (username, password) or (None, None)."""
-
-    admin_user = f"admin_{slug}"
-
-    admin_password = "admin123"
-
-    admin_hash = hash_password(admin_password)
-
-
-    try:
-
-        execute_write(
-
-            """
-
-            INSERT INTO usuarios (usuario, password, rol, barberia_id, telefono)
-
-            VALUES (%s, %s, %s, %s, %s)
-
-            """,
-
-            (admin_user, admin_hash, "ADMIN", barberia_id, telefono)
-
-        )
-
-        logger.info(f"[OK] Admin user creado: {admin_user}")
-
-        return admin_user, admin_password
-
-    except Exception as e:
-
-        logger.exception(f"Error creating admin user: {str(e)}")
-
-        return None, None
-
-def create_services_in_db(barberia_id, services):
-
-    """Create services. Returns count of created services."""
-
-    count = 0
-
-    try:
-
-        for service in services:
-
-            execute_write(
-
-                """
-
-                INSERT INTO servicios 
-
-                (barberia_id, nombre, duracion_minutos, precio, icono)
-
-                VALUES (%s, %s, %s, %s, %s)
-
-                """,
-
-                (
-
-                    barberia_id,
-
-                    service["nombre"],
-
-                    service["duracion"],
-
-                    int(service["precio"]),
-
-                    "Servicio"
-
-                )
-
-            )
-
-            count += 1
-
-        logger.info(f"[OK] Servicios creados: {count}")
-
-        return count
-
-    except Exception as e:
-
-        logger.exception(f"Error creating services: {str(e)}")
-
-        return 0
-
-def create_barbers_in_db(barberia_id, barbers):
-
-    """Create barber users. Returns dict of username:password pairs."""
-
-    barber_passwords = {}
-
-    try:
-
-        for barber in barbers:
-
-            barber_password = f"barber_{barber['usuario'][:3]}123"
-
-            barber_hash = hash_password(barber_password)
-
-            nombre_completo = f"{barber['nombre']} {barber['apellido']}"
-
-
-            execute_write(
-
-                """
-
-                INSERT INTO usuarios (usuario, password, rol, barberia_id, telefono, nombre, apellido)
-
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-
-                """,
-
-                (
-
-                    barber["usuario"],
-
-                    barber_hash,
-
-                    "BARBERO",
-
-                    barberia_id,
-
-                    None,
-
-                    barber["nombre"],
-
-                    barber["apellido"]
-
-                )
-
-            )
-
-            barber_passwords[barber["usuario"]] = barber_password
-
-
-        logger.info(f"[OK] Barberos creados: {len(barber_passwords)}")
-
-        return barber_passwords
-
-    except Exception as e:
-
-        logger.exception(f"Error creating barbers: {str(e)}")
-
-        return {}
 
 # --------- UI RENDER FUNCTIONS ---------
 
@@ -5770,7 +3367,10 @@ def render_success_screen():
 
             st.code(f"{usuario}: {password}", language="text")
 
-        st.caption("📍 Cada barbero debe cambiar su contraseña al primer acceso")
+        render_public_note(
+            "Cada barbero debe cambiar su contraseña al primer acceso.",
+            note_type="info",
+        )
 
 
     # Next steps
@@ -6909,43 +4509,54 @@ def render_modal_booking(barberia):
                 # Save booking to database
 
                 try:
+                    fecha_raw = str(st.session_state.modal_booking_data.get("fecha") or "").strip()
+                    hora_raw = str(st.session_state.modal_booking_data.get("hora") or "").strip()
+                    servicio = st.session_state.modal_booking_data.get("servicio")
+                    precio = int(st.session_state.modal_booking_data.get("precio") or 0)
+                    duracion = int(st.session_state.modal_booking_data.get("duracion") or 0)
 
-                    reserva_id = execute_write(
+                    if not fecha_raw or not hora_raw or not servicio or precio <= 0 or duracion <= 0:
+                        st.error("Faltan datos de la reserva. Vuelve a seleccionar servicio, fecha y hora.")
+                        return
 
-                        """INSERT INTO reservas 
+                    inicio = datetime.fromisoformat(f"{fecha_raw} {hora_raw}")
+                    fin = inicio + timedelta(minutes=duracion)
+                    barbero_placeholder = "Sin asignar"
 
-                        (barberia_id, cliente, telefono, email, servicio, fecha, hora, estado, pagado)
-
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-
-                        RETURNING id""",
-
+                    reserva_row = safe_execute(
+                        """
+                        INSERT INTO reservas (
+                            nombre, barbero, barbero_id, servicio, precio, inicio, fin, barberia_id,
+                            cliente, telefono, email, fecha, hora, estado, monto, pagado
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                        """,
                         (
-
-                            barberia_id,
-
                             nombre,
-
+                            barbero_placeholder,
+                            None,
+                            servicio,
+                            precio,
+                            inicio,
+                            fin,
+                            barberia_id,
+                            nombre,
                             telefono,
-
                             email or None,
-
-                            st.session_state.modal_booking_data.get("servicio"),
-
-                            st.session_state.modal_booking_data.get("fecha"),
-
-                            st.session_state.modal_booking_data.get("hora"),
-
+                            inicio.date(),
+                            inicio.time(),
                             "confirmada",
-
-                            False
-
+                            precio,
+                            False,
                         ),
-
                         fetch_one_result=True
-
                     )
-
+                    reserva_id = (
+                        reserva_row[0]
+                        if isinstance(reserva_row, (tuple, list))
+                        else reserva_row
+                    )
 
                     if reserva_id:
 
@@ -6974,82 +4585,6 @@ def render_modal_booking(barberia):
 
     st.markdown('</div></div>', unsafe_allow_html=True)
 
-def obtener_todas_barberias(ciudad=None, servicio=None):
-
-    """Fetch all public barberias with optional filters."""
-
-    try:
-
-        query = "SELECT id, nombre, slug, telefono, email, ciudad, direccion, latitud, longitud, color_primario, logo_url, hora_apertura, hora_cierre, estado FROM barberias WHERE estado = %s"
-
-        params = ["active"]
-
-
-        if ciudad and ciudad.strip():
-
-            query += " AND LOWER(ciudad) LIKE LOWER(%s)"
-
-            params.append(f"%{ciudad.strip()}%")
-
-
-        # TODO: Implement servicio filter by joining with servicios table
-
-        # if servicio and servicio.strip():
-
-        #     query += " AND id IN (SELECT DISTINCT barberia_id FROM servicios WHERE LOWER(nombre) LIKE LOWER(%s))"
-
-        #     params.append(f"%{servicio.strip()}%")
-
-
-        query += " ORDER BY nombre ASC"
-
-
-        results = fetch_all(query, tuple(params))
-
-        barberias_list = []
-
-        for row in results:
-
-            barberias_list.append({
-
-                "id": row[0],
-
-                "nombre": row[1],
-
-                "slug": row[2],
-
-                "telefono": row[3],
-
-                "email": row[4],
-
-                "ciudad": row[5],
-
-                "direccion": row[6],
-
-                "latitud": float(row[7]) if row[7] else None,
-
-                "longitud": float(row[8]) if row[8] else None,
-
-                "color_primario": row[9],
-
-                "logo_url": row[10],
-
-                "hora_apertura": row[11],
-
-                "hora_cierre": row[12],
-
-                "estado": row[13],
-
-            })
-
-        return barberias_list
-
-    except Exception as e:
-
-        logger.exception(f"Error fetching barberias: {e}")
-
-        return []
-
 def render_barberia_card(barberia, index):
 
     """Render a marketplace card for a single barberia."""
@@ -7065,19 +4600,19 @@ def render_barberia_card(barberia, index):
 
         .barberia-card-{index} {{
 
-            background: white;
+            background: linear-gradient(135deg, #101114 0%, #16181d 100%);
 
-            border: 1px solid #e0e0e0;
+            border: 1px solid rgba(197,159,85,0.18);
 
-            border-radius: 12px;
+            border-radius: 16px;
 
-            padding: 16px;
+            padding: 18px;
 
-            margin-bottom: 12px;
+            margin-bottom: 14px;
 
             transition: all 0.3s ease;
 
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 
         }}
 
@@ -7086,9 +4621,9 @@ def render_barberia_card(barberia, index):
 
             transform: translateY(-4px);
 
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 22px 48px rgba(0, 0, 0, 0.36);
 
-            border-color: #667eea;
+            border-color: rgba(197,159,85,0.42);
 
         }}
 
@@ -7112,7 +4647,7 @@ def render_barberia_card(barberia, index):
 
             font-weight: 600;
 
-            color: #1a1a1a;
+            color: #f5f0e8;
 
             margin: 0;
 
@@ -7121,9 +4656,9 @@ def render_barberia_card(barberia, index):
 
         .card-rating-{index} {{
 
-            background: #ffd700;
+            background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%);
 
-            color: #333;
+            color: #080808;
 
             padding: 4px 8px;
 
@@ -7138,7 +4673,7 @@ def render_barberia_card(barberia, index):
 
         .card-meta-{index} {{
 
-            color: #666;
+            color: rgba(245,240,232,0.78);
 
             font-size: 14px;
 
@@ -7157,7 +4692,7 @@ def render_barberia_card(barberia, index):
 
             gap: 8px;
 
-            color: #555;
+            color: rgba(245,240,232,0.86);
 
             font-size: 13px;
 
@@ -7172,9 +4707,9 @@ def render_barberia_card(barberia, index):
 
             padding: 10px;
 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%);
 
-            color: white;
+            color: #080808;
 
             border: none;
 
@@ -7195,7 +4730,7 @@ def render_barberia_card(barberia, index):
 
             transform: scale(1.02);
 
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 12px 28px rgba(197,160,40,0.32);
 
         }}
 
@@ -7206,7 +4741,7 @@ def render_barberia_card(barberia, index):
 
     # Card HTML - with rating stars (placeholder for future integration)
 
-    rating_stars = "­" * min(5, max(1, 4))  # Placeholder: 4 stars
+    rating_stars = "★" * 4
 
 
     card_html = f"""
@@ -7223,19 +4758,19 @@ def render_barberia_card(barberia, index):
 
         <div class="card-meta-{index}">
 
-            Teléfono: {barberia.get('telefono', 'N/A')}
+            Contacto · {barberia.get('telefono', 'N/A')}
 
         </div>
 
         <div class="card-address-{index}">
 
-            Dirección: {barberia.get('direccion', 'Dirección no disponible')}
+            Ubicación · {barberia.get('direccion', 'Dirección no disponible')}
 
         </div>
 
         <div class="card-meta-{index}">
 
-            Ciudad: {barberia.get('ciudad', 'N/A')}
+            Ciudad · {barberia.get('ciudad', 'N/A')}
 
         </div>
 
@@ -7326,9 +4861,10 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_left:
 
-        st.markdown(f"### Resultados ({len(barberias)} barberías)")
-
-        st.markdown("")
+        render_section_block(
+            "Barberías disponibles",
+            f"{len(barberias)} opciones para revisar y agendar.",
+        )
 
 
         for idx, barberia in enumerate(barberias):
@@ -7340,9 +4876,10 @@ def render_marketplace_results(servicio_busqueda="", ubicacion_busqueda=""):
 
     with col_right:
 
-        st.markdown("### Mapa")
-
-        st.markdown("")
+        render_section_block(
+            "Mapa",
+            "Ubicaciones disponibles para esta búsqueda.",
+        )
 
 
         # Prepare map data (Streamlit's st.map expects lat/lon in dataframe)
@@ -7440,18 +4977,14 @@ def render_home_screen():
 
     # ===== MAIN OPTIONS SECTION =====
 
-    st.markdown("---")
-
-    st.markdown("")
-
-
     col_center = st.columns([1, 2, 1])
 
     with col_center[1]:
 
-        st.markdown("<h2 style='text-align: center;'>¿Qué deseas hacer?</h2>", unsafe_allow_html=True)
-
-        st.markdown("")
+        render_section_block(
+            "Elige tu siguiente paso",
+            "Accede a tu panel, crea tu barbería o agenda una nueva cita.",
+        )
 
 
         col1, col2, col3 = st.columns(3, gap="large")
@@ -7623,19 +5156,46 @@ def render_landing_publico(barberia):
 
     render_public_landing_hero(barberia)
 
+    col_cta_primary, col_cta_secondary = st.columns([1.25, 1], gap="large")
+    with col_cta_primary:
+        st.markdown('<div class="public-primary-cta">', unsafe_allow_html=True)
+        hero_cta_clicked = st.button(
+            "Reservar ahora en pocos pasos",
+            key="barberia_hero_cta_button",
+            use_container_width=True,
+            type="primary",
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="public-secondary-cta-note"><strong>Empieza aqui.</strong> Elige servicio, barbero y horario sin perder el contexto de la barberia.</p>',
+            unsafe_allow_html=True,
+        )
+    with col_cta_secondary:
+        render_alert(
+            "Proceso claro y rapido: revisa servicios, elige horario y confirma tu cita desde esta misma pagina.",
+            alert_type="info",
+            title="Reserva online disponible",
+        )
+
+    if hero_cta_clicked:
+        st.session_state[landing_key] = False
+        st.session_state.booking_step = 1
+        st.session_state["public_barberia_nombre"] = barberia_name
+        st.rerun()
+
     st.markdown("""
     <div class="public-trust-grid">
         <div class="public-trust-card">
-            <h3>Reserva en segundos</h3>
-            <p>Elige servicio, barbero y horario desde tu teléfono.</p>
+            <h3>Proceso rapido</h3>
+            <p>Empiezas a reservar en pocos pasos y sin formularios innecesarios.</p>
         </div>
         <div class="public-trust-card">
-            <h3>Confirmación inmediata</h3>
-            <p>Recibe el detalle de tu cita y mantén tu hora organizada.</p>
+            <h3>Todo claro antes de confirmar</h3>
+            <p>Servicio, barbero, horario y pago se muestran de forma simple y ordenada.</p>
         </div>
         <div class="public-trust-card">
-            <h3>Atención profesional</h3>
-            <p>Una experiencia clara, rápida y confiable de principio a fin.</p>
+            <h3>Disponibilidad visible</h3>
+            <p>Avanzas directo a los horarios disponibles de esta barberia sin perder contexto.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -7646,120 +5206,92 @@ def render_landing_publico(barberia):
     if servicios_list:
 
         render_public_section_heading(
-            "Elige tu servicio",
-            "Selecciona una categoría y continúa con tu barbero y horario.",
+            "Servicios destacados",
+            "Entiende rapido que incluye cada opcion y reserva desde la misma card si ya sabes cual quieres.",
         )
-
-
-        # Display services in responsive grid - CLICKABLE
-
-        num_services = len(servicios_list)
-
-        if num_services == 1:
-
-            cols = st.columns(1)
-
-            cols_list = [cols]
-
-        elif num_services == 2:
-
-            cols = st.columns(2, gap="large")
-
-            cols_list = cols
-
-        else:
-
-            cols = st.columns(min(3, num_services), gap="large")
-
-            cols_list = cols
-
+        cols = st.columns(min(3, max(1, len(servicios_list))), gap="large")
 
         for idx, servicio in enumerate(servicios_list):
-
-            col = cols_list[idx % len(cols_list)] if isinstance(cols_list[0], object) else cols_list[idx]
-
+            col = cols[idx % len(cols)]
 
             with col:
-
-                # Format price with thousand separator
-
                 precio_formateado = f"${servicio['precio']:,}".replace(",", ".")
-
-
-                # Clickable service button - looks like card, acts like button
-
+                descripcion = html.escape((servicio.get("descripcion") or "Reserva este servicio y elige tu horario en el siguiente paso.").strip())
+                icono = html.escape(str(servicio.get("icono") or "SV").strip()[:2])
+                servicio_nombre = html.escape(servicio["nombre"])
+                st.markdown(
+                    f"""
+                    <div class="public-service-shell">
+                        <div class="public-service-kicker">{icono}</div>
+                        <h3>{servicio_nombre}</h3>
+                        <p class="public-service-description">{descripcion}</p>
+                        <div class="public-service-meta">
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Que es</span>
+                                <span class="public-service-meta-value">{servicio_nombre}</span>
+                            </div>
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Duracion</span>
+                                <span class="public-service-meta-value">{servicio['duracion']} min</span>
+                            </div>
+                            <div class="public-service-meta-row">
+                                <span class="public-service-meta-label">Precio</span>
+                                <span class="public-service-meta-value">{precio_formateado}</span>
+                            </div>
+                        </div>
+                        <p class="public-service-footer">Continua con barbero y horario sin perder el contexto de la barberia.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
                 button_clicked = st.button(
-
-                    label=f"{servicio.get('icono') or 'Servicio'}  {servicio['nombre']}\n\n{servicio.get('descripcion', '')}\n\n{servicio['duracion']} min · {precio_formateado}",
-
+                    f"Reservar {servicio['nombre']}",
                     key=f"service_card_{servicio['id']}",
-
                     use_container_width=True,
-
-                    help=f"Seleccionar {servicio['nombre']}"
-
+                    help=f"Seleccionar {servicio['nombre']}",
                 )
 
                 if button_clicked:
-
                     st.session_state.preselected_service = {
-
                         "nombre": servicio["nombre"],
-
                         "duracion": servicio["duracion"],
-
                         "precio": servicio["precio"],
-
                     }
-
                     st.session_state[landing_key] = False
-
                     st.session_state.booking_step = 2  # Skip to barber selection
-
+                    st.session_state["public_barberia_nombre"] = barberia_name
                     st.rerun()
 
     else:
 
-        st.info("Los servicios se mostrarán aquí una vez configurados")
-
-
-    render_public_section_heading(
-        "Agenda tu próxima cita",
-        "También puedes comenzar sin elegir servicio y decidir en el primer paso.",
-    )
-
-
-    col_btn_1, col_btn_2, col_btn_3 = st.columns([1, 2, 1])
-
-    with col_btn_2:
-
-        st.markdown('<div class="public-cta">', unsafe_allow_html=True)
-
-        cta_clicked = st.button(
-
-            "Agendar mi cita",
-
-            key="barberia_cta_button",
-
-            use_container_width=True,
-
-            help="Comienza tu reserva ahora",
-
+        render_alert(
+            "Los servicios se mostrarán aquí una vez configurados.",
+            alert_type="info",
+            title="Catálogo en preparación",
         )
 
-        st.markdown('</div>', unsafe_allow_html=True)
 
+    cta_clicked = render_cta_section(
+        f"Reserva online en {barberia_name}",
+        "Si todavia no decides el servicio, entra igual: veras opciones, horarios y el siguiente paso con claridad.",
+        button_text="Empezar reserva",
+        button_key="barberia_cta_button",
+        icon="Agenda",
+    )
 
-        if cta_clicked:
+    if cta_clicked:
 
-            st.session_state[landing_key] = False
+        st.session_state[landing_key] = False
 
-            st.session_state.booking_step = 1  # Go to service selection
+        st.session_state.booking_step = 1  # Go to service selection
+        st.session_state["public_barberia_nombre"] = barberia_name
 
-            st.rerun()
+        st.rerun()
 
-
-    st.caption("Barbería profesional · Barberos expertos · Reserva online")
+    render_public_note(
+        "Barbería profesional · Barberos expertos · Reserva online",
+        note_type="info",
+    )
 
 def render_booking_publico(barberia_slug):
 
@@ -7769,23 +5301,50 @@ def render_booking_publico(barberia_slug):
 
     barberia = obtener_barberia_por_slug(barberia_slug)
 
-    if not barberia:
-
-        st.error("Barbería no encontrada")
-
+    if not barberia_es_publicable(barberia):
+        st.session_state.public_mode = False
+        apply_public_booking_css()
+        render_public_section_heading(
+            "Barberia no disponible",
+            "No pudimos abrir esta pagina publica con el enlace recibido.",
+        )
+        render_alert(
+            "Verifica el enlace o vuelve al inicio para elegir una barberia disponible.",
+            alert_type="warning",
+            title="No encontramos una barberia publica activa",
+        )
+        volver_inicio = render_cta_section(
+            "Volver al inicio",
+            "Puedes regresar a la portada publica y continuar desde una barberia disponible.",
+            button_text="Ir al inicio",
+            button_key="public_barberia_invalid_back_home",
+            icon="OK",
+        )
+        render_public_note(
+            "Si el enlace es correcto pero sigue sin funcionar, contacta a la barberia directamente.",
+            warning=False,
+        )
+        if volver_inicio:
+            st.query_params.clear()
+            st.session_state.view = "home"
+            st.rerun()
         st.stop()
-
         return
 
 
     barberia_id = barberia["id"]
+    st.session_state["public_barberia_nombre"] = barberia.get("nombre", "Barberia")
+    barberia_ciudad = (barberia.get("ciudad") or "").strip()
+    page_title = f"Reserva en {barberia['nombre']}"
+    if barberia_ciudad:
+        page_title = f"{page_title} | {barberia_ciudad}"
 
 
     # Set page config
 
     st.set_page_config(
 
-        page_title=f"Reserva en {barberia['nombre']}",
+        page_title=page_title,
 
         page_icon="Barberia",
 
@@ -7797,10 +5356,7 @@ def render_booking_publico(barberia_slug):
 
 
     # Store barberia context in session state temporarily
-
-    st.session_state.barberia_id = barberia_id
-
-    st.session_state.public_mode = True
+    apply_public_barberia_context(barberia_id)
 
 
     # Initialize landing page state - use barberia-specific key
@@ -7832,51 +5388,89 @@ def render_booking_publico(barberia_slug):
         normalizar_texto=normalizar_texto,
     )
 
+
+def render_public_screen(screen_key, default_barberia_id, db_ok):
+    """Render public screens while keeping app.py as the final orchestrator."""
+
+    if screen_key == "home":
+        render_home_screen()
+        return True
+
+    if screen_key == "login":
+        st.markdown("""<style>
+.stApp { background: #080808 !important; }
+section[data-testid="stSidebar"] { display: none !important; }
+div[data-testid="stForm"] { background: #141414 !important; border: 1px solid rgba(197,159,85,0.25) !important; border-radius: 12px !important; padding: 24px !important; }
+div[data-testid="stTextInput"] input { background: #1a1a1a !important; color: #f5f0e8 !important; border: 1px solid rgba(197,159,85,0.3) !important; border-radius: 8px !important; }
+div[data-testid="stTextInput"] label { color: #c5a028 !important; }
+div[data-testid="stForm"] button[kind="primaryFormSubmit"] { background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%) !important; color: #080808 !important; font-weight: 700 !important; border: none !important; border-radius: 8px !important; }
+h3 { color: #f5f0e8 !important; }
+</style>""", unsafe_allow_html=True)
+
+        col_center = st.columns([1, 2, 1])
+        with col_center[1]:
+            if st.button("Volver al inicio", key="back_to_home"):
+                st.session_state.view = "home"
+                st.rerun()
+
+            st.markdown("### Accede a tu cuenta")
+
+            with st.form("login_form"):
+                usuario = st.text_input("Usuario", placeholder="Tu usuario")
+                password = st.text_input("Contraseña", type="password", placeholder="Tu contraseña")
+                entrar = st.form_submit_button("Entrar", use_container_width=True, disabled=not db_ok)
+
+            if entrar:
+                try:
+                    with st.spinner("Verificando credenciales..."):
+                        session_result = login_and_prepare_session(
+                            usuario,
+                            password,
+                            default_barberia_id,
+                        )
+
+                        if session_result:
+                            st.success("¡Bienvenido!")
+                            st.rerun()
+                        else:
+                            st.error("[ERROR] Datos incorrectos. Intenta nuevamente.")
+                except Exception as e:
+                    logger.exception("Error en login")
+                    st.error(f"Error en login: {str(e)}")
+        return True
+
+    if screen_key == "registro":
+        render_registro_barberia()
+        return True
+
+    if screen_key == "reserva":
+        st.set_page_config(layout="wide")
+        col_center = st.columns([1, 2, 1])
+        with col_center[1]:
+            if st.button("Volver al inicio", key="back_to_home_res"):
+                st.session_state.view = "home"
+                st.rerun()
+
+            flujo_reserva_publica(
+                obtener_servicios=obtener_servicios,
+                insertar_reserva_con_fecha_hora=insertar_reserva_con_fecha_hora,
+                crear_pago_mercadopago=crear_pago_mercadopago,
+                normalizar_texto=normalizar_texto,
+            )
+        return True
+
+    return False
+
 # ================= BOOKING WITHOUT LOGIN =================
 
 # ------------------ LOGIN ------------------
 
 try:
 
-    if "user" not in st.session_state:
-
-        st.session_state.user = None
-
-    if "rol" not in st.session_state:
-
-        st.session_state.rol = "CLIENTE"
-
-    if "barberia_id" not in st.session_state:
-
-        st.session_state.barberia_id = default_barberia_id
-
-    if "barberia_context_id" not in st.session_state:
-
-        st.session_state.barberia_context_id = default_barberia_id
-
-    if "super_admin_all_barberias" not in st.session_state:
-
-        st.session_state.super_admin_all_barberias = False
-
-    if "reserva_seleccionada_id" not in st.session_state:
-
-        st.session_state.reserva_seleccionada_id = None
-
-    if "mostrar_detalles_reserva" not in st.session_state:
-
-        st.session_state.mostrar_detalles_reserva = False
-
-    if "view" not in st.session_state:
-
-        st.session_state.view = "home"
-
-    if "public_mode" not in st.session_state:
-
-        st.session_state.public_mode = False
-
-    st.session_state["db_available"] = is_db_available()
-
-    db_ok = st.session_state["db_available"]
+    db_ok = ensure_session_defaults(
+        default_barberia_id,
+        db_available=is_db_available(),
+    )
 
     render_modo_sin_db_banner()
 
@@ -7898,8 +5492,10 @@ try:
     else:
 
         # Reset barberia_id to default when no slug (to prevent carryover from previous public booking)
-
-        st.session_state.barberia_id = default_barberia_id
+        if st.session_state.get("user"):
+            st.session_state.public_mode = False
+        else:
+            reset_public_barberia_context(default_barberia_id)
 
 
     # ===== LOGIN SCREEN =====
@@ -7913,176 +5509,26 @@ try:
 
     # If user is already logged in, skip auth screens and go to main app
 
-    if st.session_state.get("user") and st.session_state.view in ["home", "login", "registro", "reserva"]:
+    dispatch_decision = resolve_screen_dispatch(
+        default_barberia_id,
+        current_view=st.session_state.get("view"),
+    )
+    if dispatch_decision and dispatch_decision.get("resolved_view") != st.session_state.get("view"):
+        st.session_state.view = dispatch_decision["resolved_view"]
+    if dispatch_decision and dispatch_decision.get("should_rerun"):
+        st.rerun()
 
-        st.session_state.view = st.session_state.get("view", "dashboard")
-
-        # Force navigation to appropriate dashboard
-
-        if st.session_state.get("user_role") == "SUPER_ADMIN":
-
-            st.session_state.view = "dashboard_admin"
-
-        elif st.session_state.get("user_role") == "BARBERO":
-
-            st.session_state.view = "dashboard_barbero"
-
-        else:
-
-            st.session_state.view = "dashboard"
+    screen_key = dispatch_decision["screen_key"] if dispatch_decision else "home"
+    screen_group = dispatch_decision["screen_group"] if dispatch_decision else "public"
 
 
     # Route based on view state
 
-    if st.session_state.view == "home":
-
-        render_home_screen()
-
-
-    elif st.session_state.view == "login":
-
-        # Show login form
-
-        st.markdown("""<style>
-.stApp { background: #080808 !important; }
-section[data-testid="stSidebar"] { display: none !important; }
-div[data-testid="stForm"] { background: #141414 !important; border: 1px solid rgba(197,159,85,0.25) !important; border-radius: 12px !important; padding: 24px !important; }
-div[data-testid="stTextInput"] input { background: #1a1a1a !important; color: #f5f0e8 !important; border: 1px solid rgba(197,159,85,0.3) !important; border-radius: 8px !important; }
-div[data-testid="stTextInput"] label { color: #c5a028 !important; }
-div[data-testid="stForm"] button[kind="primaryFormSubmit"] { background: linear-gradient(135deg, #c5a028 0%, #8a6e17 100%) !important; color: #080808 !important; font-weight: 700 !important; border: none !important; border-radius: 8px !important; }
-h3 { color: #f5f0e8 !important; }
-</style>""", unsafe_allow_html=True)
-
-        col_center = st.columns([1, 2, 1])
-
-        with col_center[1]:
-
-            if st.button("Volver al inicio", key="back_to_home"):
-
-                st.session_state.view = "home"
-
-                st.rerun()
-
-            st.markdown("### Accede a tu cuenta")
-
-            with st.form("login_form"):
-
-                usuario = st.text_input("Usuario", placeholder="Tu usuario")
-
-                password = st.text_input("Contraseña", type="password", placeholder="Tu contraseña")
-
-                entrar = st.form_submit_button("Entrar", use_container_width=True, disabled=not db_ok)
-
-            if entrar:
-
-                try:
-
-                    with st.spinner("Verificando credenciales..."):
-
-                        user = login(usuario, password)
-
-                        if user:
-
-                            st.session_state.user = user
-
-                            st.session_state.user_id = user[0]
-
-                            raw_rol = user[3] if len(user) > 3 else None
-
-                            st.session_state.rol = normalizar_rol(raw_rol)
-
-                            st.session_state.user_role = st.session_state.rol
-
-                            nr_login = st.session_state.rol
-
-                            if nr_login == "SUPER_ADMIN":
-
-                                st.session_state.barberia_id = None
-
-                                with st.spinner("Cargando barberías..."):
-
-                                    fb = fetch_one("SELECT id FROM barberias ORDER BY id LIMIT 1")
-
-                                st.session_state.barberia_context_id = fb[0] if fb else None
-
-                                st.session_state.super_admin_all_barberias = False
-
-                                st.session_state.view = "dashboard_admin"
-
-                            elif nr_login == "BARBERO":
-
-                                bid_u = user[5] if len(user) > 5 else None
-
-                                st.session_state.barberia_id = bid_u or default_barberia_id
-
-                                st.session_state.barberia_context_id = st.session_state.barberia_id
-
-                                st.session_state.view = "dashboard_barbero"
-
-                            else:
-
-                                bid_u = user[5] if len(user) > 5 else None
-
-                                st.session_state.barberia_id = bid_u or default_barberia_id
-
-                                st.session_state.barberia_context_id = st.session_state.barberia_id
-
-                                st.session_state.view = "dashboard"
-
-                            st.success("¡Bienvenido!")
-
-                            st.rerun()
-
-                        else:
-
-                            st.error("[ERROR] Datos incorrectos. Intenta nuevamente.")
-
-                except Exception as e:
-
-                    logger.exception("Error en login")
-
-                    st.error(f"Error en login: {str(e)}")
-
-
-    elif st.session_state.view == "registro":
-
-        # Show professional barber registration flow
-
-        render_registro_barberia()
-
-
-    elif st.session_state.view == "reserva":
-
-        # Show public booking
-
-        st.set_page_config(layout="wide")
-
-        col_center = st.columns([1, 2, 1])
-
-        with col_center[1]:
-
-            if st.button("Volver al inicio", key="back_to_home_res"):
-
-                st.session_state.view = "home"
-
-                st.rerun()
-
-            flujo_reserva_publica(
-                obtener_servicios=obtener_servicios,
-                insertar_reserva_con_fecha_hora=insertar_reserva_con_fecha_hora,
-                crear_pago_mercadopago=crear_pago_mercadopago,
-                normalizar_texto=normalizar_texto,
-            )
-
-
-    elif st.session_state.view in ["dashboard_admin", "dashboard_barbero", "dashboard"]:
-
-        # User is logged in, proceed to main app
-
-        pass
-
-
-    else:
+    if screen_group == "public":
+        if not render_public_screen(screen_key, default_barberia_id, db_ok):
+            st.session_state.view = "home"
+            st.rerun()
+    elif screen_group != "authenticated":
 
         # Default to home if view is unknown
 
@@ -8095,562 +5541,188 @@ h3 { color: #f5f0e8 !important; }
 
     # Otherwise, if user is logged in but no valid view, redirect to dashboard
 
-    if st.session_state.get("user") and st.session_state.view not in ["home", "login", "registro", "reserva"]:
-
-        # Proceed to main app (don't stop here)
-
-        pass
-
-    elif st.session_state.get("user") and st.session_state.view in ["home", "login", "registro", "reserva"]:
-
-        # User logged in but on public view - redirect
-
-        if st.session_state.get("user_role") == "SUPER_ADMIN":
-
-            st.session_state.view = "dashboard_admin"
-
-        elif st.session_state.get("user_role") == "BARBERO":
-
-            st.session_state.view = "dashboard_barbero"
-
-        else:
-
-            st.session_state.view = "dashboard"
-
-        st.rerun()
-
-    elif not st.session_state.get("user"):
-
-        # User not logged in, stop here
-
+    if dispatch_decision and dispatch_decision.get("should_stop"):
         st.stop()
 
     # ===== MAIN APP (Only runs if logged in) =====
 
-    apply_internal_panel_css()
+    def render_authenticated_shell(default_barberia_id, db_ok):
 
-    user = st.session_state.get("user")
+        apply_internal_panel_css()
 
-    usuario = user[1] if user and len(user) > 1 else None
+        user = st.session_state.get("user")
+        usuario = user[1] if user and len(user) > 1 else None
+        nr = st.session_state.get("rol", "CLIENTE")
 
-    # Always use normalized role from session state
+        if not nr:
 
-    nr = st.session_state.get("rol", "CLIENTE")
+            st.session_state.rol = "CLIENTE"
+            nr = "CLIENTE"
 
-    if not nr:
+        barberia_id = st.session_state.get("barberia_id")
+        bid_ctx = effective_barberia_id()
 
-        st.session_state.rol = "CLIENTE"
+        if not db_ok:
 
-        nr = "CLIENTE"
+            st.warning(
+                "La base de datos no está disponible. Estás en modo demo: la interfaz se muestra, "
+                "pero no se pueden crear ni modificar reservas ni consultar datos en vivo."
+            )
 
-    barberia_id = st.session_state.get("barberia_id")
-
-    bid_ctx = effective_barberia_id()
-
-    if not db_ok:
-
-        st.warning(
-
-            "La base de datos no está disponible. Estás en modo demo: la interfaz se muestra, "
-
-            "pero no se pueden crear ni modificar reservas ni consultar datos en vivo."
-
-        )
-
-    # ===== SIDEBAR =====
-
-    with st.sidebar:
-
-        st.markdown("## Barbería Leveling")
-
-        st.markdown(f"**{usuario or 'Invitado'}**")
-
-        st.caption(f"Rol: {nr.replace('_', ' ')}")
-
-        barberia_name = "Principal"
-
-        if barberia_id:
-
-            if "barberia_name" not in st.session_state or st.session_state.get("cached_barberia_id") != barberia_id:
-
-                with st.spinner("Cargando barbería..."):
-
-                    b_name_row = fetch_one("SELECT nombre FROM barberias WHERE id = %s", (barberia_id,))
-
-                st.session_state.barberia_name = b_name_row[0] if b_name_row else "Principal"
-
-                st.session_state.cached_barberia_id = barberia_id
-
-            barberia_name = st.session_state.barberia_name
-
-        st.markdown(f"**Barbería:** {barberia_name}")
-
-        st.markdown("---")
-
+        barberia_name = get_cached_barberia_name(barberia_id, default_name="Principal")
+        current_context_label = barberia_name
         if nr == "SUPER_ADMIN":
-
-            st.markdown("### Contexto")
-
-            try:
-
-                if "barberias_list" not in st.session_state:
-
-                    with st.spinner("Cargando barberías..."):
-
-                        b_list = fetch_all("SELECT id, nombre FROM barberias ORDER BY nombre") or []
-
-                    st.session_state.barberias_list = b_list
-
-                else:
-
-                    b_list = st.session_state.barberias_list
-
-
-                if b_list and len(b_list) > 0:
-
-                    etiquetas = {f"{r[1]}": r[0] for r in b_list}
-
-                    claves = list(etiquetas.keys())
-
-
-                    # Ensure valid index
-
-                    idx = 0
-
-                    if st.session_state.barberia_context_id is not None:
-
-                        barberia_ids = list(etiquetas.values())
-
-                        if st.session_state.barberia_context_id in barberia_ids:
-
-                            idx = barberia_ids.index(st.session_state.barberia_context_id)
-
-                        else:
-
-                            idx = 0 if len(barberia_ids) > 0 else 0
-
-
-                    # Ensure index is within bounds
-
-                    idx = min(idx, len(claves) - 1) if claves else 0
-
-
-                    if len(claves) > 0:
-
-                        sel_lab = st.selectbox("Barbería activa", claves, index=idx, key="super_sel_barb")
-
-                        st.session_state.barberia_context_id = etiquetas[sel_lab]
-
-                    else:
-
-                        st.warning("No hay barberías disponibles")
-
-                else:
-
-                    st.warning("No hay barberías registradas en el sistema")
-
-                    st.session_state.barberia_context_id = None
-
-            except Exception as e:
-
-                logger.exception("Error loading barberia context for SUPER_ADMIN")
-
-                st.error(f"Error cargando contexto de barbería: {str(e)}")
-
-                st.session_state.barberia_context_id = None
-
-
-            try:
-
-                st.session_state.super_admin_all_barberias = st.checkbox(
-
-                    "Ver todas las barberías",
-
-                    value=st.session_state.get("super_admin_all_barberias", False),
-
-                    key="chk_super_all",
-
+            if st.session_state.get("super_admin_all_barberias"):
+                current_context_label = "Todas las barberias"
+            elif st.session_state.get("barberia_context_id"):
+                current_context_label = get_cached_barberia_name(
+                    st.session_state.get("barberia_context_id"),
+                    default_name=barberia_name,
                 )
 
-            except Exception as e:
+        with st.sidebar:
 
-                logger.exception("Error in SUPER_ADMIN checkbox")
+            st.markdown("## Barbería Leveling")
 
-                st.session_state.super_admin_all_barberias = False
-
+            render_sidebar_section(
+                "Cuenta",
+                [
+                    (usuario or "Invitado", "usuario", "Cuenta"),
+                    (nr.replace("_", " "), "rol", "Rol"),
+                    (current_context_label if nr == "SUPER_ADMIN" else barberia_name, "barberia", "Barberia"),
+                ],
+            )
 
             st.markdown("---")
 
+            if nr == "SUPER_ADMIN":
 
-        # ===== DEBUG: VERIFY BARBERIA_ID ISOLATION =====
+                try:
+                    with st.spinner("Cargando barberías..."):
+                        b_list, etiquetas, claves, idx = load_super_admin_context_options()
 
-        st.markdown("### Navegación")
+                    if claves:
+                        sel_lab = st.selectbox("Barbería activa", claves, index=idx, key="super_sel_barb")
+                        st.session_state.barberia_context_id = etiquetas[sel_lab]
+                        current_context_label = sel_lab
+                    elif b_list:
+                        st.warning("No hay barberías disponibles")
+                        current_context_label = "Sin barberia activa"
+                    else:
+                        st.warning("No hay barberías registradas en el sistema")
+                        st.session_state.barberia_context_id = None
+                        current_context_label = "Sin barberia activa"
 
-        nav_opts = ["Dashboard", "Agenda", "Barberos", "Configuración"]
+                except Exception as e:
 
-        if nr in ("ADMIN", "SUPER_ADMIN"):
+                    logger.exception("Error loading barberia context for SUPER_ADMIN")
+                    st.error(f"Error cargando contexto de barbería: {str(e)}")
+                    st.session_state.barberia_context_id = None
+                    current_context_label = "Sin barberia activa"
 
-            nav_opts = [
-                "Dashboard",
-                "Agenda",
-                "Barberos",
-                "Servicios",
-                "Clientes",
-                "Sitio Web",
-                "Complementos",
-                "Configuración",
-            ]
+                try:
 
-        elif nr == "BARBERO":
+                    st.session_state.super_admin_all_barberias = st.checkbox(
+                        "Ver todas las barberías",
+                        value=st.session_state.get("super_admin_all_barberias", False),
+                        key="chk_super_all",
+                    )
 
-            nav_opts = ["Dashboard", "Agenda", "Configuración"]
+                except Exception as e:
 
-        if nr == "CLIENTE":
+                    logger.exception("Error in SUPER_ADMIN checkbox")
+                    st.session_state.super_admin_all_barberias = False
 
-            nav_opts = ["Dashboard", "Agenda"]
+                context_scope_label = (
+                    "Vista global"
+                    if st.session_state.get("super_admin_all_barberias")
+                    else "Vista por barberia"
+                )
+                if st.session_state.get("super_admin_all_barberias"):
+                    current_context_label = "Todas las barberias"
 
-        nav_labels = {
-            "Dashboard": "Visión general",
-            "Agenda": "Agenda y calendario",
-            "Barberos": "Equipo",
-            "Servicios": "Servicios",
-            "Clientes": "Clientes",
-            "Sitio Web": "Sitio Web",
-            "Complementos": "Complementos",
-            "Configuración": "Configuración",
+                render_sidebar_section(
+                    "Contexto activo",
+                    [
+                        (current_context_label, "contexto_barberia", "Barberia activa"),
+                        (context_scope_label, "contexto_scope", "Alcance"),
+                    ],
+                    active_item="contexto_barberia",
+                )
+
+                st.markdown("---")
+
+            st.markdown("### Navegación")
+
+            nav_opts = ["Dashboard", "Agenda", "Barberos", "Configuración"]
+
+            if nr in ("ADMIN", "SUPER_ADMIN"):
+
+                nav_opts = [
+                    "Dashboard",
+                    "Agenda",
+                    "Barberos",
+                    "Servicios",
+                    "Clientes",
+                    "Sitio Web",
+                    "Complementos",
+                    "Configuración",
+                ]
+
+            elif nr == "BARBERO":
+
+                nav_opts = ["Dashboard", "Agenda", "Configuración"]
+
+            if nr == "CLIENTE":
+
+                nav_opts = ["Dashboard", "Agenda"]
+
+            nav_labels = {
+                "Dashboard": "Visión general",
+                "Agenda": "Agenda y calendario",
+                "Barberos": "Equipo",
+                "Servicios": "Servicios",
+                "Clientes": "Clientes",
+                "Sitio Web": "Sitio Web",
+                "Complementos": "Complementos",
+                "Configuración": "Configuración",
+            }
+
+            nav_key = f"nav_main_{nr}"
+
+            if st.session_state.get(nav_key) not in nav_opts:
+
+                st.session_state[nav_key] = nav_opts[0]
+
+            seccion = st.radio(
+                "Navegación principal",
+                nav_opts,
+                key=nav_key,
+                label_visibility="collapsed",
+                format_func=lambda item: nav_labels.get(item, item),
+            )
+
+            render_sidebar_section(
+                "Vista actual",
+                [(nav_labels.get(seccion, seccion), "vista_actual", "Seccion")],
+                active_item="vista_actual",
+            )
+
+            st.markdown("---")
+
+            if st.button("Cerrar sesión", use_container_width=True, type="secondary"):
+                logout_and_reset_session(default_barberia_id)
+                st.rerun()
+
+        return {
+            "user": user,
+            "usuario": usuario,
+            "nr": nr,
+            "barberia_id": barberia_id,
+            "bid_ctx": effective_barberia_id(),
+            "barberia_name": current_context_label if nr == "SUPER_ADMIN" else barberia_name,
+            "seccion": seccion,
         }
-
-        nav_key = f"nav_main_{nr}"
-
-        if st.session_state.get(nav_key) not in nav_opts:
-
-            st.session_state[nav_key] = nav_opts[0]
-
-        seccion = st.radio(
-            "Navegación principal",
-            nav_opts,
-            key=nav_key,
-            label_visibility="collapsed",
-            format_func=lambda item: nav_labels.get(item, item),
-        )
-
-        st.markdown("---")
-
-        if st.button("Cerrar sesión", use_container_width=True, type="secondary"):
-
-            st.session_state.user = None
-
-            st.session_state.barberia_id = None
-
-            st.session_state.barberia_context_id = None
-
-            st.rerun()
-
-    def render_equipo_barberos(barberia_id):
-
-        """Render barber team as cards with create and delete actions."""
-
-        if not db_ok or not barberia_id:
-
-            render_alert("Gestión de equipo no disponible sin base de datos", alert_type="info")
-
-            return
-
-        # --- Card CSS ---
-
-        st.markdown("""<style>
-.barbero-card {
-    background: #1a1a1a;
-    border: 1px solid rgba(197,159,85,0.2);
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.barbero-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #c5a028, #8a6e17);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    font-weight: 700;
-    color: #080808;
-    flex-shrink: 0;
-    text-transform: uppercase;
-}
-.barbero-info { flex: 1; }
-.barbero-nombre { font-size: 17px; font-weight: 600; color: #f5f0e8; margin: 0; }
-.barbero-rol { font-size: 13px; color: rgba(197,159,85,0.8); margin: 2px 0 0 0; }
-</style>""", unsafe_allow_html=True)
-
-        # --- Create new barber form ---
-
-        render_subsection_title("Agregar barbero")
-
-        with st.form("form_crear_barbero_equipo", clear_on_submit=True):
-
-            col_u, col_p = st.columns(2)
-
-            with col_u:
-
-                nuevo_usuario = st.text_input("Nombre de usuario", placeholder="Ej: carlos")
-
-            with col_p:
-
-                nueva_password = st.text_input("Contraseña", type="password")
-
-            crear_btn = st.form_submit_button("Agregar al equipo", use_container_width=True, type="primary")
-
-        if crear_btn:
-
-            if not nuevo_usuario or not nuevo_usuario.strip():
-
-                st.error("El nombre de usuario es obligatorio.")
-
-            elif not nueva_password or len(nueva_password) < 4:
-
-                st.error("La contraseña debe tener al menos 4 caracteres.")
-
-            else:
-
-                ok = registrar(nuevo_usuario.strip(), nueva_password, "BARBERO", barberia_id=barberia_id)
-
-                if ok:
-
-                    st.success(f"Barbero '{nuevo_usuario}' añadido al equipo.")
-
-                    st.rerun()
-
-        render_divider()
-
-        # --- Barber cards ---
-
-        render_subsection_title("Equipo registrado")
-
-        with st.spinner("Cargando equipo..."):
-
-            barberos_data = listar_usuarios_barberos(barberia_id)
-
-        if not barberos_data:
-
-            render_panel_empty_state(
-
-                "Sin barberos aún",
-
-                "Usa el formulario de arriba para añadir el primer barbero al equipo.",
-
-            )
-
-            return
-
-        for row in barberos_data:
-
-            bid_barber, bname = row[0], row[1]
-
-            inicial = bname[0].upper() if bname else "B"
-
-            st.markdown(
-
-                f'<div class="barbero-card">'
-
-                f'<div class="barbero-avatar">{inicial}</div>'
-
-                f'<div class="barbero-info">'
-
-                f'<p class="barbero-nombre">{bname}</p>'
-
-                f'<p class="barbero-rol">Barbero</p>'
-
-                f'</div></div>',
-
-                unsafe_allow_html=True,
-
-            )
-
-            col_space, col_del = st.columns([4, 1])
-
-            with col_del:
-
-                if st.button("Eliminar", key=f"del_barbero_{bid_barber}", type="secondary", use_container_width=True):
-
-                    try:
-
-                        execute_write(
-
-                            "DELETE FROM usuarios WHERE id = %s AND barberia_id = %s AND UPPER(TRIM(rol)) = 'BARBERO'",
-
-                            (int(bid_barber), int(barberia_id)),
-
-                        )
-
-                        st.success(f"Barbero '{bname}' eliminado.")
-
-                        st.rerun()
-
-                    except Exception as _e:
-
-                        logger.exception(f"Error eliminando barbero {bid_barber}")
-
-                        st.error("Error al eliminar el barbero.")
-
-    def render_gestion_servicios(barberia_id):
-
-        """Render CRUD UI for services management in admin/super_admin panels."""
-
-        if not db_ok or not barberia_id:
-
-            render_alert("Gestión de servicios no disponible sin base de datos", alert_type="info")
-
-            return
-
-        # --- Load current services ---
-
-        servicios_actuales = safe_fetch_all(
-
-            "SELECT id, nombre, duracion_minutos, precio, descripcion, icono FROM servicios WHERE barberia_id = %s ORDER BY id ASC",
-
-            (barberia_id,),
-
-        )
-
-        # --- Add new service form ---
-
-        render_subsection_title("Agregar servicio")
-
-        with st.form("form_crear_servicio", clear_on_submit=True):
-
-            col_n, col_d, col_p = st.columns([3, 2, 2])
-
-            with col_n:
-
-                nuevo_nombre = st.text_input("Nombre del servicio", max_chars=80)
-
-            with col_d:
-
-                nueva_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=30, step=5)
-
-            with col_p:
-
-                nuevo_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=0, step=100)
-
-            nueva_descripcion = st.text_input("Descripción (opcional)", max_chars=200)
-
-            nuevo_icono = st.text_input("Icono / etiqueta (opcional)", value="Servicio", max_chars=40)
-
-            guardar = st.form_submit_button("Agregar servicio", use_container_width=True, type="primary")
-
-        if guardar:
-
-            if not nuevo_nombre or not nuevo_nombre.strip():
-
-                st.error("El nombre del servicio es obligatorio.")
-
-            else:
-
-                ok = crear_servicio(barberia_id, nuevo_nombre, nueva_duracion, nuevo_precio, nueva_descripcion or "", nuevo_icono or "Servicio")
-
-                if ok:
-
-                    st.success(f"Servicio '{nuevo_nombre}' creado correctamente.")
-
-                    st.rerun()
-
-                else:
-
-                    st.error("Error al crear el servicio. Verifica que el nombre no esté duplicado.")
-
-        render_divider()
-
-        # --- List + edit/delete ---
-
-        render_subsection_title("Servicios registrados")
-
-        if not servicios_actuales:
-
-            render_panel_empty_state(
-
-                "Sin servicios aún",
-
-                "Agrega un servicio con el formulario de arriba y aparecerá aquí y en el flujo de reservas.",
-
-            )
-
-            return
-
-        for row in servicios_actuales:
-
-            sid, snombre, sduracion, sprecio, sdesc, sicono = row
-
-            with st.expander(f"{sicono or 'Servicio'} — {snombre} | {sduracion} min | ${sprecio}", expanded=False):
-
-                with st.form(f"form_editar_{sid}", clear_on_submit=False):
-
-                    col_en, col_ed, col_ep = st.columns([3, 2, 2])
-
-                    with col_en:
-
-                        edit_nombre = st.text_input("Nombre", value=snombre, max_chars=80, key=f"en_{sid}")
-
-                    with col_ed:
-
-                        edit_duracion = st.number_input("Duración (min)", min_value=5, max_value=480, value=int(sduracion or 30), step=5, key=f"ed_{sid}")
-
-                    with col_ep:
-
-                        edit_precio = st.number_input("Precio ($)", min_value=0, max_value=999999, value=int(sprecio or 0), step=100, key=f"ep_{sid}")
-
-                    edit_desc = st.text_input("Descripción", value=sdesc or "", max_chars=200, key=f"edesc_{sid}")
-
-                    edit_icono = st.text_input("Icono / etiqueta", value=sicono or "Servicio", max_chars=40, key=f"eico_{sid}")
-
-                    col_save, col_del = st.columns(2)
-
-                    with col_save:
-
-                        update_btn = st.form_submit_button("Guardar cambios", use_container_width=True, type="primary")
-
-                    with col_del:
-
-                        delete_btn = st.form_submit_button("Eliminar servicio", use_container_width=True, type="secondary")
-
-                if update_btn:
-
-                    if not edit_nombre or not edit_nombre.strip():
-
-                        st.error("El nombre no puede estar vacío.")
-
-                    else:
-
-                        ok = actualizar_servicio(sid, barberia_id, edit_nombre, edit_duracion, edit_precio, edit_desc or "", edit_icono or "Servicio")
-
-                        if ok:
-
-                            st.success("Servicio actualizado.")
-
-                            st.rerun()
-
-                        else:
-
-                            st.error("Error al actualizar el servicio.")
-
-                if delete_btn:
-
-                    ok = eliminar_servicio(sid, barberia_id)
-
-                    if ok:
-
-                        st.success(f"Servicio '{snombre}' eliminado.")
-
-                        st.rerun()
-
-                    else:
-
-                        st.error("Error al eliminar el servicio.")
 
     def _panel_ingresos(bid):
 
@@ -8660,7 +5732,7 @@ h3 { color: #f5f0e8 !important; }
 
             return
 
-        total_row = fetch_one(
+        total_row = safe_fetch_one(
 
             "SELECT SUM(precio) FROM reservas WHERE barberia_id = %s",
 
@@ -8674,22 +5746,23 @@ h3 { color: #f5f0e8 !important; }
 
             total = 0
 
-        st.metric("Total generado", f"${total if total else 0}")
+        render_income_summary_card(total if total else 0, "Total generado")
 
-    # ================= CLIENTE =================
-
-    if nr == "CLIENTE":
+    def render_cliente_content(seccion, barberia_id, usuario, user, db_ok, barberia_name):
 
         if not barberia_id:
 
             st.warning("No hay barberia asociada a la sesión.")
-
             st.stop()
 
         if seccion == "Dashboard":
 
-            render_section_title("Mi panel", subtitle="Visualiza tus reservas y métricas")
-
+            render_internal_section_header(
+                "Mi panel",
+                "Visualiza tus reservas y métricas.",
+                eyebrow="Cliente",
+                meta=barberia_name,
+            )
 
             if not db_ok:
 
@@ -8700,64 +5773,41 @@ h3 { color: #f5f0e8 !important; }
                 with st.spinner("Cargando métricas..."):
 
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
-
                     total_reservas, hoy_reservas, _ = calcular_metricas_cliente(barberia_id, usuario)
-
                     num_barberos_cached = len(listar_usuarios_barberos(barberia_id))
 
-
-                # Dashboard metrics with new design system
-
                 render_metric_grid([
-                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
-                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
-                    ("Pendientes", pendientes_hoy, "Espera", Colors.WARNING),
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
                 ], columns=3)
 
-
                 render_divider()
-
-
                 render_subsection_title("Resumen de actividad")
-
                 render_metric_grid([
-                    ("Total", total_reservas, "📊", Colors.SECONDARY),
-                    ("Hoy", hoy_reservas, "📆", Colors.PRIMARY),
-                    ("Ingresos", "$0", "Ingresos", Colors.SUCCESS),
-                    ("Barberos", num_barberos_cached, "Tijeras", Colors.WARNING),
+                    ("Total", total_reservas, "Total", Colors.SECONDARY),
+                    ("Hoy", hoy_reservas, "Agenda", Colors.PRIMARY),
+                    ("Ingresos", "$0", "$", Colors.SUCCESS),
+                    ("Barberos", num_barberos_cached, "Equipo", Colors.WARNING),
                 ], columns=4)
-
-
                 render_divider()
-
-
                 render_subsection_title("Información útil")
-
                 col_tip1, col_tip2 = st.columns(2, gap="large")
-
                 with col_tip1:
-
                     render_alert("Obtén descuento cada 5 cortes", alert_type="success", title="Beneficio de fidelización")
-
                 with col_tip2:
-
                     render_alert("Cancela con 1 hora de anticipación para evitar penalización", alert_type="info", title="Política de cancelación")
 
         elif seccion == "Agenda":
 
-            render_section_title("Mi agenda", subtitle="Gestiona tus citas")
+            render_internal_section_header(
+                "Mi agenda",
+                "Gestiona tus citas.",
+                eyebrow="Cliente",
+                meta=barberia_name,
+            )
 
-            tab_calendario, tab_crear, tab_lista = st.tabs([
-
-                "Calendario",
-
-                "Nueva reserva",
-
-                "Listado"
-
-            ])
-
-            # TAB: CALENDARIO
+            tab_calendario, tab_crear, tab_lista = st.tabs(["Calendario", "Nueva reserva", "Listado"])
 
             with tab_calendario:
 
@@ -8766,282 +5816,148 @@ h3 { color: #f5f0e8 !important; }
                     with st.spinner("Cargando tu calendario..."):
 
                         mis_reservas_raw = listar_reservas_filtradas(barberia_id, "CLIENTE", usuario)
-
-                        # Convertir a formato para calendario
-
                         mis_reservas_dict = []
 
                         for r in mis_reservas_raw:
-
                             fecha = r.get("fecha")
-
                             hora = r.get("hora")
-
                             if fecha and hora:
-
                                 try:
-
                                     start_dt = datetime.combine(fecha, hora)
-
                                     end_dt = start_dt + timedelta(minutes=30)
-
                                     monto = r.get("monto") or r.get("precio") or 0
-
                                     pagado = bool(r.get("pagado", False))
-
                                     mis_reservas_dict.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
-
                                 except (TypeError, ValueError):
-
                                     continue
-
 
                         eventos_cliente = construir_eventos_calendario(mis_reservas_dict)
 
-
                     if eventos_cliente:
-
                         render_agenda_interactiva(eventos_cliente, read_only=True)
-
                     else:
-
                         st.info("No tienes reservas aún. ¡Crea una!")
 
                 else:
 
                     st.warning("Calendario no disponible sin base de datos.")
 
-            # TAB: CREAR NUEVA
-
             with tab_crear:
 
                 with st.container(border=True):
-
                     st.markdown("### Nueva reserva")
 
                     if not db_ok:
-
                         st.warning("No hay base de datos: no puedes crear reservas en modo demo.")
-
                     else:
-
                         with st.spinner("Cargando barberos disponibles..."):
-
                             barber_opts = [x[0] for x in listar_usuarios_barberos(barberia_id)] or list(barberos.keys())
 
-
-                        # Initialize session state for barber selection
-
                         if "cliente_barbero_sel_premium" not in st.session_state:
-
                             st.session_state.cliente_barbero_sel_premium = None
-
                         if "cliente_barber_loading" not in st.session_state:
-
                             st.session_state.cliente_barber_loading = False
 
-
-                        # Premium barber selection cards
-
                         st.markdown("#### Elige tu barbero")
-
+                        render_public_note("Selecciona un profesional para habilitar el formulario de reserva.")
                         barberos_list = [(name, name) for name in barber_opts]
-
-
                         cols = st.columns(min(3, len(barberos_list)))
-
                         barber_clicked = False
 
                         for idx, (barber_id, barber_name) in enumerate(barberos_list):
-
                             with cols[idx % len(cols)]:
-
                                 is_selected = st.session_state.cliente_barbero_sel_premium == barber_name
-
                                 if render_barber_card(
-
                                     barber_name=barber_name,
-
                                     barber_id=barber_id,
-
                                     availability="Disponible",
-
-                                    icon="Tijeras",
-
+                                    icon="scissors",
                                     is_selected=is_selected
-
                                 ):
-
                                     st.session_state.cliente_barbero_sel_premium = barber_name
-
                                     st.session_state.cliente_barber_loading = True
-
                                     barber_clicked = True
 
-
-                        # Show loading animation if a barber was just clicked
-
                         if st.session_state.cliente_barber_loading and not barber_clicked:
-
                             render_loading_panel(
                                 "Preparando formulario...",
                                 icon="Espera",
                                 padding="15px",
                                 top_margin="10px",
                             )
-
                             import time
-
                             time.sleep(0.15)
-
                             st.session_state.cliente_barber_loading = False
-
                             st.rerun()
-
                         elif barber_clicked:
-
                             st.rerun()
-
-
-                        # Only show form if barber is selected
 
                         if st.session_state.cliente_barbero_sel_premium:
-
                             render_divider(color=Colors.BORDER, height="2px", margin=Spacing.MD)
-
-
                             with st.form("form_reserva_cliente"):
-
                                 st.markdown("#### Detalles de la reserva")
-
-
-                                # Barber (pre-selected and read-only display)
-
-                                st.caption(f"**Barbero:** {st.session_state.cliente_barbero_sel_premium}")
-
-
+                                render_public_note(f"Barbero seleccionado: {st.session_state.cliente_barbero_sel_premium}")
                                 col2 = st.columns(1)[0]
-
                                 with col2:
-
                                     servicio_sel = st.selectbox("Servicio", list(servicios.keys()), key="cliente_servicio_sel")
-
-
                                 col3, col4 = st.columns(2)
-
                                 with col3:
-
                                     fecha_sel = st.date_input("Fecha", key="cliente_fecha_sel")
-
                                 with col4:
-
                                     hora_sel = st.time_input("Hora", value=datetime.strptime("10:00", "%H:%M").time(), key="cliente_hora_sel")
-
-
-                                st.caption(f"Cliente: **{usuario}**")
-
+                                render_public_note(f"Reserva para: {usuario}")
                                 enviar = st.form_submit_button("Reservar", use_container_width=True)
 
                             if enviar:
-
                                 with st.spinner("Procesando reserva..."):
-
                                     duracion = servicios[servicio_sel]["duracion"]
-
                                     precio = servicios[servicio_sel]["precio"]
-
                                     ok = insertar_reserva_con_fecha_hora(
-
                                         barberia_id,
-
                                         usuario,
-
                                         st.session_state.cliente_barbero_sel_premium,
-
                                         servicio_sel,
-
                                         fecha_sel,
-
                                         hora_sel,
-
                                         precio,
-
                                         duracion,
-
                                     )
-
                                     if ok:
-
                                         procesar_beneficio_fidelizacion(usuario, barberia_id)
-
                                         inicio_msg = datetime.combine(fecha_sel, hora_sel)
-
                                         telefono_cliente = user[4] if len(user) > 4 else obtener_telefono_usuario(usuario)
-
                                         if telefono_cliente:
-
                                             mensaje = construir_mensaje_reserva(
-
                                                 usuario, inicio_msg, st.session_state.cliente_barbero_sel_premium, servicio_sel
-
                                             )
-
                                             try:
-
                                                 enviar_whatsapp_twilio(telefono_cliente, mensaje)
-
                                             except Exception as exc:
-
                                                 logger.exception("Error al ejecutar el envio de WhatsApp: %s", exc)
-
                                     st.success("Reserva creada exitosamente")
-
                                     st.rerun()
 
-            # TAB: LISTADO
-
             with tab_lista:
-
                 st.markdown("### Tus reservas")
-
                 if not db_ok:
-
                     st.info("Lista de reservas no disponible sin base de datos.")
-
                 else:
-
                     with st.spinner("Cargando datos..."):
-
                         mis_reservas = listar_reservas_filtradas(barberia_id, "CLIENTE", usuario)
-
                     if mis_reservas:
-
                         mostrar_reservas_dataframe(mis_reservas)
-
-
-                        # Payment UI for unpaid reservations
-
                         ui_pagar_reserva(mis_reservas, barberia_id, usuario)
-
-
                         ui_eliminar_reserva_lista(mis_reservas, "cliente")
-
                     else:
-
                         st.info("Aún no tienes reservas. ¡Crea una!")
 
-    # ================= BARBERO =================
-
-    elif nr == "BARBERO":
+    def render_barbero_content(seccion, barberia_id, usuario, user, db_ok, barberia_name):
 
         if not barberia_id:
-
             st.warning("No hay barberia asociada a la sesión.")
-
             st.stop()
 
         if seccion == "Dashboard":
-
             render_panel_header(
                 "Visión general",
                 "Panel de control de cortes, agenda e ingresos.",
@@ -9049,104 +5965,36 @@ h3 { color: #f5f0e8 !important; }
                 meta=barberia_name,
             )
 
-
             if not db_ok:
-
                 render_alert("Métricas no disponibles sin base de datos", alert_type="info")
-
             else:
-
                 with st.spinner("Cargando métricas..."):
-
                     total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
-
                     total_reservas, hoy_reservas, total_ingresos = calcular_metricas_barbero(barberia_id, user[0])
 
-
-                # Dashboard metrics
-
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "Espera", Colors.WARNING)
-
-
+                render_metric_grid([
+                    ("Reservas Hoy", total_hoy, "Hoy", Colors.PRIMARY),
+                    ("Pagadas", pagadas_hoy, "Pago", Colors.SUCCESS),
+                    ("Pendientes", pendientes_hoy, "Pendiente", Colors.WARNING),
+                ], columns=3)
                 render_divider()
-
-
                 render_subsection_title("Rendimiento")
-
-                col_x, col_y, col_z = st.columns(3, gap="large")
-
-                with col_x:
-
-                    render_stat_box("Cortes", total_reservas, "Servicio", Colors.PRIMARY)
-
-                with col_y:
-
-                    render_stat_box("Hoy", hoy_reservas, "Hoy", Colors.SECONDARY)
-
-                with col_z:
-
-                    render_stat_box("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS)
-
-
+                render_metric_grid([
+                    ("Cortes", total_reservas, "Servicio", Colors.PRIMARY),
+                    ("Hoy", hoy_reservas, "Agenda", Colors.SECONDARY),
+                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
+                ], columns=3)
                 render_divider()
-
 
                 with st.spinner("Cargando próximas citas..."):
-
                     reservas_barbero = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
-
                     hoy = datetime.now().date()
-
                     hoy_reservas_list = [r for r in reservas_barbero if r[3] == hoy]
 
-
                 if hoy_reservas_list:
-
-                    render_subsection_title("Próximas citas (hoy)")
-
-                    for r in hoy_reservas_list[:5]:
-
-                        hora_str = r[4].strftime("%H:%M") if hasattr(r[4], "strftime") else str(r[4])
-
-                        cliente_str = r[5] or r[6]
-
-                        servicio_str = r[2]
-
-                        st.markdown(f"""
-
-                        <div style="
-
-                            background-color: {Colors.CARD};
-
-                            border-left: 4px solid {Colors.PRIMARY};
-
-                            padding: {Spacing.MD};
-
-                            border-radius: {BorderRadius.MD};
-
-                            margin-bottom: {Spacing.SM};
-
-                        ">
-
-                            <strong style="color: {Colors.PRIMARY};">Hora: {hora_str}</strong> - <span style="color: {Colors.TEXT};">{cliente_str}</span> ({servicio_str})
-                        </div>
-
-                        """, unsafe_allow_html=True)
+                    render_upcoming_appointments_summary("Próximas citas (hoy)", hoy_reservas_list)
 
         elif seccion == "Agenda":
-
             render_panel_header(
                 "Agenda y calendario",
                 "Gestiona tus reservas, disponibilidad y listado de citas.",
@@ -9154,880 +6002,432 @@ h3 { color: #f5f0e8 !important; }
                 meta=barberia_name,
             )
 
-
-            tab_cal, tab_crear, tab_lista = st.tabs([
-
-                "Calendario Calendario",
-
-                "Editar Crear/Editar",
-
-                "Listado Listado"
-
-            ])
-
-
-            # TAB: CALENDARIO
+            tab_cal, tab_crear, tab_lista = st.tabs(["Calendario", "Crear / Editar", "Listado"])
 
             with tab_cal:
-
                 if db_ok:
-
                     with st.spinner("Cargando datos..."):
-
                         eventos_barbero = obtener_reservas(usuario)
-
                     render_agenda_interactiva(eventos_barbero, usuario, read_only=False)
-
                 else:
-
                     st.warning("Calendario no disponible sin base de datos (modo demo).")
 
-
-            # TAB: CREAR/EDITAR
-
             with tab_crear:
-
                 render_gestion_agenda(usuario)
 
-
-            # TAB: LISTADO
-
             with tab_lista:
-
                 st.markdown("### Mis reservas")
-
-
-                # Toggle between card and calendar view
-
                 view_type = st.radio(
-
                     "Modo de vista",
-
-                    ["Tarjetas Tarjetas", "Calendario Calendario"],
-
+                    ["Tarjetas", "Calendario"],
                     horizontal=True,
-
                     key="barbero_view_type"
-
                 )
 
-
                 if not db_ok:
-
                     st.info("Tabla no disponible sin base de datos.")
-
                 else:
-
                     with st.spinner("Cargando tus reservas..."):
-
                         rows_bar = listar_reservas_filtradas(barberia_id, "BARBERO", usuario)
 
-
                     if rows_bar:
-
-                        if view_type == "Tarjetas Tarjetas":
-
+                        if view_type == "Tarjetas":
                             mostrar_reservas_dataframe(rows_bar)
-
                             ui_marcar_pagado_reservas(rows_bar, "barbero_panel")
-
                             ui_eliminar_reserva_lista(rows_bar, "barbero_panel")
-
-                        else:  # Calendar view
-
-                            # Convert rows to calendar format
-
+                        else:
                             reservas_calendar = []
-
                             for r in rows_bar:
-
                                 fecha = r.get("fecha")
-
                                 hora = r.get("hora")
-
                                 if fecha and hora:
-
                                     try:
-
                                         start_dt = datetime.combine(fecha, hora)
-
                                         end_dt = start_dt + timedelta(minutes=30)
-
                                         monto = r.get("monto") or r.get("precio") or 0
-
                                         pagado = bool(r.get("pagado", False))
-
                                         reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
-
                                     except (TypeError, ValueError):
-
                                         continue
 
-
                             mostrar_calendario_reservas(reservas_calendar)
-
                             st.markdown("---")
-
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
-
+                            render_public_note(
+                                "Vista semanal del calendario con navegación por flechas.",
+                            )
                     else:
-
-                        st.info("No hay reservas")
+                        st.info("No hay reservas para mostrar.")
 
         elif seccion == "Barberos":
-
-            render_section_title("Equipo", subtitle="Gestión de barberos")
-
+            render_internal_section_header(
+                "Equipo",
+                "Gestión de barberos.",
+                eyebrow="Barbero",
+                meta=barberia_name,
+            )
             render_alert("Solo el administrador de la barbería puede gestionar el equipo de barberos", alert_type="info")
 
         elif seccion == "Configuración":
-
             render_panel_header(
                 "Configuración",
                 "Preferencias y ajustes disponibles para tu cuenta.",
                 eyebrow="Ajustes",
-                meta=nr.replace("_", " "),
+                meta="BARBERO",
             )
-
             render_alert("Preferencias y ajustes próximamente", alert_type="info")
 
-    # ================= ADMIN =================
+    def render_admin_agenda_calendar_tab(eventos, db_ok):
+        if db_ok:
+            with st.spinner("Cargando calendario..."):
+                render_calendario_multi_barbero(eventos, read_only=not db_ok)
+        else:
+            st.warning("Calendario no disponible sin base de datos (modo demo).")
 
-    elif nr == "ADMIN":
+    def render_admin_agenda_income_tab(barberia_id, db_ok):
+        st.markdown("### Ingresos")
+        if not db_ok:
+            return
 
+        with st.spinner("Cargando datos..."):
+            total_row = safe_fetch_one(
+                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE",
+                (barberia_id,),
+            )
+            total = total_row[0] if total_row and total_row[0] else 0
+
+        render_income_summary_card(total, "Ingresos totales (pagado)")
+        st.markdown("---")
+        with st.spinner("Cargando desglose..."):
+            barberos_list = listar_usuarios_barberos(barberia_id)
+            render_income_breakdown(
+                barberos_list,
+                lambda barbero_id_val: (
+                    (safe_fetch_one(
+                        "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                        (barberia_id, barbero_id_val),
+                    ) or [0])[0] or 0
+                ),
+            )
+
+    def render_admin_agenda_section(barberia_id, usuario, db_ok, barberia_name):
+        render_panel_header(
+            "Agenda y calendario",
+            "Consulta reservas, crea citas y revisa ingresos desde una vista operativa.",
+            eyebrow="Agenda",
+            meta=barberia_name,
+        )
+
+        eventos = []
+        if db_ok:
+            try:
+                eventos = obtener_reservas()
+            except Exception as e:
+                logger.exception("Error fetching eventos for ADMIN")
+                eventos = []
+
+        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario", "Crear / Editar", "Listado", "Ingresos"])
+
+        with tab_cal:
+            render_admin_agenda_calendar_tab(eventos, db_ok)
+
+        with tab_crear:
+            render_gestion_agenda()
+
+        with tab_lista:
+            render_admin_agenda_list_tab(
+                barberia_id=barberia_id,
+                usuario=usuario,
+                db_ok=db_ok,
+                opciones_filtro_barberos_ui=opciones_filtro_barberos_ui,
+                listar_reservas_filtradas=listar_reservas_filtradas,
+                mostrar_reservas_dataframe=mostrar_reservas_dataframe,
+                ui_marcar_pagado_reservas=ui_marcar_pagado_reservas,
+                ui_eliminar_reserva_lista=ui_eliminar_reserva_lista,
+                mostrar_calendario_reservas=mostrar_calendario_reservas,
+                render_public_note=render_public_note,
+            )
+
+        with tab_ingresos:
+            render_admin_agenda_income_tab(barberia_id, db_ok)
+
+    def render_admin_configuracion_section(barberia_name):
+        render_panel_header(
+            "Configuración",
+            "Datos de la barbería, preferencias y ajustes generales.",
+            eyebrow="Ajustes",
+            meta=barberia_name,
+        )
+        render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
+
+    def render_admin_clientes_section(barberia_id, barberia_name, db_ok):
+        render_clientes_section(
+            barberia_id=barberia_id,
+            db_ok=db_ok,
+            meta=barberia_name,
+            no_context_message="No hay barberia asociada a la sesion.",
+            search_key="clientes_busqueda_admin",
+            picker_key="clientes_selector_admin",
+        )
+
+    def render_admin_sitio_web_section(barberia_name):
+        render_panel_header(
+            "Sitio Web",
+            "Configura la experiencia pública de tu barbería desde el panel.",
+            eyebrow="Presencia online",
+            meta=barberia_name,
+        )
+        render_panel_empty_state(
+            "Editor del sitio pendiente",
+            "La sección está preparada para centralizar la configuración del sitio público en una fase posterior.",
+        )
+
+    def render_admin_complementos_section(barberia_name):
+        render_panel_header(
+            "Complementos",
+            "Extensiones, integraciones y herramientas adicionales.",
+            eyebrow="Add-ons",
+            meta=barberia_name,
+        )
+        render_panel_empty_state(
+            "Complementos pendiente",
+            "No se detectó una lógica existente de complementos; se deja una pantalla visual segura sin efectos laterales.",
+        )
+
+    def render_admin_content(seccion, barberia_id, usuario, user, db_ok, barberia_name):
         if not barberia_id:
-
             st.warning("No hay barberia asociada a la sesión.")
-
             st.stop()
 
         if seccion == "Dashboard":
-
-            render_panel_header(
-                "Visión general",
-                "Gestiona métricas, agenda y actividad diaria de tu barbería.",
-                eyebrow="Panel administrativo",
-                meta=barberia_name,
+            render_admin_dashboard_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
+                barberia_name=barberia_name,
+                render_upcoming_summary=render_upcoming_appointments_summary,
             )
-
-
-            if not db_ok:
-
-                render_alert("Métricas no disponibles sin base de datos", alert_type="info")
-
-            else:
-
-                with st.spinner("Cargando métricas..."):
-
-                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(barberia_id)
-
-                    total_reservas, hoy_reservas, total_ingresos, num_barberos = calcular_metricas_admin(barberia_id)
-
-
-                # Dashboard metrics
-
-                render_metric_grid([
-                    ("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY),
-                    ("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS),
-                    ("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING),
-                ], columns=3)
-
-
-                render_divider()
-
-
-                render_subsection_title("Resumen general")
-
-                render_metric_grid([
-                    ("Total Reservas", total_reservas, "Listado", Colors.SECONDARY),
-                    ("Hoy", hoy_reservas, "Hoy", Colors.PRIMARY),
-                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
-                    ("Barberos", num_barberos, "Servicio", Colors.WARNING),
-                ], columns=4)
-
-
-                render_divider()
-
-                with st.spinner("Cargando próximas citas..."):
-
-                    todas_reservas = safe_fetch_all(
-
-                        """
-
-                        SELECT id, barbero, servicio, fecha, hora, cliente, nombre, inicio, precio, estado, pagado, monto
-
-                        FROM reservas
-
-                        WHERE barberia_id = %s
-
-                        ORDER BY inicio DESC
-
-                        """,
-
-                        (barberia_id,),
-
-                    ) or []
-
-                    hoy = datetime.now().date()
-
-                    hoy_reservas_list = [r for r in todas_reservas if r[3] == hoy]
-
-
-                if hoy_reservas_list:
-
-                    st.markdown("### ð Próximas Citas (Hoy)")
-
-                    for r in hoy_reservas_list[:5]:
-
-                        hora_str = r[4].strftime("%H:%M") if hasattr(r[4], "strftime") else str(r[4])
-
-                        cliente_str = r[5] or r[6]
-
-                        st.caption(f"ð {hora_str} - {cliente_str} con {r[1]} ({r[2]})")
-
         elif seccion == "Agenda":
-
-            render_panel_header(
-                "Agenda y calendario",
-                "Consulta reservas, crea citas y revisa ingresos desde una vista operativa.",
-                eyebrow="Agenda",
-                meta=barberia_name,
-            )
-
-
-            # Fetch eventos for calendar
-
-            eventos = []
-
-            if db_ok:
-
-                try:
-
-                    eventos = obtener_reservas()
-
-                except Exception as e:
-
-                    logger.exception("Error fetching eventos for ADMIN")
-
-                    eventos = []
-
-
-            tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
-
-                "Calendario Calendario",
-
-                "Editar Crear/Editar",
-
-                "Listado Reservas",
-
-                "$ Ingresos"
-
-            ])
-
-
-            # TAB: CALENDARIO
-
-            with tab_cal:
-
-                if db_ok:
-
-                    with st.spinner("Cargando calendario..."):
-
-                        render_calendario_multi_barbero(eventos, read_only=not db_ok)
-
-                else:
-
-                    st.warning("Calendario no disponible sin base de datos (modo demo).")
-
-
-            # TAB: CREAR/EDITAR
-
-            with tab_crear:
-
-                render_gestion_agenda()
-
-
-            # TAB: RESERVAS
-
-            with tab_lista:
-
-                st.markdown("### Reservas")
-
-
-                # Toggle between card and calendar view
-
-                col_view1, col_view2 = st.columns(2)
-
-                with col_view1:
-
-                    view_type = st.radio(
-
-                        "Modo de vista",
-
-                        ["Tarjetas Tarjetas", "Calendario Calendario"],
-
-                        horizontal=True,
-
-                        key="admin_view_type"
-
-                    )
-
-
-                if not db_ok:
-
-                    st.info("Tabla no disponible sin base de datos.")
-
-                else:
-
-                    filtro_adm = st.selectbox(
-
-                        "Filtrar por barbero",
-
-                        opciones_filtro_barberos_ui(barberia_id),
-
-                        key="tabla_admin_filtro",
-
-                    )
-
-                    with st.spinner("Cargando datos..."):
-
-                        rows_adm = listar_reservas_filtradas(
-
-                            barberia_id, "ADMIN", usuario, filtro_barbero=filtro_adm
-
-                        )
-
-
-                    if rows_adm:
-
-                        if view_type == "Tarjetas Tarjetas":
-
-                            mostrar_reservas_dataframe(rows_adm)
-
-                            ui_marcar_pagado_reservas(rows_adm, "admin_panel")
-
-                            ui_eliminar_reserva_lista(rows_adm, "admin_panel")
-
-                        else:  # Calendar view
-
-                            # Convert rows to calendar format
-
-                            reservas_calendar = []
-
-                            for r in rows_adm:
-
-                                fecha = r.get("fecha")
-
-                                hora = r.get("hora")
-
-                                if fecha and hora:
-
-                                    try:
-
-                                        start_dt = datetime.combine(fecha, hora)
-
-                                        end_dt = start_dt + timedelta(minutes=30)
-
-                                        monto = r.get("monto") or r.get("precio") or 0
-
-                                        pagado = bool(r.get("pagado", False))
-
-                                        reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
-
-                                    except (TypeError, ValueError):
-
-                                        continue
-
-
-                            mostrar_calendario_reservas(reservas_calendar)
-
-                            st.markdown("---")
-
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
-
-                    else:
-
-                        st.info("No hay reservas")
-
-
-            # TAB: INGRESOS
-
-            with tab_ingresos:
-
-                st.markdown("### Ingresos")
-
-                if db_ok:
-
-                    with st.spinner("Cargando datos..."):
-
-                        total_row = safe_fetch_one(
-
-                            "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE",
-
-                            (barberia_id,),
-
-                        )
-
-                        total = total_row[0] if total_row and total_row[0] else 0
-
-                    st.metric("Ingresos totales (pagado)", f"${total}")
-
-
-                    st.markdown("---")
-
-                    st.markdown("#### Desglose por barbero")
-
-                    with st.spinner("Cargando desglose..."):
-
-                        barberos_list = listar_usuarios_barberos(barberia_id)
-
-                        for barbero_id_val, barbero_name in barberos_list:
-
-                            barbero_ingresos = safe_fetch_one(
-
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
-
-                                (barberia_id, barbero_id_val),
-
-                            )
-
-                            ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
-
-                            st.caption(f"{barbero_name}: ${ingreso}")
-
+            render_admin_agenda_section(barberia_id, usuario, db_ok, barberia_name)
         elif seccion == "Barberos":
-
-            render_panel_header(
-                "Equipo",
-                "Crea y administra los barberos asociados a esta barbería.",
-                eyebrow="Gestión",
+            render_barberos_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
                 meta=barberia_name,
+                no_context_message="No hay barbería asociada a la sesión.",
             )
-
-
-            render_equipo_barberos(barberia_id)
-
         elif seccion == "Configuración":
-
-            render_panel_header(
-                "Configuración",
-                "Datos de la barbería, preferencias y ajustes generales.",
-                eyebrow="Ajustes",
-                meta=barberia_name,
-            )
-
-            render_alert("Datos de la barbería y preferencias próximamente", alert_type="info")
-
+            render_admin_configuracion_section(barberia_name)
         elif seccion == "Servicios":
-
-            render_panel_header(
-                "Servicios",
-                "Crea, edita y elimina los servicios que ofrece tu barbería.",
-                eyebrow="Catálogo",
+            render_services_section(
+                barberia_id=barberia_id,
+                db_ok=db_ok,
                 meta=barberia_name,
+                no_context_message="No hay barbería asociada a la sesión.",
             )
-
-            render_gestion_servicios(barberia_id)
-
         elif seccion == "Clientes":
-
-            render_panel_header(
-                "Clientes",
-                "Centraliza la vista de clientes, historial y actividad.",
-                eyebrow="CRM",
-                meta=barberia_name,
-            )
-
-            render_panel_empty_state(
-                "Vista de clientes pendiente",
-                "Esta sección queda preparada visualmente para una futura pantalla de clientes sin cambiar consultas ni base de datos.",
-            )
-
+            render_admin_clientes_section(barberia_id, barberia_name, db_ok)
         elif seccion == "Sitio Web":
-
-            render_panel_header(
-                "Sitio Web",
-                "Configura la experiencia pública de tu barbería desde el panel.",
-                eyebrow="Presencia online",
-                meta=barberia_name,
-            )
-
-            render_panel_empty_state(
-                "Editor del sitio pendiente",
-                "La sección está preparada para centralizar la configuración del sitio público en una fase posterior.",
-            )
-
+            render_admin_sitio_web_section(barberia_name)
         elif seccion == "Complementos":
+            render_admin_complementos_section(barberia_name)
 
-            render_panel_header(
-                "Complementos",
-                "Extensiones, integraciones y herramientas adicionales.",
-                eyebrow="Add-ons",
-                meta=barberia_name,
+    def render_super_admin_agenda_calendar_tab(eventos, db_ok):
+        if db_ok:
+            with st.spinner("Cargando calendario..."):
+                render_calendario_multi_barbero(eventos, read_only=not db_ok)
+        else:
+            st.warning("Calendario no disponible sin base de datos (modo demo).")
+
+    def render_super_admin_agenda_income_tab(bid_ctx, db_ok):
+        st.markdown("### Ingresos (barbería activa)")
+        if not (db_ok and bid_ctx):
+            st.info("Selecciona una barbería para ver ingresos")
+            return
+
+        with st.spinner("Cargando datos de ingresos..."):
+            total_row = safe_fetch_one(
+                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE",
+                (bid_ctx,),
+            )
+            total = total_row[0] if total_row and total_row[0] else 0
+
+        render_income_summary_card(total, "Ingresos totales (pagado)")
+        st.markdown("---")
+        with st.spinner("Cargando desglose..."):
+            barberos_list = listar_usuarios_barberos(bid_ctx)
+            render_income_breakdown(
+                barberos_list,
+                lambda barbero_id_val: (
+                    (safe_fetch_one(
+                        "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
+                        (bid_ctx, barbero_id_val),
+                    ) or [0])[0] or 0
+                ),
             )
 
-            render_panel_empty_state(
-                "Complementos pendiente",
-                "No se detectó una lógica existente de complementos; se deja una pantalla visual segura sin efectos laterales.",
+    def render_super_admin_agenda_section(bid_ctx, usuario, db_ok, barberia_name):
+        render_panel_header(
+            "Agenda global",
+            "Vista consolidada de citas, reservas e ingresos.",
+            eyebrow="Agenda",
+            meta=barberia_name,
+        )
+
+        eventos = []
+        if db_ok:
+            try:
+                eventos = obtener_reservas()
+            except Exception as e:
+                logger.exception("Error fetching eventos for SUPER_ADMIN")
+                eventos = []
+
+        tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs(["Calendario", "Crear / Editar", "Listado", "Ingresos"])
+
+        with tab_cal:
+            render_super_admin_agenda_calendar_tab(eventos, db_ok)
+
+        with tab_crear:
+            render_gestion_agenda()
+
+        with tab_lista:
+            render_super_admin_agenda_list_tab(
+                bid_ctx=bid_ctx,
+                usuario=usuario,
+                db_ok=db_ok,
+                barberos=barberos,
+                opciones_filtro_barberos_ui=opciones_filtro_barberos_ui,
+                listar_reservas_filtradas=listar_reservas_filtradas,
+                mostrar_reservas_dataframe=mostrar_reservas_dataframe,
+                ui_marcar_pagado_reservas=ui_marcar_pagado_reservas,
+                ui_eliminar_reserva_lista=ui_eliminar_reserva_lista,
+                mostrar_calendario_reservas=mostrar_calendario_reservas,
+                render_public_note=render_public_note,
             )
 
-    # ================= SUPER_ADMIN =================
+        with tab_ingresos:
+            render_super_admin_agenda_income_tab(bid_ctx, db_ok)
 
-    elif nr == "SUPER_ADMIN":
+    def render_super_admin_configuracion_section():
+        render_panel_header(
+            "Configuración global",
+            "Parámetros generales de la plataforma.",
+            eyebrow="Ajustes",
+            meta="Super admin",
+        )
+        st.info("Parámetros de plataforma próximamente.")
 
+    def render_super_admin_clientes_section(bid_ctx, barberia_name, db_ok):
+        render_clientes_section(
+            barberia_id=bid_ctx,
+            db_ok=db_ok,
+            meta=barberia_name,
+            no_context_message="Selecciona una barberia activa para ver clientes.",
+            search_key="clientes_busqueda_super_admin",
+            picker_key="clientes_selector_super_admin",
+        )
+
+    def render_super_admin_sitio_web_section():
+        render_panel_header(
+            "Sitio Web",
+            "Sección preparada para gestionar presencia pública por barbería.",
+            eyebrow="Presencia online",
+            meta="Contexto activo",
+        )
+        render_panel_empty_state(
+            "Configuración del sitio pendiente",
+            "El sitio público no fue modificado; esta pantalla solo prepara el panel interno.",
+        )
+
+    def render_super_admin_complementos_section():
+        render_panel_header(
+            "Complementos",
+            "Integraciones y herramientas adicionales de plataforma.",
+            eyebrow="Add-ons",
+            meta="Super admin",
+        )
+        render_panel_empty_state(
+            "Complementos pendiente",
+            "No se detectó una lógica existente de complementos; se deja una pantalla visual segura.",
+        )
+
+    def render_super_admin_content(seccion, barberia_id, bid_ctx, usuario, user, db_ok, barberia_name):
         if seccion == "Dashboard":
-
-            render_panel_header(
-                "Visión global",
-                "Supervisa métricas y operación de todas las barberías.",
-                eyebrow="Super admin",
-                meta="Vista plataforma",
+            render_super_admin_dashboard_section(
+                bid_ctx=bid_ctx,
+                db_ok=db_ok,
+                barberia_name=barberia_name,
             )
-
-
-            if not db_ok:
-
-                render_alert("Métricas no disponibles sin base de datos", alert_type="info")
-
-            else:
-
-                with st.spinner("Cargando métricas globales..."):
-
-                    total_hoy, pagadas_hoy, pendientes_hoy = calcular_metricas_header(bid_ctx) if bid_ctx else (0, 0, 0)
-
-                    num_barberias, num_usuarios, num_reservas, total_ingresos, hoy_count = calcular_metricas_super_admin(bid_ctx)
-
-
-                # Dashboard metrics
-
-                col1, col2, col3 = st.columns(3, gap="large")
-
-                with col1:
-
-                    render_stat_box("Reservas Hoy", total_hoy, "Calendario", Colors.PRIMARY)
-
-                with col2:
-
-                    render_stat_box("Pagadas", pagadas_hoy, "[OK]", Colors.SUCCESS)
-
-                with col3:
-
-                    render_stat_box("Pendientes", pendientes_hoy, "Cargando", Colors.WARNING)
-
-
-                render_divider()
-
-
-                render_subsection_title("Resumen global")
-
-                render_metric_grid([
-                    ("Barberías", num_barberias, "Barberias", Colors.PRIMARY),
-                    ("Usuarios", num_usuarios, "Rol", Colors.SECONDARY),
-                    ("Total", num_reservas, "Listado", Colors.PRIMARY),
-                    ("Hoy", hoy_count, "Hoy", Colors.SECONDARY),
-                    ("Ingresos", f"${total_ingresos}", "$", Colors.SUCCESS),
-                ], columns=5)
-
         elif seccion == "Agenda":
-
-            render_panel_header(
-                "Agenda global",
-                "Vista consolidada de citas, reservas e ingresos.",
-                eyebrow="Agenda",
-                meta="Contexto global",
-            )
-
-
-            # Fetch eventos for calendar
-
-            eventos = []
-
-            if db_ok:
-
-                try:
-
-                    eventos = obtener_reservas()
-
-                except Exception as e:
-
-                    logger.exception("Error fetching eventos for SUPER_ADMIN")
-
-                    eventos = []
-
-
-            tab_cal, tab_crear, tab_lista, tab_ingresos = st.tabs([
-
-                "Calendario Calendario",
-
-                "Editar Crear/Editar",
-
-                "Listado Reservas",
-
-                "$ Ingresos"
-
-            ])
-
-
-            # TAB: CALENDARIO
-
-            with tab_cal:
-
-                if db_ok:
-
-                    with st.spinner("Cargando calendario..."):
-
-                        render_calendario_multi_barbero(eventos, read_only=not db_ok)
-
-                else:
-
-                    st.warning("Calendario no disponible sin base de datos (modo demo).")
-
-
-            # TAB: CREAR/EDITAR
-
-            with tab_crear:
-
-                render_gestion_agenda()
-
-            # TAB: RESERVAS
-
-            with tab_lista:
-
-                st.markdown("### Reservas")
-
-
-                # Toggle between card and calendar view
-
-                view_type = st.radio(
-
-                    "Modo de vista",
-
-                    ["Tarjetas Tarjetas", "Calendario Calendario"],
-
-                    horizontal=True,
-
-                    key="super_view_type"
-
-                )
-
-
-                if not db_ok:
-
-                    st.info("Tabla no disponible sin base de datos.")
-
-                else:
-
-                    filtro_su = st.selectbox(
-
-                        "Filtrar por barbero",
-
-                        opciones_filtro_barberos_ui(bid_ctx) if bid_ctx else ["Todos"] + list(barberos.keys()),
-
-                        key="tabla_super_filtro",
-
-                    )
-
-                    with st.spinner("Cargando reservas..."):
-
-                        rows_su = listar_reservas_filtradas(
-
-                            bid_ctx, "SUPER_ADMIN", usuario, filtro_barbero=filtro_su
-
-                        )
-
-                    if rows_su:
-
-                        if view_type == "Tarjetas Tarjetas":
-
-                            mostrar_reservas_dataframe(rows_su)
-
-                            ui_marcar_pagado_reservas(rows_su, "super_panel")
-
-                            ui_eliminar_reserva_lista(rows_su, "super_panel")
-
-                        else:  # Calendar view
-
-                            # Convert rows to calendar format
-
-                            reservas_calendar = []
-
-                            for r in rows_su:
-
-                                fecha = r.get("fecha")
-
-                                hora = r.get("hora")
-
-                                if fecha and hora:
-
-                                    try:
-
-                                        start_dt = datetime.combine(fecha, hora)
-
-                                        end_dt = start_dt + timedelta(minutes=30)
-
-                                        monto = r.get("monto") or r.get("precio") or 0
-
-                                        pagado = bool(r.get("pagado", False))
-
-                                        reservas_calendar.append((r.get("id"), r.get("cliente") or r.get("nombre"), r.get("barbero"), r.get("servicio"), monto, start_dt, end_dt, pagado))
-
-                                    except (TypeError, ValueError):
-
-                                        continue
-
-
-                            mostrar_calendario_reservas(reservas_calendar)
-
-                            st.markdown("---")
-
-                            st.caption("Vista de calendario en formato semanal: usa las flechas para navegar")
-
-                    else:
-
-                        st.info("No hay reservas")
-
-            # TAB: INGRESOS
-
-            with tab_ingresos:
-
-                st.markdown("### Ingresos (barbería activa)")
-
-                if db_ok and bid_ctx:
-
-                    with st.spinner("Cargando datos de ingresos..."):
-
-                        total_row = safe_fetch_one(
-
-                            "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND pagado = TRUE",
-
-                            (bid_ctx,),
-
-                        )
-
-                        total = total_row[0] if total_row and total_row[0] else 0
-
-                    st.metric("Ingresos totales (pagado)", f"${total}")
-
-
-                    st.markdown("---")
-
-                    st.markdown("#### Desglose por barbero")
-
-                    with st.spinner("Cargando desglose..."):
-
-                        barberos_list = listar_usuarios_barberos(bid_ctx)
-
-                        for barbero_id_val, barbero_name in barberos_list:
-
-                            barbero_ingresos = safe_fetch_one(
-
-                                "SELECT SUM(monto) FROM reservas WHERE barberia_id = %s AND barbero_id = %s AND pagado = TRUE",
-
-                                (bid_ctx, barbero_id_val),
-
-                            )
-
-                            ingreso = barbero_ingresos[0] if barbero_ingresos and barbero_ingresos[0] else 0
-
-                            st.caption(f"{barbero_name}: ${ingreso}")
-
-                else:
-
-                    st.info("Selecciona una barbería para ver ingresos")
-
+            render_super_admin_agenda_section(bid_ctx, usuario, db_ok, barberia_name)
         elif seccion == "Barberos":
-
-            render_panel_header(
-                "Equipo",
-                "Barberos del contexto de barbería seleccionado.",
-                eyebrow="Gestión",
-                meta="Contexto activo",
+            render_barberos_section(
+                barberia_id=bid_ctx,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="Selecciona una barbería en la barra lateral.",
             )
-
-            if bid_ctx:
-
-                render_equipo_barberos(bid_ctx)
-
-            else:
-
-                st.info("Selecciona una barbería en la barra lateral.")
-
         elif seccion == "Configuración":
-
-            render_panel_header(
-                "Configuración global",
-                "Parámetros generales de la plataforma.",
-                eyebrow="Ajustes",
-                meta="Super admin",
-            )
-
-            st.info("Parámetros de plataforma próximamente.")
-
+            render_super_admin_configuracion_section()
         elif seccion == "Servicios":
-
-            render_panel_header(
-                "Servicios",
-                "Administra los servicios de la barbería activa en contexto.",
-                eyebrow="Catálogo",
-                meta="Contexto activo",
+            render_services_section(
+                barberia_id=bid_ctx,
+                db_ok=db_ok,
+                meta=barberia_name,
+                no_context_message="Selecciona una barbería en la barra lateral para gestionar sus servicios.",
             )
-
-            if bid_ctx:
-
-                render_gestion_servicios(bid_ctx)
-
-            else:
-
-                render_alert("Selecciona una barbería en la barra lateral para gestionar sus servicios.", alert_type="info")
-
         elif seccion == "Clientes":
-
-            render_panel_header(
-                "Clientes",
-                "Vista preparada para clientes e historial por barbería.",
-                eyebrow="CRM",
-                meta="Contexto activo",
-            )
-
-            render_panel_empty_state(
-                "Clientes pendiente",
-                "No se agregaron consultas nuevas para respetar el alcance visual y no tocar base de datos.",
-            )
-
+            render_super_admin_clientes_section(bid_ctx, barberia_name, db_ok)
         elif seccion == "Sitio Web":
-
-            render_panel_header(
-                "Sitio Web",
-                "Sección preparada para gestionar presencia pública por barbería.",
-                eyebrow="Presencia online",
-                meta="Contexto activo",
-            )
-
-            render_panel_empty_state(
-                "Configuración del sitio pendiente",
-                "El sitio público no fue modificado; esta pantalla solo prepara el panel interno.",
-            )
-
+            render_super_admin_sitio_web_section()
         elif seccion == "Complementos":
+            render_super_admin_complementos_section()
 
-            render_panel_header(
-                "Complementos",
-                "Integraciones y herramientas adicionales de plataforma.",
-                eyebrow="Add-ons",
-                meta="Super admin",
-            )
+    def render_authenticated_content(
+        nr,
+        seccion,
+        barberia_id,
+        bid_ctx,
+        usuario,
+        user,
+        db_ok,
+        barberia_name,
+    ):
 
-            render_panel_empty_state(
-                "Complementos pendiente",
-                "No se detectó una lógica existente de complementos; se deja una pantalla visual segura.",
-            )
+        if nr == "CLIENTE":
+            render_cliente_content(seccion, barberia_id, usuario, user, db_ok, barberia_name)
+        elif nr == "BARBERO":
+            render_barbero_content(seccion, barberia_id, usuario, user, db_ok, barberia_name)
+        elif nr == "ADMIN":
+            render_admin_content(seccion, barberia_id, usuario, user, db_ok, barberia_name)
+        elif nr == "SUPER_ADMIN":
+            render_super_admin_content(seccion, barberia_id, bid_ctx, usuario, user, db_ok, barberia_name)
+        else:
+            st.error(f"Vista no disponible para el rol: {nr}")
 
-    else:
+    def render_authenticated_screen(default_barberia_id, db_ok):
 
-        st.error(f"Vista no disponible para el rol: {nr}")
+        shell_context = render_authenticated_shell(
+            default_barberia_id=default_barberia_id,
+            db_ok=db_ok,
+        )
+
+        render_authenticated_content(
+            nr=shell_context["nr"],
+            seccion=shell_context["seccion"],
+            barberia_id=shell_context["barberia_id"],
+            bid_ctx=shell_context["bid_ctx"],
+            usuario=shell_context["usuario"],
+            user=shell_context["user"],
+            db_ok=db_ok,
+            barberia_name=shell_context["barberia_name"],
+        )
+
+    render_authenticated_screen(
+        default_barberia_id=default_barberia_id,
+        db_ok=db_ok,
+    )
 
 except Exception as e:
 
     logger.exception("Unhandled exception in Streamlit app")
 
-    st.error(f"Error en la aplicación:\n{traceback.format_exc()}")
+    st.error("Error inesperado en la aplicación. Por favor, recarga la página.")
