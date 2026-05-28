@@ -1,0 +1,62 @@
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+ENV/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Local databases and runtime artifacts
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+qa_screenshots/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Session backups created during encoding repair
+backup_before_*/
+*.backup_utf8
+
+# One-shot repair and fix scripts (not part of the application)
+fix_*.py
+repair_*.py
+diagnose.py
+LOGIN_SECTION_FIX.py
+
+# Temporary scan/check scripts
+_scan_*.py
+
+# Manual verification dump files and temporary text extracts
+end_check*.txt
+booking_section_extract.txt
+insert_check.txt
+middle_check.txt
+step2_header.txt
+IMPLEMENTATION_LOG.txt
+startup_log.txt
+log.txt
+log_new.txt
+debug_execution.log
+
+# Empty/ephemeral data files
+reservas.json

@@ -21,11 +21,22 @@ CREATE TABLE IF NOT EXISTS reservas (
     id SERIAL PRIMARY KEY,
     nombre TEXT NOT NULL,
     barbero TEXT NOT NULL,
+    barbero_id INTEGER,
     servicio TEXT NOT NULL,
     precio INTEGER NOT NULL,
     inicio TIMESTAMP NOT NULL,
     fin TIMESTAMP NOT NULL,
     barberia_id INTEGER NOT NULL,
+    cliente TEXT,
+    telefono TEXT,
+    email TEXT,
+    fecha DATE,
+    hora TIME,
+    estado TEXT NOT NULL DEFAULT 'activo',
+    pagado BOOLEAN NOT NULL DEFAULT FALSE,
+    monto INTEGER,
+    payment_id TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_reservas_barberia
         FOREIGN KEY (barberia_id)
         REFERENCES barberias(id)
@@ -49,6 +60,10 @@ CREATE TABLE IF NOT EXISTS servicios (
 
 CREATE INDEX IF NOT EXISTS idx_servicios_barberia ON servicios(barberia_id);
 CREATE INDEX IF NOT EXISTS idx_reservas_barberia ON reservas(barberia_id);
+CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);
+CREATE INDEX IF NOT EXISTS idx_reservas_fecha ON reservas(fecha);
+CREATE INDEX IF NOT EXISTS idx_reservas_inicio ON reservas(inicio);
+CREATE INDEX IF NOT EXISTS idx_reservas_pagado ON reservas(pagado);
 CREATE INDEX IF NOT EXISTS idx_usuarios_barberia ON usuarios(barberia_id);
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;

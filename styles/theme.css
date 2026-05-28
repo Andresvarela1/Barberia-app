@@ -1,0 +1,314 @@
+/* ==================== SAAS GLOBAL THEME OVERRIDES ==================== */
+/* Loaded last by components.ui_loader. Keep this file global and behavior-neutral. */
+
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-light: #93c5fd;
+    --secondary: #0f766e;
+    --secondary-dark: #115e59;
+    --success: #22c55e;
+    --success-dark: #16a34a;
+    --warning: #f59e0b;
+    --warning-dark: #d97706;
+    --danger: #ef4444;
+    --danger-dark: #dc2626;
+    --background: #f6f7fb;
+    --surface: #ffffff;
+    --surface-muted: #f8fafc;
+    --surface-hover: #eef2ff;
+    --border: #d8dee8;
+    --border-strong: #cbd5e1;
+    --text: #111827;
+    --text-secondary: #4b5563;
+    --text-tertiary: #6b7280;
+    --text-disabled: #9ca3af;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 8px 18px -12px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 16px 32px -20px rgba(15, 23, 42, 0.28), 0 6px 14px rgba(15, 23, 42, 0.08);
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.75rem;
+    --space-7: 2.25rem;
+}
+
+html,
+body,
+.stApp {
+    background: var(--background) !important;
+    color: var(--text) !important;
+}
+
+.main,
+.block-container {
+    background: transparent !important;
+}
+
+.block-container {
+    max-width: 1360px;
+    padding-top: var(--space-5) !important;
+    padding-bottom: var(--space-6) !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text) !important;
+    letter-spacing: 0 !important;
+}
+
+p,
+label,
+[data-testid="stMarkdownContainer"],
+.stCaptionContainer {
+    color: var(--text-secondary);
+}
+
+/* Buttons */
+.stButton > button,
+.stDownloadButton > button,
+[data-testid="stBaseButton-primary"],
+[data-testid="stBaseButton-secondary"],
+[data-testid="stLinkButton"] a {
+    min-height: 42px !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-sm) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease, background 0.16s ease !important;
+}
+
+.stButton > button,
+[data-testid="stBaseButton-primary"],
+[data-testid="stLinkButton"] a {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+    border-color: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+[data-testid="stBaseButton-primary"]:hover,
+[data-testid="stBaseButton-secondary"]:hover,
+[data-testid="stLinkButton"] a:hover {
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-1px) !important;
+}
+
+.stButton > button[kind="secondary"],
+[data-testid="stBaseButton-secondary"] {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: var(--border-strong) !important;
+}
+
+.stButton > button:disabled,
+[data-testid="stBaseButton-primary"]:disabled,
+[data-testid="stBaseButton-secondary"]:disabled {
+    background: #e5e7eb !important;
+    border-color: #e5e7eb !important;
+    color: var(--text-disabled) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* Inputs and selectors */
+input,
+textarea,
+[role="textbox"],
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input,
+[data-testid="stTimeInput"] input,
+[data-testid="stSelectbox"] > div > div,
+[data-testid="stMultiSelect"] > div > div {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: none !important;
+}
+
+input:hover,
+textarea:hover,
+[data-testid="stSelectbox"] > div > div:hover,
+[data-testid="stMultiSelect"] > div > div:hover {
+    border-color: var(--border-strong) !important;
+    background: var(--surface) !important;
+}
+
+input:focus,
+textarea:focus,
+[role="textbox"]:focus,
+[data-testid="stSelectbox"] > div > div:focus-within,
+[data-testid="stMultiSelect"] > div > div:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+    outline: none !important;
+}
+
+/* Cards, expanders and metrics */
+[data-testid="metric-container"],
+[data-testid="stExpander"],
+div[data-testid="stForm"],
+.card-container,
+.premium-card,
+.booking-panel,
+.booking-section,
+.form-container,
+.info-box,
+.success-box,
+.warning-box,
+.error-box {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+[data-testid="metric-container"] {
+    padding: var(--space-4) !important;
+}
+
+[data-testid="metric-container"]:hover,
+.card-container:hover,
+.premium-card:hover {
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Tables and dataframes */
+table,
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    overflow: hidden !important;
+}
+
+th,
+[data-testid="stTable"] th {
+    background: var(--surface-muted) !important;
+    color: var(--text) !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+td,
+[data-testid="stTable"] td {
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: var(--surface) !important;
+    border-right: 1px solid var(--border) !important;
+    box-shadow: 8px 0 24px -24px rgba(15, 23, 42, 0.35);
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: var(--text) !important;
+}
+
+[data-testid="stSidebar"] .stCaptionContainer,
+[data-testid="stSidebar"] small {
+    color: var(--text-tertiary) !important;
+}
+
+[data-testid="stSidebar"] .stButton > button {
+    justify-content: flex-start !important;
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: var(--surface-hover) !important;
+    border-color: rgba(37, 99, 235, 0.20) !important;
+    color: var(--primary) !important;
+    transform: none !important;
+}
+
+[data-testid="stSidebar"] hr {
+    border-top: 1px solid var(--border) !important;
+}
+
+/* Streamlit tabs/radios */
+.stTabs [data-baseweb="tab-list"] {
+    gap: var(--space-2);
+    border-bottom: 1px solid var(--border);
+}
+
+.stTabs [data-baseweb="tab"] {
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.stTabs [aria-selected="true"] {
+    color: var(--primary) !important;
+}
+
+/* Calendar/status helpers */
+.appointment-cell,
+.fc-event {
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid rgba(37, 99, 235, 0.25) !important;
+    box-shadow: none !important;
+}
+
+/* Mobile base */
+@media (max-width: 768px) {
+    .block-container {
+        padding: var(--space-4) var(--space-3) var(--space-5) !important;
+    }
+
+    h1 {
+        font-size: 1.75rem !important;
+    }
+
+    h2 {
+        font-size: 1.35rem !important;
+    }
+
+    .stButton > button,
+    .stDownloadButton > button,
+    [data-testid="stLinkButton"] a {
+        width: 100% !important;
+        min-height: 44px !important;
+        white-space: normal !important;
+    }
+
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    [data-testid="stHorizontalBlock"] {
+        gap: var(--space-3) !important;
+    }
+
+    [data-testid="metric-container"],
+    div[data-testid="stForm"],
+    .card-container,
+    .booking-panel {
+        padding: var(--space-4) !important;
+    }
+}

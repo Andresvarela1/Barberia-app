@@ -1,0 +1,103 @@
+INFO:barberia_app:\U0001f4cd Creando conexión PostgreSQL: postgresql://postgres.fxqslbyefsuhzqlgbmbm:***@aws-1-us-east-1.pooler.supabase.com:6543/postgres
+INFO:barberia_app:[OK] Conexión a DB creada exitosamente
+ERROR:barberia_app:Error creando tabla 'barberias': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'usuarios': cannot execute CREATE TABLE in a read-only transaction
+
+INFO:barberia_app: Restricción UNIQUE en 'usuario' ya existe
+ERROR:barberia_app:Error creando índice 'idx_usuarios_barberia': cannot execute CREATE INDEX in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'reservas': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'servicios': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando índice 'idx_servicios_barberia': cannot execute CREATE INDEX in a read-only transaction
+
+WARNING:barberia_app:[AVISO] Error añadiendo columnas a barberias: cannot execute ALTER TABLE in a read-only transaction
+
+WARNING:barberia_app:[AVISO] Error añadiendo columnas a usuarios: cannot execute ALTER TABLE in a read-only transaction
+
+ERROR:barberia_app:Error al asegurar tablas de base de datos
+Traceback (most recent call last):
+  File "C:\Users\Joanb\OneDrive\Escritorio\barberia_app\app.py", line 1024, in ensure_database_tables
+    cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nombre TEXT;")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute ALTER TABLE in a read-only transaction
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Joanb\OneDrive\Escritorio\barberia_app\app.py", line 1038, in ensure_database_tables
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE INDEX in a read-only transaction
+
+INFO:barberia_app:Running seed...
+INFO:barberia_app:Verificando Verificando si barbería 'Barberia Leveling' existe...
+INFO:barberia_app:[OK] Barbería Leveling ya existe (ID: 3)
+INFO:barberia_app:Verificando Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...
+INFO:barberia_app:[OK] SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: 2)
+INFO:barberia_app:Verificando Verificando barberos...
+INFO:barberia_app:[OK] Barbero 'Yor' ya existe
+INFO:barberia_app:[OK] Barbero 'Andres' ya existe
+INFO:barberia_app:[OK] Barbero 'Andrea' ya existe
+INFO:barberia_app:[OK] Barbero 'Maikel' ya existe
+INFO:barberia_app:[OK] Commit exitoso - verificando SUPER_ADMIN...
+INFO:barberia_app:[OK] SUPER_ADMIN listo en la base de datos
+INFO:barberia_app:SUPER_ADMIN listo
+INFO:barberia_app:\U0001f4cd Creando conexión PostgreSQL: postgresql://postgres.fxqslbyefsuhzqlgbmbm:***@aws-1-us-east-1.pooler.supabase.com:6543/postgres
+INFO:barberia_app:[OK] Conexión a DB creada exitosamente
+INFO:components.ui_loader:CSS UI Loader: 7 stylesheet(s) loaded successfully
+INFO:components.ui_loader:CSS UI Loader: 7 stylesheet(s) loaded successfully
+INFO:components.ui_loader:CSS UI Loader: 7 stylesheet(s) loaded successfully
+INFO:barberia_app:\U0001f4cd Creando conexión PostgreSQL: postgresql://postgres.fxqslbyefsuhzqlgbmbm:***@aws-1-us-east-1.pooler.supabase.com:6543/postgres
+INFO:barberia_app:[OK] Conexión a DB creada exitosamente
+ERROR:barberia_app:Error creando tabla 'barberias': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'usuarios': cannot execute CREATE TABLE in a read-only transaction
+
+INFO:barberia_app: Restricción UNIQUE en 'usuario' ya existe
+ERROR:barberia_app:Error creando índice 'idx_usuarios_barberia': cannot execute CREATE INDEX in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'reservas': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando tabla 'servicios': cannot execute CREATE TABLE in a read-only transaction
+
+ERROR:barberia_app:Error creando índice 'idx_servicios_barberia': cannot execute CREATE INDEX in a read-only transaction
+
+WARNING:barberia_app:[AVISO] Error añadiendo columnas a barberias: cannot execute ALTER TABLE in a read-only transaction
+
+WARNING:barberia_app:[AVISO] Error añadiendo columnas a usuarios: cannot execute ALTER TABLE in a read-only transaction
+
+ERROR:barberia_app:Error al asegurar tablas de base de datos
+Traceback (most recent call last):
+  File "C:\Users\Joanb\OneDrive\Escritorio\barberia_app\app.py", line 1024, in ensure_database_tables
+    cur.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nombre TEXT;")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute ALTER TABLE in a read-only transaction
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Joanb\OneDrive\Escritorio\barberia_app\app.py", line 1038, in ensure_database_tables
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_reservas_barbero_id ON reservas(barbero_id);")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute CREATE INDEX in a read-only transaction
+
+INFO:barberia_app:Running seed...
+INFO:barberia_app:Verificando Verificando si barbería 'Barberia Leveling' existe...
+INFO:barberia_app:[OK] Barbería Leveling ya existe (ID: 3)
+INFO:barberia_app:Verificando Verificando si SUPER_ADMIN 'JoanBeatsAD' existe...
+INFO:barberia_app:[OK] SUPER_ADMIN 'JoanBeatsAD' ya existe (ID: 2)
+INFO:barberia_app:Verificando Verificando barberos...
+INFO:barberia_app:[OK] Barbero 'Yor' ya existe
+INFO:barberia_app:[OK] Barbero 'Andres' ya existe
+INFO:barberia_app:[OK] Barbero 'Andrea' ya existe
+INFO:barberia_app:[OK] Barbero 'Maikel' ya existe
+INFO:barberia_app:[OK] Commit exitoso - verificando SUPER_ADMIN...
+INFO:barberia_app:[OK] SUPER_ADMIN listo en la base de datos
+INFO:barberia_app:SUPER_ADMIN listo
+INFO:barberia_app:\U0001f4cd Creando conexión PostgreSQL: postgresql://postgres.fxqslbyefsuhzqlgbmbm:***@aws-1-us-east-1.pooler.supabase.com:6543/postgres
+INFO:barberia_app:[OK] Conexión a DB creada exitosamente
